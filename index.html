@@ -2330,23 +2330,67 @@ function closeJugadorModal(){
 
 function buildPlayerListHTML(){
   const tInfo={v:{color:'var(--cyan)',label:'VISITANTE'},l:{color:'var(--green)',label:'LOCAL'}};
-  let html=`<h3 style="margin-bottom:14px">👤 JUGADORES</h3>`;
+  let html=`
+    <h3 style="margin-bottom:12px">👤 JUGADORES</h3>
+    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+      <input id="jug-search" type="text" placeholder="Buscar jugador…"
+        oninput="filterJugadores(this.value)"
+        style="flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px 12px;color:#fff;font-size:.82rem;outline:none;font-family:inherit">
+      <button onclick="startJugadorVoiceSearch()" id="jug-mic-btn"
+        style="background:rgba(255,182,72,.12);border:1px solid rgba(255,182,72,.3);border-radius:10px;padding:8px 12px;cursor:pointer;font-size:1.05rem;flex-shrink:0">🎙️</button>
+    </div>`;
   ['v','l'].forEach(t=>{
     const {color}=tInfo[t];
-    html+=`<div class="jug-team-hdr" style="color:${color}">${gs.teams[t].name}</div>`;
+    html+=`<div class="jug-team-hdr" data-team="${t}" style="color:${color}">${gs.teams[t].name}</div>`;
     gs.teams[t].players.forEach((p,idx)=>{
       const subs=(gs.subs[t]||[]).filter(s=>s.outPidx===idx);
       const curName=subs.length>0?subs[subs.length-1].inName:p.name;
       const curPos=subs.length>0?subs[subs.length-1].inPos:p.pos;
-      html+=`<div class="jug-player-item" onclick="showPlayerFicha('${t}',${idx})">
+      const plys=gs.plays[t][idx]||{};
+      let pab=0,ph=0;
+      Object.values(plys).forEach(pl=>{if(pl){if(pl.ab)pab++;if(pl.h)ph++;}});
+      const avgStr=pab>0?(ph/pab).toFixed(3).replace('0.','.'):'';
+      html+=`<div class="jug-player-item" data-team="${t}" data-name="${curName.toLowerCase()}" onclick="showPlayerFicha('${t}',${idx})">
         <span class="jug-bat-num">${p.bat}</span>
         <span class="jug-name">${curName}${p.dh?'<span style="font-size:.52rem;color:var(--amber);margin-left:4px;opacity:.7"> DH</span>':''}</span>
         <span class="jug-pos">${curPos}</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:.82rem;color:var(--green);min-width:32px;text-align:right">${avgStr}</span>
         <span style="color:var(--text-dim);font-size:.9rem">›</span>
       </div>`;
     });
   });
   return html;
+}
+
+function filterJugadores(q){
+  q=(q||'').trim().toLowerCase();
+  ['v','l'].forEach(t=>{
+    const items=[...document.querySelectorAll(`#jugador-content [data-team="${t}"].jug-player-item`)];
+    const hdr=document.querySelector(`#jugador-content [data-team="${t}"].jug-team-hdr`);
+    let anyVisible=false;
+    items.forEach(el=>{
+      const show=!q||el.dataset.name.includes(q);
+      el.style.display=show?'flex':'none';
+      if(show) anyVisible=true;
+    });
+    if(hdr) hdr.style.display=anyVisible?'':'none';
+  });
+}
+
+function startJugadorVoiceSearch(){
+  if(!('webkitSpeechRecognition' in window)){ showToast('⚠️ Voz no disponible en este navegador',true); return; }
+  const btn=document.getElementById('jug-mic-btn');
+  const inp=document.getElementById('jug-search');
+  if(!btn||!inp) return;
+  const rec=new webkitSpeechRecognition();
+  rec.lang=gs.lang==='en'?'en-US':'es-MX';
+  rec.interimResults=false; rec.maxAlternatives=1;
+  function resetBtn(){ btn.style.background='rgba(255,182,72,.12)'; btn.style.borderColor='rgba(255,182,72,.3)'; btn.textContent='🎙️'; }
+  btn.style.background='rgba(255,77,103,.25)'; btn.style.borderColor='var(--red)'; btn.textContent='🔴';
+  rec.onresult=e=>{ const txt=e.results[0][0].transcript; inp.value=txt; filterJugadores(txt); resetBtn(); };
+  rec.onerror=()=>resetBtn();
+  rec.onend=()=>{ if(btn.textContent==='🔴') resetBtn(); };
+  rec.start();
 }
 
 function showPlayerFicha(team,pidx){
