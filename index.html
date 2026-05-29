@@ -192,6 +192,26 @@
   .run-btn-out   { background:rgba(255,77,103,.15); border:1px solid #ff4d67; color:#ff4d67; }
   .run-btn-back  { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); color:#8fa3b7; }
   .run-btn:hover { opacity:.75; }
+  /* ── FICHA JUGADOR ──────────────────────────────────────── */
+  .jug-player-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:12px; cursor:pointer; transition:background .15s; border:1px solid transparent; }
+  .jug-player-item:hover { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.1); }
+  .jug-bat-num { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:#ff4d67; min-width:22px; text-align:center; }
+  .jug-name { font-size:0.82rem; font-weight:600; color:#fff; flex:1; }
+  .jug-pos { font-size:0.68rem; color:#ffb648; }
+  .jug-team-hdr { font-family:'Oswald',sans-serif; font-size:0.7rem; letter-spacing:3px; padding:8px 4px 5px; border-bottom:1px solid rgba(255,255,255,.08); margin-bottom:4px; }
+  .jug-stat-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; margin-top:8px; }
+  .jug-stat-box { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:7px 4px; text-align:center; }
+  .jug-stat-lbl { font-size:0.5rem; color:#8fa3b7; letter-spacing:1px; font-family:'Oswald',sans-serif; }
+  .jug-stat-val { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; color:#fff; line-height:1.1; }
+  .jug-metric-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; margin-top:8px; }
+  .jug-metric-box { background:rgba(0,229,153,.06); border:1px solid rgba(0,229,153,.15); border-radius:10px; padding:7px 4px; text-align:center; }
+  .jug-metric-lbl { font-size:0.5rem; color:#00e599; letter-spacing:1px; font-family:'Oswald',sans-serif; }
+  .jug-metric-val { font-family:'Bebas Neue',sans-serif; font-size:1.2rem; color:#00e599; line-height:1.1; }
+  .jug-line-wrap { display:flex; gap:4px; flex-wrap:wrap; margin-top:8px; }
+  .jug-inn { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:8px; padding:4px 6px; text-align:center; min-width:36px; }
+  .jug-inn-num { font-size:0.48rem; color:#8fa3b7; letter-spacing:1px; font-family:'Oswald',sans-serif; }
+  .jug-inn-sym { font-size:0.7rem; font-weight:700; font-family:'Bebas Neue',sans-serif; }
+  .jug-lw-box { background:rgba(0,191,255,.07); border:1px solid rgba(0,191,255,.2); border-radius:12px; padding:10px 16px; margin-top:10px; display:flex; align-items:center; justify-content:space-between; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -216,6 +236,7 @@
     </div>
     <button id="numeritos-btn" onclick="openNumeritos()" style="display:none;background:var(--amber);color:#000;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(255,184,0,0.3)">📊 NUMERITOS</button>
     <button id="cambio-pit-btn" onclick="openCambioPitcher()" style="display:none;background:var(--navy);color:#fff;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(0,48,135,0.4)">🔄 PITCHER</button>
+    <button id="jugador-btn" onclick="openJugadorModal()" style="display:none;background:var(--cyan);color:#071018;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(0,191,255,0.3)">👤 JUGADOR</button>
     <div id="lang-toggle" style="display:none" onclick="toggleLang()">🎤 ES</div>
   </div>
 </header>
@@ -337,6 +358,14 @@
     <h3 id="mtitle">REGISTRAR JUGADA</h3>
     <div id="mbody"></div>
     <button class="modal-close" onclick="closeModal()">✕ CANCELAR</button>
+  </div>
+</div>
+
+<!-- FICHA JUGADOR -->
+<div class="modal-overlay" id="jugador-overlay" onclick="if(event.target===this)closeJugadorModal()">
+  <div class="modal" style="max-width:480px;padding:20px">
+    <div id="jugador-content"></div>
+    <button class="modal-close" style="margin-top:14px" onclick="closeJugadorModal()">✕ CERRAR</button>
   </div>
 </div>
 
@@ -810,6 +839,7 @@ function startGame(){
   document.getElementById('lang-toggle').style.display='block';
   document.getElementById('numeritos-btn').style.display='block';
   document.getElementById('cambio-pit-btn').style.display='block';
+  document.getElementById('jugador-btn').style.display='block';
   document.getElementById('pitch-bar').style.display='flex';
   buildLineScore(); buildInningNav(); buildScoresheets(); updateScores();
   updatePitchCounterUI();
@@ -2286,6 +2316,152 @@ function applySubFromModal(team,pidx,inn){
   const inPos=(posEl&&posEl.value.trim()?posEl.value.trim():p.pos).toUpperCase();
   closeModal();
   applySubstitution(team,pidx,inName,inPos);
+}
+
+// ─── FICHA JUGADOR ────────────────────────────────────────
+function openJugadorModal(){
+  document.getElementById('jugador-content').innerHTML=buildPlayerListHTML();
+  document.getElementById('jugador-overlay').classList.add('show');
+}
+
+function closeJugadorModal(){
+  document.getElementById('jugador-overlay').classList.remove('show');
+}
+
+function buildPlayerListHTML(){
+  const tInfo={v:{color:'var(--cyan)',label:'VISITANTE'},l:{color:'var(--green)',label:'LOCAL'}};
+  let html=`<h3 style="margin-bottom:14px">👤 JUGADORES</h3>`;
+  ['v','l'].forEach(t=>{
+    const {color}=tInfo[t];
+    html+=`<div class="jug-team-hdr" style="color:${color}">${gs.teams[t].name}</div>`;
+    gs.teams[t].players.forEach((p,idx)=>{
+      const subs=(gs.subs[t]||[]).filter(s=>s.outPidx===idx);
+      const curName=subs.length>0?subs[subs.length-1].inName:p.name;
+      const curPos=subs.length>0?subs[subs.length-1].inPos:p.pos;
+      html+=`<div class="jug-player-item" onclick="showPlayerFicha('${t}',${idx})">
+        <span class="jug-bat-num">${p.bat}</span>
+        <span class="jug-name">${curName}${p.dh?'<span style="font-size:.52rem;color:var(--amber);margin-left:4px;opacity:.7"> DH</span>':''}</span>
+        <span class="jug-pos">${curPos}</span>
+        <span style="color:var(--text-dim);font-size:.9rem">›</span>
+      </div>`;
+    });
+  });
+  return html;
+}
+
+function showPlayerFicha(team,pidx){
+  const p=gs.teams[team].players[pidx];
+  const subs=(gs.subs[team]||[]).filter(s=>s.outPidx===pidx).sort((a,b)=>a.inn-b.inn);
+  const curName=subs.length>0?subs[subs.length-1].inName:p.name;
+  const curPos=subs.length>0?subs[subs.length-1].inPos:p.pos;
+  const tColor=team==='v'?'var(--cyan)':'var(--green)';
+
+  const plays=gs.plays[team][pidx]||{};
+  let ab=0,h=0,r=0,rbi=0,d2=0,d3=0,hr=0,bb=0,hbp=0,k=0,sb=0,sf=0;
+  Object.entries(plays).forEach(([inn,pl])=>{
+    if(!pl) return;
+    if(pl.ab) ab++;
+    if(pl.h){ h++;
+      if(['2B','LC','RC','LL','RL'].includes(pl.sym)) d2++;
+      else if(pl.sym==='3B') d3++;
+      else if(pl.sym==='HR'||pl.sym==='IHR') hr++;
+    }
+    if(pl.scored) r++;
+    if(pl.sym==='BB'||pl.sym==='BBI') bb++;
+    if(pl.sym==='BG') hbp++;
+    if(pl.sym==='KS'||pl.sym==='KL') k++;
+    if(pl.sym==='SB') sb++;
+    if(pl.sym==='SF') sf++;
+    if(pl.type!=='out'&&pl.type!=='clear'){
+      if(pl.scored&&pl.type==='hit') rbi++;
+      for(let j=0;j<pidx;j++){
+        const jp=(gs.plays[team][j]||{})[inn];
+        if(jp&&jp.scored) rbi++;
+      }
+    }
+  });
+  const s1=Math.max(0,h-d2-d3-hr);
+  const tb=s1+d2*2+d3*3+hr*4;
+  const avg=ab>0?h/ab:0;
+  const den=ab+bb+hbp+sf;
+  const obp=den>0?(h+bb+hbp)/den:0;
+  const slg=ab>0?tb/ab:0;
+  const ops=obp+slg;
+  const fmt3=n=>(!isFinite(n)||isNaN(n)||n===0)?'.000':n>0&&n<1?n.toFixed(3).slice(1):n.toFixed(3);
+
+  const LWV={'BB':0.55,'BBI':0.55,'BG':0.55,'1B':0.70,'LS':0.70,'RS':0.70,'MI':0.70,'B':0.70,
+    '2B':1.10,'LC':1.10,'RC':1.10,'LL':1.10,'RL':1.10,'3B':1.35,'HR':1.65,'IHR':1.65};
+  let lw=0;
+  Object.values(plays).forEach(pl=>{
+    if(!pl) return;
+    if(LWV[pl.sym]!==undefined) lw+=LWV[pl.sym];
+    else if(pl.type==='out') lw-=0.25;
+  });
+  const lwStr=(lw>=0?'+':'')+lw.toFixed(2);
+  const lwColor=lw>0?'var(--green)':lw<0?'var(--red)':'var(--text-dim)';
+
+  const INNINGS=gs.scores[team].length;
+  let lineHTML='';
+  for(let i=1;i<=INNINGS;i++){
+    const pl=plays[i];
+    let sym='—', col='var(--text-dim)';
+    if(pl){
+      sym=pl.sym||'?';
+      if(pl.type==='out') col='var(--red)';
+      else if(pl.type==='hit') col='var(--green)';
+      else if(pl.type==='walk') col='var(--cyan)';
+      else col='var(--amber)';
+    }
+    lineHTML+=`<div class="jug-inn"><div class="jug-inn-num">E${i}</div><div class="jug-inn-sym" style="color:${col}">${sym}</div></div>`;
+  }
+
+  let histHTML='';
+  if(subs.length>0){
+    histHTML=`<div style="margin-top:8px;padding:8px 10px;background:rgba(255,255,255,.03);border-radius:10px;font-size:0.65rem">
+      <span style="color:var(--red)">↑ SALIÓ E${subs[0].inn}</span>&nbsp;·&nbsp;`;
+    histHTML+=subs.map(s=>`<span style="color:var(--cyan)">${s.inName} (${s.inPos}) E${s.inn}</span>`).join(' › ');
+    histHTML+='</div>';
+  }
+
+  const sbox=(lbl,val,col='#fff')=>
+    `<div class="jug-stat-box"><div class="jug-stat-lbl">${lbl}</div><div class="jug-stat-val" style="color:${col}">${val}</div></div>`;
+  const mbox=(lbl,val)=>
+    `<div class="jug-metric-box"><div class="jug-metric-lbl">${lbl}</div><div class="jug-metric-val">${val}</div></div>`;
+
+  document.getElementById('jugador-content').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button onclick="document.getElementById('jugador-content').innerHTML=buildPlayerListHTML()"
+        style="background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-dim);font-size:.72rem;padding:4px 9px;cursor:pointer">‹ LISTA</button>
+      <h3 style="margin:0;border:none;padding:0;flex:1">${curName}</h3>
+    </div>
+    <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <span style="background:rgba(255,255,255,.06);border-radius:8px;padding:3px 10px;font-family:'Oswald',sans-serif;font-size:.75rem;color:${tColor}">${gs.teams[team].name}</span>
+      <span style="background:rgba(255,182,72,.08);border:1px solid rgba(255,182,72,.2);border-radius:8px;padding:3px 10px;font-family:'Bebas Neue',sans-serif;font-size:.8rem;color:var(--amber)">${curPos}</span>
+      <span style="font-family:'Oswald',sans-serif;font-size:.72rem;color:var(--text-dim)">#${p.bat}</span>
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:.82rem;color:var(--text-dim)">LÍNEA: ${ab}-${h}</span>
+    </div>
+    ${histHTML}
+    <div class="modal-section" style="margin-top:10px">LÍNEA DEL JUEGO</div>
+    <div class="jug-line-wrap">${lineHTML}</div>
+    <div class="modal-section" style="margin-top:14px">ESTADÍSTICAS</div>
+    <div class="jug-stat-grid">
+      ${sbox('AB',ab)}${sbox('H',h,'var(--green)')}${sbox('R',r,'var(--cyan)')}
+      ${sbox('RBI',rbi,'var(--amber)')}${sbox('2B',d2)}${sbox('3B',d3)}
+      ${sbox('HR',hr,'var(--red)')}${sbox('BB',bb,'var(--cyan)')}${sbox('HBP',hbp)}
+      ${sbox('K',k,'var(--red)')}${sbox('SB',sb)}${sbox('TB',tb)}
+    </div>
+    <div class="modal-section" style="margin-top:14px">MÉTRICAS</div>
+    <div class="jug-metric-grid">
+      ${mbox('AVG',fmt3(avg))}${mbox('OBP',fmt3(obp))}
+      ${mbox('SLG',fmt3(slg))}${mbox('OPS',fmt3(ops))}
+    </div>
+    <div class="jug-lw-box">
+      <div>
+        <div style="font-family:'Oswald',sans-serif;font-size:.65rem;color:var(--text-dim);letter-spacing:2px">⚡ LINEAR WEIGHTS</div>
+        <div style="font-size:.6rem;color:var(--text-dim);margin-top:2px">Valor estimado en carreras generadas</div>
+      </div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;color:${lwColor};line-height:1">${lwStr}</div>
+    </div>`;
 }
 
 // ─── TOAST ────────────────────────────────────────────────
