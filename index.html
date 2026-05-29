@@ -17,6 +17,7 @@
     --text: #ffffff; --text-dim: #8fa3b7; --border: rgba(255,255,255,0.08);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
+  button { border-radius: 12px; }
   body { background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; }
 
   header {
@@ -78,11 +79,12 @@
   /* GAME LAYOUT */
   .game-layout { display:grid; grid-template-columns:1fr 1fr; gap:12px; max-width:1400px; margin:12px auto 0; padding:0 12px; }
   .team-panel { background:linear-gradient(180deg,#101b25,#0c151d); border:1px solid rgba(255,255,255,.08); border-radius:34px; box-shadow:0 20px 60px rgba(0,0,0,.45); overflow:hidden; }
+  .team-panel:has(.team-header.v) { background:rgba(0,191,255,.08); border:1px solid rgba(0,191,255,.15); }
   .team-header { padding:10px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); }
   .team-header.v { background:var(--navy-bg); border-left:4px solid var(--navy); }
   .team-header.l { background:var(--red-dark); border-left:4px solid var(--red); }
   .team-name-d { font-family:'Bebas Neue',sans-serif; font-size:1.5rem; letter-spacing:3px; color:#fff; }
-  .team-score-d { font-family:'Bebas Neue',sans-serif; font-size:2.4rem; color:#fff; line-height:1; }
+  .team-score-d { font-family:'Bebas Neue',sans-serif; font-size:2.4rem; color:#fff; line-height:1; font-weight:900; }
 
   /* SCORESHEET */
   .scoresheet-wrap { overflow-x:auto; }
