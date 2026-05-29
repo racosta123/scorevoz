@@ -323,7 +323,7 @@ const PLAY_CATALOG = {
   outs:[
     // Ponches
     { id:'KS',  label:'K ⚾ Ponche Swing',      sym:'KS',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche swing','strike out swing','abanicó','abaniq','chocolate','abanicar','whiff','abanico'] },
-    { id:'KL',  label:'KL Ponche Cantado',       sym:'KL',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche cantado','ponche mirando','ponche llamado','strike out looking','sin tirarle','sin mover','ponche viendo'] },
+    { id:'KL',  label:'KL Ponche Cantado',       sym:'KL',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche cantado','ponche mirando','ponche llamado','strike out looking','sin tirarle','sin mover','ponche viendo','parado','ponche parado','sin mover el bate'] },
     // Fly outs
     { id:'F7',  label:'F7 Fly Left Field',       sym:'F7',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly izquierda','elevado izquierda','fly left'] },
     { id:'F8',  label:'F8 Fly Center',           sym:'F8',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly center','elevado centro','fly central'] },
@@ -353,10 +353,10 @@ const PLAY_CATALOG = {
 
   // ── HITS ──
   hits:[
-    { id:'1B',  label:'1B Sencillo',             sym:'1B',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['sencillo','single','hit sencillo','hit uno','una base'] },
+    { id:'1B',  label:'1B Sencillo',             sym:'1B',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['sencillo','single','hit sencillo','hit uno','una base','imparable','hit infield','texas leaguer'] },
     { id:'2B',  label:'2B Doble',                sym:'2B',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['doble','double','dos bases','hit doble','tubey'] },
     { id:'3B',  label:'3B Triple',               sym:'3B',  bases:3, type:'hit',  ab:true,  h:true, color:'green', voice:['triple','tres bases','hit triple','triplete'] },
-    { id:'HR',  label:'HR Jonrón',               sym:'HR',  bases:4, type:'hit',  ab:true,  h:true, color:'green', voice:['jonron','jonrón','home run','cuadrangular','cuadrangula','grand slam','bambinazo','toletazo','largo','se la llevó'] },
+    { id:'HR',  label:'HR Jonrón',               sym:'HR',  bases:4, type:'hit',  ab:true,  h:true, color:'green', voice:['jonron','jonrón','home run','cuadrangular','cuadrangula','grand slam','bambinazo','toletazo','largo','se la llevó','cuadrangulo'] },
     { id:'IHR', label:'IHR Jonrón Inside Park',  sym:'IHR', bases:4, type:'hit',  ab:true,  h:true, color:'green', voice:['jonron dentro del parque','inside park','jonron interior'] },
     // Hits por zona
     { id:'LS',  label:'LS Hit Lado Izquierdo',   sym:'LS',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['hit lado izquierdo','hit izquierda','hit left side'] },
@@ -395,12 +395,12 @@ const PLAY_CATALOG = {
   // ── AVANCES / EVENTOS EN BASE ──
   advances:[
     { id:'SB',  label:'SB Base Robada',           sym:'SB',  bases:null, type:'advance', ab:false, color:'amber', voice:['robo','robó','base robada','stolen base','sb','se robó','se robo'] },
-    { id:'WP',  label:'WP Wild Pitch',            sym:'WP',  bases:null, type:'advance', ab:false, color:'amber', voice:['wild pitch','lanzamiento wild','tiro salvaje','wp','lanzamiento loco'] },
+    { id:'WP',  label:'WP Wild Pitch',            sym:'WP',  bases:null, type:'advance', ab:false, color:'amber', voice:['wild pitch','lanzamiento wild','tiro salvaje','wp','lanzamiento loco','lanzamiento descontrolado','tiro descontrolado'] },
     { id:'PB',  label:'PB Passed Ball',           sym:'PB',  bases:null, type:'advance', ab:false, color:'amber', voice:['passed ball','pasbol','pb'] },
-    { id:'BK',  label:'BK Balk / Falta',          sym:'BK',  bases:null, type:'advance', ab:false, color:'amber', voice:['balk','falta lanzador','bk'] },
+    { id:'BK',  label:'BK Balk / Falta',          sym:'BK',  bases:null, type:'advance', ab:false, color:'amber', voice:['balk','falta lanzador','bk','engaño','infracción del lanzador','infraccion del lanzador'] },
     { id:'T',   label:'T  Avance por Tiro',       sym:'T',   bases:null, type:'advance', ab:false, color:'amber', voice:['avance por tiro'] },
     { id:'FC',  label:'FC Fielder\'s Choice',     sym:'FC',  bases:1,    type:'advance', ab:true,  color:'amber', voice:["fielder's choice",'fielder choice','jugada de eleccion','jugada elección','fc'] },
-    { id:'PC',  label:'PC Pisa y Corre',          sym:'PC',  bases:null, type:'advance', ab:false, color:'amber', voice:['pisa y corre','squeeze play'] },
+    { id:'PC',  label:'PC Pisa y Corre',          sym:'PC',  bases:null, type:'advance', ab:false, color:'amber', voice:['pisa y corre','squeeze play','squeeze suicida','jugada de cuña','jugada de cuna','toque suicida'] },
   ],
 
   // ── CARRERA / ESPECIAL ──
