@@ -167,6 +167,14 @@
   .setup-mic-btn.recording { border-color:#ff3347; background:rgba(255,51,71,0.2); animation:pulse-red 0.7s infinite; }
   .cambio-btn.recording { border-color:#ff3347; color:#ff3347; animation:pulse-red 0.7s infinite; }
 
+  /* PITCHER SECTION (SETUP) */
+  .pitcher-section{margin-top:14px;padding:12px;background:rgba(0,48,135,0.06);border:1px solid rgba(0,48,135,0.2);border-left:3px solid var(--navy);border-radius:6px;}
+  .pitcher-section-label{font-family:'Oswald',sans-serif;font-size:0.72rem;letter-spacing:2px;color:var(--blue);margin-bottom:8px;}
+  .pitcher-row-wrap{display:flex;align-items:center;gap:6px;}
+  .pitcher-batea-toggle{font-size:0.58rem;font-family:'Roboto Mono',monospace;background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text-dim);cursor:pointer;letter-spacing:1px;padding:4px 7px;white-space:nowrap;transition:all 0.15s;flex-shrink:0;}
+  .pitcher-batea-toggle:hover{border-color:var(--blue);color:var(--blue);}
+  .pitcher-batea-toggle.active{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700;}
+
   /* BANNER DE CONFIRMACIÓN */
   #confirm-banner { position:fixed; top:0; left:0; right:0; z-index:450; background:var(--gold); color:#000; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; transform:translateY(-110%); transition:transform 0.25s cubic-bezier(0.4,0,0.2,1); box-shadow:0 6px 32px rgba(0,0,0,0.7); }
   #confirm-banner.show { transform:translateY(0); }
@@ -201,6 +209,7 @@
       <div class="inning-display" id="inning-label">1</div>
     </div>
     <button id="numeritos-btn" onclick="openNumeritos()" style="display:none;background:var(--amber);color:#000;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(255,184,0,0.3)">📊 NUMERITOS</button>
+    <button id="cambio-pit-btn" onclick="openCambioPitcher()" style="display:none;background:var(--navy);color:#fff;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(0,48,135,0.4)">🔄 PITCHER</button>
     <div id="lang-toggle" style="display:none" onclick="toggleLang()">🎤 ES</div>
   </div>
 </header>
@@ -216,6 +225,17 @@
       <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div>
     </div>
     <div id="pl-v"></div>
+    <div class="pitcher-section">
+      <div class="pitcher-section-label">⚾ PITCHER ABRIDOR</div>
+      <div class="pitcher-row-wrap">
+        <input class="player-input" id="pit-v" placeholder="Nombre del pitcher abridor" maxlength="25" style="flex:1">
+        <button class="pitcher-batea-toggle" id="pitbt-v" onclick="togglePitcherBatea('v',this)" title="Pitcher que también batea (tipo Ohtani)">¿BATEA?</button>
+        <button class="setup-mic-row" id="pitmb-v"
+          onmousedown="pitcherPttStart('v',event)" onmouseup="pitcherPttEnd(event)"
+          ontouchstart="pitcherPttStart('v',event)" ontouchend="pitcherPttEnd(event)"
+          ontouchcancel="pitcherPttEnd(event)" title="Mantén: di nombre del pitcher">🎤</button>
+      </div>
+    </div>
   </div>
   <div class="team-setup">
     <h3><span style="color:var(--amber)">▶ LOCAL</span></h3>
@@ -224,6 +244,17 @@
       <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div>
     </div>
     <div id="pl-l"></div>
+    <div class="pitcher-section">
+      <div class="pitcher-section-label">⚾ PITCHER ABRIDOR</div>
+      <div class="pitcher-row-wrap">
+        <input class="player-input" id="pit-l" placeholder="Nombre del pitcher abridor" maxlength="25" style="flex:1">
+        <button class="pitcher-batea-toggle" id="pitbt-l" onclick="togglePitcherBatea('l',this)" title="Pitcher que también batea (tipo Ohtani)">¿BATEA?</button>
+        <button class="setup-mic-row" id="pitmb-l"
+          onmousedown="pitcherPttStart('l',event)" onmouseup="pitcherPttEnd(event)"
+          ontouchstart="pitcherPttStart('l',event)" ontouchend="pitcherPttEnd(event)"
+          ontouchcancel="pitcherPttEnd(event)" title="Mantén: di nombre del pitcher">🎤</button>
+      </div>
+    </div>
   </div>
   <button class="btn-start" onclick="startGame()">⚡ INICIAR JUEGO</button>
 </div>
@@ -291,6 +322,8 @@ let gs = {
   plays:{ v:{}, l:{} },
   scores:{ v:[], l:[] },
   subs:{ v:[], l:[] },
+  pitcher:{ v:{name:'',batea:false}, l:{name:'',batea:false} },
+  pitcherChanges:{ v:[], l:[] },
   selected:null,
   lang:'es-MX'
 };
@@ -478,6 +511,75 @@ function setupRowStopUI(team,row){
   const btn=document.getElementById(`smb-${team}-${row}`);
   if(btn){ btn.classList.remove('recording'); btn.textContent='🎤'; }
   setupListeningRow=null;
+}
+
+// ─── VOZ EN PITCHER (SETUP) ───────────────────────────────
+let pitcherRec=null, pitcherListeningTeam=null;
+
+function pitcherPttStart(team,e){
+  e.preventDefault();
+  if(pitcherListeningTeam&&pitcherListeningTeam!==team) pitcherPttForceStop();
+  if(pitcherListeningTeam) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ showToast('⚠️ Navegador sin soporte de voz',true); return; }
+  let sTranscript='';
+  pitcherRec=new SR();
+  pitcherRec.continuous=true; pitcherRec.interimResults=true; pitcherRec.lang=gs.lang;
+  pitcherRec.onresult=ev=>{ sTranscript=Array.from(ev.results).map(r=>r[0].transcript).join(''); };
+  pitcherRec.onend=()=>{
+    const txt=sTranscript.toLowerCase().trim(); sTranscript='';
+    pitcherStopUI(team);
+    if(txt){
+      const res=parsePitcherVoice(txt,team);
+      const btn=document.getElementById(`pitmb-${team}`);
+      if(btn){ btn.textContent=res?'✓':'⚠'; setTimeout(()=>{ btn.textContent='🎤'; },1800); }
+      if(!res) showToast('⚠️ No reconocido — di el nombre del pitcher',true);
+    }
+  };
+  pitcherRec.onerror=ev=>{ sTranscript=''; pitcherStopUI(team); if(ev.error!=='aborted') showToast(`⚠️ ${ev.error}`,true); };
+  pitcherRec.start();
+  pitcherListeningTeam=team;
+  const btn=document.getElementById(`pitmb-${team}`);
+  if(btn){ btn.classList.add('recording'); btn.textContent='🔴'; }
+}
+
+function pitcherPttEnd(e){
+  e.preventDefault();
+  if(!pitcherListeningTeam) return;
+  try{ if(pitcherRec) pitcherRec.stop(); }catch(ex){}
+}
+
+function pitcherPttForceStop(){
+  if(pitcherListeningTeam) pitcherStopUI(pitcherListeningTeam);
+  try{ if(pitcherRec) pitcherRec.abort(); }catch(ex){}
+}
+
+function pitcherStopUI(team){
+  const btn=document.getElementById(`pitmb-${team}`);
+  if(btn){ btn.classList.remove('recording'); btn.textContent='🎤'; }
+  pitcherListeningTeam=null;
+}
+
+function togglePitcherBatea(team,btn){
+  btn.classList.toggle('active');
+}
+
+function parsePitcherVoice(text,team){
+  let t=text.toLowerCase().trim();
+  let batea=false;
+  if(/\btambién\s+batea\b|\btambien\s+batea\b|\bbatea\b/.test(t)){
+    batea=true;
+    t=t.replace(/\s*también\s+batea\s*|\s*tambien\s+batea\s*|\s*batea\s*/gi,'').trim();
+  }
+  t=t.replace(/^(es|lanza|abre|el|pitcher)\s+/gi,'').trim();
+  if(!t) return null;
+  const fmt=toTitleCase(t);
+  document.getElementById(`pit-${team}`).value=fmt;
+  if(batea){
+    const btn=document.getElementById(`pitbt-${team}`);
+    if(btn&&!btn.classList.contains('active')) btn.classList.add('active');
+  }
+  return `✓ Pitcher: ${fmt}${batea?' · BATEA':''}`;
 }
 
 function hasDH(team, exceptRow){
@@ -675,6 +777,15 @@ function startGame(){
     gs.plays[t]={};
     pl.forEach((_,i)=>{ gs.plays[t][i]={}; });
     gs.scores[t] = Array(INNINGS).fill(0);
+    const pitName=(document.getElementById(`pit-${t}`).value.trim()||'').toUpperCase();
+    const pitBatea=document.getElementById(`pitbt-${t}`).classList.contains('active');
+    gs.pitcher[t]={name:pitName||'PITCHER',batea:pitBatea};
+    gs.pitcherChanges[t]=[];
+    if(pitBatea&&pitName){
+      const idx=pl.length;
+      pl.push({name:pitName,pos:'P',bat:idx+1});
+      gs.plays[t][idx]={};
+    }
   });
   document.getElementById('setup-screen').style.display='none';
   document.getElementById('game-screen').style.display='block';
@@ -682,6 +793,7 @@ function startGame(){
   document.getElementById('game-status').style.display='flex';
   document.getElementById('lang-toggle').style.display='block';
   document.getElementById('numeritos-btn').style.display='block';
+  document.getElementById('cambio-pit-btn').style.display='block';
   buildLineScore(); buildInningNav(); buildScoresheets(); updateScores();
 }
 
@@ -1145,6 +1257,97 @@ function interpretVoice(text){
   }
 }
 
+// ─── CAMBIO DE PITCHER ────────────────────────────────────
+let pitCambioTeam=null, pitCambioRec=null, pitCambioListening=false;
+
+function openCambioPitcher(){
+  pitCambioTeam=null;
+  document.getElementById('mtitle').textContent='CAMBIO DE PITCHER';
+  const body=document.getElementById('mbody'); body.innerHTML='';
+  const sec=document.createElement('div'); sec.className='modal-section'; sec.textContent='¿QUÉ EQUIPO CAMBIA?'; body.appendChild(sec);
+  const tGrid=document.createElement('div'); tGrid.className='play-buttons';
+  ['v','l'].forEach(t=>{
+    const b=document.createElement('button'); b.className='play-btn';
+    b.style.borderColor=t==='v'?'var(--blue)':'var(--amber)';
+    b.style.color=t==='v'?'var(--blue)':'var(--amber)';
+    b.textContent=gs.teams[t].name;
+    b.onclick=()=>{
+      pitCambioTeam=t;
+      tGrid.querySelectorAll('.play-btn').forEach(x=>{ x.style.background=''; });
+      b.style.background=t==='v'?'rgba(68,153,238,0.15)':'rgba(255,184,28,0.15)';
+      renderCambioPitFields();
+    };
+    tGrid.appendChild(b);
+  });
+  body.appendChild(tGrid);
+  const fieldsDiv=document.createElement('div'); fieldsDiv.id='pit-cambio-fields'; body.appendChild(fieldsDiv);
+  document.getElementById('modal').classList.add('show');
+}
+
+function renderCambioPitFields(){
+  const fieldsDiv=document.getElementById('pit-cambio-fields'); if(!fieldsDiv||!pitCambioTeam) return;
+  const changes=gs.pitcherChanges[pitCambioTeam];
+  const curName=changes.length?changes[changes.length-1].inName:gs.pitcher[pitCambioTeam].name;
+  const inn=gs.currentInning||1;
+  fieldsDiv.innerHTML=`
+    <div class="modal-section" style="margin-top:10px">SALE</div>
+    <div style="font-size:0.82rem;padding:4px 0 8px;color:var(--text-dim)">${curName||'Pitcher actual'}</div>
+    <div class="modal-section">ENTRA — ENTRADA ${inn}</div>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+      <input class="player-input" id="pit-cambio-input" placeholder="Nombre del relevista" maxlength="25" style="flex:1">
+      <button class="setup-mic-row" id="pit-cambio-mic"
+        onmousedown="pitCambioMicStart(event)" onmouseup="pitCambioMicEnd(event)"
+        ontouchstart="pitCambioMicStart(event)" ontouchend="pitCambioMicEnd(event)"
+        title="Mantén: di nombre del pitcher">🎤</button>
+    </div>
+    <button class="play-btn" onclick="applyCambioPitcher(${inn})" style="width:100%;margin-top:10px;border-color:var(--green);color:var(--green)">✓ CONFIRMAR CAMBIO</button>
+  `;
+}
+
+function pitCambioMicStart(e){
+  e.preventDefault();
+  if(pitCambioListening) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ showToast('⚠️ Sin soporte de voz',true); return; }
+  let sTranscript='';
+  pitCambioRec=new SR();
+  pitCambioRec.continuous=true; pitCambioRec.interimResults=true; pitCambioRec.lang=gs.lang;
+  pitCambioRec.onresult=ev=>{ sTranscript=Array.from(ev.results).map(r=>r[0].transcript).join(''); };
+  pitCambioRec.onend=()=>{
+    const txt=sTranscript.toLowerCase().trim(); sTranscript='';
+    pitCambioListening=false;
+    const btn=document.getElementById('pit-cambio-mic');
+    if(btn){ btn.classList.remove('recording'); btn.textContent='🎤'; }
+    if(txt){
+      const inp=document.getElementById('pit-cambio-input');
+      if(inp) inp.value=toTitleCase(txt.replace(/^(entra|es|el|pitcher|lanza)\s+/i,'').trim());
+    }
+  };
+  pitCambioRec.onerror=()=>{ pitCambioListening=false; };
+  pitCambioRec.start();
+  pitCambioListening=true;
+  const btn=document.getElementById('pit-cambio-mic');
+  if(btn){ btn.classList.add('recording'); btn.textContent='🔴'; }
+}
+
+function pitCambioMicEnd(e){
+  e.preventDefault();
+  if(!pitCambioListening) return;
+  try{ if(pitCambioRec) pitCambioRec.stop(); }catch(ex){}
+}
+
+function applyCambioPitcher(inn){
+  if(!pitCambioTeam){ showToast('⚠️ Selecciona el equipo primero',true); return; }
+  const inp=document.getElementById('pit-cambio-input');
+  if(!inp||!inp.value.trim()){ showToast('⚠️ Ingresa el nombre del nuevo pitcher',true); return; }
+  const inName=toTitleCase(inp.value.trim());
+  const changes=gs.pitcherChanges[pitCambioTeam];
+  const outName=changes.length?changes[changes.length-1].inName:gs.pitcher[pitCambioTeam].name;
+  gs.pitcherChanges[pitCambioTeam].push({inn,inName,outName});
+  closeModal();
+  showToast(`✓ E${inn}: sale ${outName} — entra ${inName} (${gs.teams[pitCambioTeam].name})`);
+}
+
 // ─── NUMERITOS FINALES (REPORTE PDF) ──────────────────────
 function openNumeritos(){
   if(!window.jspdf||!window.jspdf.jsPDF){ showToast('⚠️ jsPDF no cargó — verifica conexión',true); return; }
@@ -1233,15 +1436,17 @@ function openNumeritos(){
   const vWins=totalV>totalL, lWins=totalL>totalV;
   const getPitchStints=pt=>{
     const bt=pt==='v'?'l':'v';
-    const pl=gs.teams[pt].players;
+    const pit=gs.pitcher[pt];
+    const changes=(gs.pitcherChanges||{})[pt]||[];
+    const spIdx=gs.teams[pt].players.findIndex(p=>p.pos==='P');
+    const starterName=pit?.name||(spIdx>=0?gs.teams[pt].players[spIdx].name:'PITCHER');
+    const sorted=[...changes].sort((a,b)=>a.inn-b.inn);
     const stints=[];
-    const spIdx=pl.findIndex(p=>p.pos==='P');
-    if(spIdx>=0){
-      const spSub=gs.subs[pt].find(s=>s.outPidx===spIdx);
-      stints.push({name:pl[spIdx].name,from:1,to:spSub?spSub.inn-1:INNINGS,role:'AB'});
-      gs.subs[pt].filter(s=>s.inPos==='P').sort((a,b)=>a.inn-b.inn)
-        .forEach(s=>stints.push({name:s.inName,from:s.inn,to:INNINGS,role:'RP'}));
-    } else stints.push({name:'LANZADOR',from:1,to:INNINGS,role:'AB'});
+    stints.push({name:starterName,from:1,to:sorted.length>0?sorted[0].inn-1:INNINGS,role:'AB'});
+    sorted.forEach((ch,i)=>{
+      const to=i<sorted.length-1?sorted[i+1].inn-1:INNINGS;
+      stints.push({name:ch.inName,from:ch.inn,to,role:'RP'});
+    });
     const tw=(pt==='v'&&vWins)||(pt==='l'&&lWins);
     const tl=(pt==='v'&&lWins)||(pt==='l'&&vWins);
     return stints.map((st,i)=>{
