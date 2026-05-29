@@ -189,6 +189,8 @@
 
   @media(max-width:768px){ .game-layout{grid-template-columns:1fr;} }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <div class="toast" id="toast"></div>
@@ -500,14 +502,15 @@ function parseRowVoice(text,team,row){
   }
   const posKeys=Object.keys(POS_WORD_MAP).sort((a,b)=>b.length-a.length);
   let posNum=null, nameText=t;
-  const alIdx=t.lastIndexOf(' al ');
-  if(alIdx!==-1){
-    const afterAl=t.slice(alIdx+4).trim();
+  // Greedy regex: captura el ÚLTIMO "al" como separador (maneja fin de cadena sin espacio final)
+  const m=t.match(/^(.*)\s+al\s+(.+)$/);
+  if(m){
+    const afterAl=m[2].trim();
     for(const pw of posKeys){
       if(afterAl===pw||afterAl.startsWith(pw+' ')||afterAl.startsWith(pw)){ posNum=POS_WORD_MAP[pw]; break; }
     }
     if(posNum===null){ const n=parseInt(afterAl,10); if(n>=1&&n<=9) posNum=n; }
-    nameText=t.slice(0,alIdx).trim();
+    nameText=m[1].trim();
   }
   nameText=nameText.replace(/^(va|es|juega|batea)\s+/,'').trim();
   if(!nameText) return null;
@@ -1132,15 +1135,349 @@ function interpretVoice(text){
 
 // ─── NUMERITOS FINALES (REPORTE PDF) ──────────────────────
 function openNumeritos(){
-  const html=generateReportHTML();
-  const w=window.open('','_blank','width=980,height=820');
-  if(!w){ showToast('⚠️ Activa ventanas emergentes para el reporte',true); return; }
-  w.document.write(html);
-  w.document.close();
-  w.focus();
+  if(!window.jspdf||!window.jspdf.jsPDF){ showToast('⚠️ jsPDF no cargó — verifica conexión',true); return; }
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'letter'});
+  const PW=doc.internal.pageSize.getWidth();
+  const PH=doc.internal.pageSize.getHeight();
+
+  // ── Paleta ──────────────────────────────────────────────
+  const BG=[10,14,20], GRN=[0,255,136], AMB=[255,184,0], TXT=[232,240,254];
+  const RED=[255,68,85], DIM=[122,143,166], HDR=[17,24,32], CARD=[19,28,40], BRD=[30,48,72];
+  const VIS=[80,140,255], LOC=[230,150,40];
+
+  // ── Helpers ──────────────────────────────────────────────
+  const safeName=s=>s.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  const fmt3=n=>(!isFinite(n)||isNaN(n))?'---':n>0&&n<1?n.toFixed(3).slice(1):n.toFixed(3);
+  const fmt2=n=>(!isFinite(n)||isNaN(n))?'---':n.toFixed(2);
+  const fmt1=n=>(!isFinite(n)||isNaN(n))?'---':n.toFixed(1);
+  const fillBG=()=>{ doc.setFillColor(...BG); doc.rect(0,0,PW,PH,'F'); };
+  const secHdr=(lbl,y)=>{
+    doc.setFillColor(...GRN); doc.rect(10,y,PW-20,6,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...BG);
+    doc.text(lbl,13,y+4.3); return y+8;
+  };
+  const tDef={
+    styles:{fillColor:BG,textColor:TXT,fontSize:7,cellPadding:1.5,lineColor:BRD,lineWidth:0.2},
+    headStyles:{fillColor:HDR,textColor:GRN,fontSize:7,fontStyle:'bold',halign:'center'},
+    alternateRowStyles:{fillColor:CARD}, theme:'grid'
+  };
+
+  const vn=gs.teams.v.name, ln=gs.teams.l.name;
+  const totalV=gs.scores.v.reduce((a,b)=>a+b,0);
+  const totalL=gs.scores.l.reduce((a,b)=>a+b,0);
+  const today=new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  // ── getBat ───────────────────────────────────────────────
+  const getBat=(team,pidx)=>{
+    const plays=gs.plays[team][pidx]||{};
+    let ab=0,h=0,r=0,rbi=0,d2=0,d3=0,hr=0,bb=0,hbp=0,k=0,sb=0,sf=0;
+    Object.entries(plays).forEach(([inn,p])=>{
+      if(!p) return;
+      if(p.ab) ab++;
+      if(p.h){ h++;
+        if(['2B','LC','RC','LL','RL'].includes(p.sym)) d2++;
+        else if(p.sym==='3B') d3++;
+        else if(p.sym==='HR'||p.sym==='IHR') hr++;
+      }
+      if(p.scored) r++;
+      if(p.sym==='BB'||p.sym==='BBI') bb++;
+      if(p.sym==='BG') hbp++;
+      if(p.sym==='KS'||p.sym==='KL') k++;
+      if(p.sym==='SB') sb++;
+      if(p.sym==='SF') sf++;
+      if(p.type!=='out'&&p.type!=='clear'){
+        if(p.scored&&p.type==='hit') rbi++;
+        for(let j=0;j<pidx;j++){
+          const jp=(gs.plays[team][j]||{})[inn];
+          if(jp&&jp.scored) rbi++;
+        }
+      }
+    });
+    const s1=Math.max(0,h-d2-d3-hr);
+    const tb=s1+d2*2+d3*3+hr*4;
+    const avg=ab>0?h/ab:0;
+    const den=ab+bb+hbp+sf;
+    const obp=den>0?(h+bb+hbp)/den:0;
+    const slg=ab>0?tb/ab:0;
+    const rc=(ab+bb)>0?(h+bb)*tb/(ab+bb):0;
+    return{ab,h,r,rbi,d2,d3,hr,bb,hbp,k,sb,avg,obp,slg,ops:obp+slg,tb,rc};
+  };
+
+  // ── getLW ────────────────────────────────────────────────
+  const LWV={'BB':0.55,'BBI':0.55,'BG':0.55,'1B':0.70,'LS':0.70,'RS':0.70,'MI':0.70,'B':0.70,
+    '2B':1.10,'LC':1.10,'RC':1.10,'LL':1.10,'RL':1.10,'3B':1.35,'HR':1.65,'IHR':1.65};
+  const getLW=(team,pidx)=>{
+    let val=0;
+    Object.values(gs.plays[team][pidx]||{}).forEach(p=>{
+      if(!p) return;
+      if(LWV[p.sym]!==undefined) val+=LWV[p.sym];
+      else if(p.type==='out') val-=0.25;
+    });
+    return val;
+  };
+
+  // ── getPitchStints ────────────────────────────────────────
+  const vWins=totalV>totalL, lWins=totalL>totalV;
+  const getPitchStints=pt=>{
+    const bt=pt==='v'?'l':'v';
+    const pl=gs.teams[pt].players;
+    const stints=[];
+    const spIdx=pl.findIndex(p=>p.pos==='P');
+    if(spIdx>=0){
+      const spSub=gs.subs[pt].find(s=>s.outPidx===spIdx);
+      stints.push({name:pl[spIdx].name,from:1,to:spSub?spSub.inn-1:INNINGS,role:'AB'});
+      gs.subs[pt].filter(s=>s.inPos==='P').sort((a,b)=>a.inn-b.inn)
+        .forEach(s=>stints.push({name:s.inName,from:s.inn,to:INNINGS,role:'RP'}));
+    } else stints.push({name:'LANZADOR',from:1,to:INNINGS,role:'AB'});
+    const tw=(pt==='v'&&vWins)||(pt==='l'&&lWins);
+    const tl=(pt==='v'&&lWins)||(pt==='l'&&vWins);
+    return stints.map((st,i)=>{
+      let h=0,r=0,bb=0,k=0,hr=0;
+      gs.teams[bt].players.forEach((_,pidx)=>{
+        for(let inn=st.from;inn<=st.to;inn++){
+          const p=(gs.plays[bt][pidx]||{})[inn];
+          if(!p) return;
+          if(p.h) h++; if(p.scored) r++;
+          if(p.sym==='BB'||p.sym==='BBI') bb++;
+          if(p.sym==='KS'||p.sym==='KL') k++;
+          if(p.sym==='HR'||p.sym==='IHR') hr++;
+        }
+      });
+      const ip=Math.max(1,st.to-st.from+1);
+      return{...st,ip,h,r,er:r,bb,k,hr,era:r*9/ip,whip:(h+bb)/ip,k9:k*9/ip,bb9:bb*9/ip,
+        dec:i===0&&tw?'W':i===0&&tl?'L':''};
+    });
+  };
+
+  // ════════════════════════════════════════════════════════
+  // PÁG 1 — PORTADA
+  // ════════════════════════════════════════════════════════
+  fillBG();
+  doc.setFont('helvetica','bold'); doc.setFontSize(32); doc.setTextColor(...GRN);
+  doc.text('NUMERITOS FINALES',PW/2,46,{align:'center'});
+  doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...DIM);
+  doc.text('Reporte estadístico completo de béisbol',PW/2,54,{align:'center'});
+  doc.text(today,PW/2,60,{align:'center'});
+  doc.setDrawColor(...GRN); doc.setLineWidth(0.5); doc.line(20,64,PW-20,64);
+
+  // Marcador
+  doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.setTextColor(...VIS);
+  doc.text(vn,PW/2-15,84,{align:'right'});
+  doc.setFontSize(28); doc.setTextColor(...GRN);
+  doc.text(String(totalV),PW/2-8,92,{align:'right'});
+  doc.setFontSize(20); doc.setTextColor(...DIM);
+  doc.text('—',PW/2,90,{align:'center'});
+  doc.setFontSize(28); doc.setTextColor(...AMB);
+  doc.text(String(totalL),PW/2+8,92,{align:'left'});
+  doc.setFontSize(12); doc.setFont('helvetica','bold'); doc.setTextColor(...LOC);
+  doc.text(ln,PW/2+15,84,{align:'left'});
+
+  const winner=totalV>totalL?vn:totalL>totalV?ln:null;
+  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(...AMB);
+  doc.text(winner?`GANADOR: ${winner}`:'EMPATE',PW/2,106,{align:'center'});
+  doc.setFontSize(8); doc.setTextColor(...DIM);
+  doc.text(`${INNINGS} entradas jugadas`,PW/2,114,{align:'center'});
+
+  doc.setDrawColor(...BRD); doc.setLineWidth(0.3); doc.line(20,PH-18,PW-18,PH-18);
+  doc.setFontSize(7); doc.setTextColor(...DIM);
+  doc.text('ScoreVoz ⚾  — Generado automáticamente',PW/2,PH-13,{align:'center'});
+
+  // ════════════════════════════════════════════════════════
+  // PÁG 2 — BOX SCORE
+  // ════════════════════════════════════════════════════════
+  doc.addPage(); fillBG();
+  let y=15;
+  y=secHdr('1 — BOX SCORE · LINE SCORE  (R - H - E)',y);
+
+  const innHdrs=Array.from({length:INNINGS},(_,i)=>({content:String(i+1),styles:{halign:'center',cellWidth:9}}));
+  doc.autoTable({...tDef, startY:y, margin:{left:10,right:10},
+    head:[[{content:'EQUIPO',styles:{halign:'left',cellWidth:38}},...innHdrs,
+      {content:'R',styles:{halign:'center',cellWidth:10,textColor:GRN}},
+      {content:'H',styles:{halign:'center',cellWidth:10}},
+      {content:'E',styles:{halign:'center',cellWidth:10}}]],
+    body:['v','l'].map(t=>{
+      let hits=0,errs=0;
+      gs.teams[t].players.forEach((_,i)=>Object.values(gs.plays[t][i]||{}).forEach(p=>{
+        if(p){if(p.h)hits++;if(p.type==='error')errs++;}
+      }));
+      const tot=gs.scores[t].reduce((a,b)=>a+b,0);
+      return[
+        {content:gs.teams[t].name,styles:{halign:'left',textColor:t==='v'?VIS:LOC,fontStyle:'bold'}},
+        ...gs.scores[t].map(r=>({content:String(r),styles:{halign:'center'}})),
+        {content:String(tot),styles:{halign:'center',textColor:GRN,fontStyle:'bold'}},
+        {content:String(hits),styles:{halign:'center'}},
+        {content:String(errs),styles:{halign:'center'}}
+      ];
+    })
+  });
+
+  // ════════════════════════════════════════════════════════
+  // PÁG 3 — BATEO
+  // ════════════════════════════════════════════════════════
+  doc.addPage(); fillBG();
+  y=15; y=secHdr('2 — ESTADÍSTICAS DE BATEO',y);
+
+  const batBody=[];
+  ['v','l'].forEach(t=>{
+    batBody.push([{content:gs.teams[t].name,colSpan:17,styles:{fillColor:t==='v'?[10,20,55]:[55,25,5],textColor:t==='v'?VIS:LOC,fontStyle:'bold',halign:'left'}}]);
+    let totals={ab:0,h:0,r:0,rbi:0,d2:0,d3:0,hr:0,bb:0,hbp:0,k:0,sb:0};
+    gs.teams[t].players.forEach((p,idx)=>{
+      const s=getBat(t,idx);
+      Object.keys(totals).forEach(k=>{ totals[k]+=s[k]; });
+      const oc=s.ops>=0.9?GRN:s.ops>=0.8?[80,160,255]:s.ops>=0.7?AMB:RED;
+      batBody.push([
+        {content:`${p.name}  ${p.pos}`,styles:{halign:'left',fontSize:6.5}},
+        s.ab,s.h,s.r,s.rbi,s.d2,s.d3,s.hr,s.bb,s.hbp,s.k,s.sb,
+        fmt3(s.avg),fmt3(s.obp),fmt3(s.slg),
+        {content:fmt3(s.ops),styles:{textColor:oc,fontStyle:'bold'}},
+        {content:s.rc.toFixed(2),styles:{textColor:GRN}}
+      ]);
+    });
+    const tAvg=totals.ab>0?totals.h/totals.ab:0;
+    batBody.push([
+      {content:'TOTALES',styles:{halign:'left',fontStyle:'bold',fillColor:HDR}},
+      ...[totals.ab,totals.h,totals.r,totals.rbi,totals.d2,totals.d3,totals.hr,totals.bb,totals.hbp,totals.k,totals.sb].map(v=>({content:v,styles:{fillColor:HDR,fontStyle:'bold'}})),
+      {content:fmt3(tAvg),styles:{fillColor:HDR,fontStyle:'bold'}},
+      {content:'—',styles:{fillColor:HDR}},{content:'—',styles:{fillColor:HDR}},{content:'—',styles:{fillColor:HDR}},{content:'—',styles:{fillColor:HDR}}
+    ]);
+  });
+  doc.autoTable({...tDef, startY:y, margin:{left:10,right:10},
+    head:[['JUGADOR','AB','H','R','RBI','2B','3B','HR','BB','HBP','K','SB','AVG','OBP','SLG','OPS','RC']],
+    body:batBody,
+    columnStyles:{0:{cellWidth:36,halign:'left'}}
+  });
+  // Nota RC
+  const batEnd=doc.lastAutoTable.finalY+4;
+  doc.setFontSize(6.5); doc.setTextColor(...DIM);
+  doc.text('RC = (H+BB)×TB / (AB+BB)  ·  TB = 1B + 2B×2 + 3B×3 + HR×4',12,batEnd);
+
+  // ════════════════════════════════════════════════════════
+  // PÁG 4 — PITCHEO
+  // ════════════════════════════════════════════════════════
+  doc.addPage(); fillBG();
+  y=15; y=secHdr('3 — ESTADÍSTICAS DE PITCHEO',y);
+
+  const pitBody=[];
+  ['v','l'].forEach(t=>{
+    pitBody.push([{content:gs.teams[t].name,colSpan:12,styles:{fillColor:t==='v'?[10,20,55]:[55,25,5],textColor:t==='v'?VIS:LOC,fontStyle:'bold',halign:'left'}}]);
+    getPitchStints(t).forEach(st=>{
+      const ec=st.era<2?GRN:st.era<3?[80,160,255]:st.era<4?AMB:st.era<5?[220,120,0]:RED;
+      const wc=st.whip<1?GRN:st.whip<1.15?[80,160,255]:st.whip<1.30?AMB:RED;
+      const lbl=`${st.name}  ${st.role}${st.dec?` (${st.dec})`:''}`;
+      pitBody.push([
+        {content:lbl,styles:{halign:'left',fontSize:6.5}},
+        st.ip,st.h,st.r,st.er,st.bb,st.k,st.hr,
+        {content:fmt2(st.era),styles:{textColor:ec,fontStyle:'bold'}},
+        {content:fmt2(st.whip),styles:{textColor:wc}},
+        fmt1(st.k9),fmt1(st.bb9)
+      ]);
+    });
+  });
+  doc.autoTable({...tDef, startY:y, margin:{left:10,right:10},
+    head:[['LANZADOR','IP','H','R','ER','BB','K','HR','ERA','WHIP','K/9','BB/9']],
+    body:pitBody,
+    columnStyles:{0:{cellWidth:52,halign:'left'}}
+  });
+
+  // ════════════════════════════════════════════════════════
+  // PÁG 5 — LÍNEAS INDIVIDUALES
+  // ════════════════════════════════════════════════════════
+  doc.addPage(); fillBG();
+  y=15; y=secHdr('4 — LÍNEA INDIVIDUAL POR BATEADOR',y);
+  const LM=12;
+
+  ['v','l'].forEach(t=>{
+    if(y>PH-30){ doc.addPage(); fillBG(); y=15; }
+    doc.setFillColor(...(t==='v'?[10,20,55]:[55,25,5]));
+    doc.rect(10,y,PW-20,6,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    doc.setTextColor(...(t==='v'?VIS:LOC));
+    doc.text(gs.teams[t].name,LM,y+4.2);
+    y+=8;
+
+    gs.teams[t].players.forEach((p,idx)=>{
+      if(y>PH-22){ doc.addPage(); fillBG(); y=15; }
+      const s=getBat(t,idx);
+      const lw=getLW(t,idx);
+      const extras=[];
+      if(s.d2) extras.push(`${s.d2} 2B`);
+      if(s.d3) extras.push(`${s.d3} 3B`);
+      if(s.hr)  extras.push(`${s.hr} HR`);
+      if(s.rbi) extras.push(`${s.rbi} RBI`);
+      if(s.r)   extras.push(`${s.r} R`);
+      if(s.bb)  extras.push(`${s.bb} BB`);
+      if(s.k)   extras.push(`${s.k} K`);
+      if(s.sb)  extras.push(`${s.sb} SB`);
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(...TXT);
+      doc.text(p.name,LM,y);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...DIM);
+      doc.text(`${s.h}-${s.ab}${extras.length?'  '+extras.join(' · '):''}`,LM+48,y);
+      y+=4.5;
+      doc.setFontSize(6.5);
+      doc.text(`AVG ${fmt3(s.avg)}  OBP ${fmt3(s.obp)}  SLG ${fmt3(s.slg)}  OPS ${fmt3(s.ops)}  RC ${s.rc.toFixed(2)}  LW ${lw>=0?'+':''}${lw.toFixed(2)}`,LM,y);
+      y+=4.5;
+      doc.setDrawColor(...BRD); doc.setLineWidth(0.1); doc.line(LM,y-0.5,PW-LM,y-0.5);
+    });
+    y+=3;
+  });
+
+  // ════════════════════════════════════════════════════════
+  // PÁG 6 — RC + LW RANKINGS
+  // ════════════════════════════════════════════════════════
+  doc.addPage(); fillBG();
+  y=15; y=secHdr('5 — CARRERAS GENERADAS (RC)  &  VALORES LINEALES — mayor a menor',y);
+
+  const allP=['v','l'].map(t=>gs.teams[t].players.map((_,idx)=>({
+    team:t, name:gs.teams[t].players[idx].name, tName:gs.teams[t].name,
+    rc:getBat(t,idx).rc, lw:getLW(t,idx)
+  }))).flat();
+
+  const rcS=[...allP].sort((a,b)=>b.rc-a.rc);
+  const lwS=[...allP].sort((a,b)=>b.lw-a.lw);
+  const half=PW/2-6;
+
+  doc.autoTable({...tDef, startY:y, margin:{left:10,right:PW/2+2},
+    head:[[
+      {content:'JUGADOR',styles:{halign:'left'}},
+      {content:'EQUIPO',styles:{halign:'center',cellWidth:22,fontSize:6}},
+      {content:'RC',styles:{halign:'center',cellWidth:18,textColor:GRN}}
+    ]],
+    body:rcS.map(r=>[
+      {content:r.name,styles:{halign:'left',textColor:r.team==='v'?VIS:LOC}},
+      {content:r.tName,styles:{halign:'center',fontSize:6,textColor:DIM}},
+      {content:r.rc.toFixed(2),styles:{halign:'center',textColor:GRN,fontStyle:'bold'}}
+    ])
+  });
+  const rcFY=doc.lastAutoTable.finalY;
+
+  doc.autoTable({...tDef, startY:y, margin:{left:PW/2+4,right:10},
+    head:[[
+      {content:'JUGADOR',styles:{halign:'left'}},
+      {content:'EQUIPO',styles:{halign:'center',cellWidth:22,fontSize:6}},
+      {content:'LW',styles:{halign:'center',cellWidth:18,textColor:AMB}}
+    ]],
+    body:lwS.map(r=>[
+      {content:r.name,styles:{halign:'left',textColor:r.team==='v'?VIS:LOC}},
+      {content:r.tName,styles:{halign:'center',fontSize:6,textColor:DIM}},
+      {content:(r.lw>=0?'+':'')+r.lw.toFixed(2),styles:{halign:'center',textColor:r.lw>=0?GRN:RED,fontStyle:'bold'}}
+    ])
+  });
+  const lwFY=doc.lastAutoTable.finalY;
+
+  const noteY=Math.max(rcFY,lwFY)+6;
+  doc.setFontSize(7); doc.setTextColor(...DIM);
+  doc.text('RC = (H+BB)×TB / (AB+BB)  ·  TB = 1B + 2B×2 + 3B×3 + HR×4',10,noteY);
+  doc.text('LW:  BB/HBP=+0.55  ·  1B=+0.70  ·  2B=+1.10  ·  3B=+1.35  ·  HR=+1.65  ·  Out=−0.25',10,noteY+5);
+
+  // ── Descarga ─────────────────────────────────────────────
+  const fname=`numeritos-finales-${safeName(vn)}-vs-${safeName(ln)}.pdf`;
+  doc.save(fname);
+  showToast(`📊 PDF descargado: ${fname}`);
 }
 
-function generateReportHTML(){
+function _oldReportHTML_removed(){
   const vn=gs.teams.v.name, ln=gs.teams.l.name;
   const totalV=gs.scores.v.reduce((a,b)=>a+b,0);
   const totalL=gs.scores.l.reduce((a,b)=>a+b,0);
