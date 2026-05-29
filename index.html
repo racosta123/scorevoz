@@ -492,30 +492,27 @@ function setupRowStopUI(team,row){
 
 function parseRowVoice(text,team,row){
   const t=text.toLowerCase().trim();
-  if(row==='dh'){
-    const name=t.replace(/bateador\s+designado|designado/g,'').trim();
-    if(!name) return null;
-    const fmt=toTitleCase(name);
-    document.getElementById(`p-${team}-dh`).value=fmt;
-    document.getElementById(`o-${team}-dh`).value='DH';
-    return `✓ DH: ${fmt}`;
-  }
   const posKeys=Object.keys(POS_WORD_MAP).sort((a,b)=>b.length-a.length);
-  let posNum=null, nameText=t;
-  // Greedy regex: captura el ÚLTIMO "al" como separador (maneja fin de cadena sin espacio final)
+  let posLabel='', nameText=t;
+  // Greedy regex: captura el ÚLTIMO "al" como separador
   const m=t.match(/^(.*)\s+al\s+(.+)$/);
   if(m){
     const afterAl=m[2].trim();
-    for(const pw of posKeys){
-      if(afterAl===pw||afterAl.startsWith(pw+' ')||afterAl.startsWith(pw)){ posNum=POS_WORD_MAP[pw]; break; }
+    if(/^(designado|dh)/.test(afterAl)){
+      posLabel='DH';
+    } else {
+      let posNum=null;
+      for(const pw of posKeys){
+        if(afterAl===pw||afterAl.startsWith(pw+' ')||afterAl.startsWith(pw)){ posNum=POS_WORD_MAP[pw]; break; }
+      }
+      if(posNum===null){ const n=parseInt(afterAl,10); if(n>=1&&n<=9) posNum=n; }
+      if(posNum!==null) posLabel=POS_ABBR[posNum-1];
     }
-    if(posNum===null){ const n=parseInt(afterAl,10); if(n>=1&&n<=9) posNum=n; }
     nameText=m[1].trim();
   }
   nameText=nameText.replace(/^(va|es|juega|batea)\s+/,'').trim();
   if(!nameText) return null;
   const fmt=toTitleCase(nameText);
-  const posLabel=posNum?POS_ABBR[posNum-1]:'';
   document.getElementById(`p-${team}-${row}`).value=fmt;
   if(posLabel) document.getElementById(`o-${team}-${row}`).value=posLabel;
   return `✓ #${row}: ${fmt}${posLabel?' · '+posLabel:''}`;
@@ -633,16 +630,6 @@ function buildSetup(t) {
         ontouchcancel="setupRowPttEnd(event)" title="Mantén: di nombre al número">🎤</button>`;
     c.appendChild(d);
   }
-  const dh = document.createElement('div');
-  dh.className = 'dh-row';
-  dh.innerHTML = `<div class="dh-label">DH</div>
-    <input class="player-input" id="p-${t}-dh" placeholder="Bateador Designado" maxlength="25">
-    <input class="pos-input" id="o-${t}-dh" value="DH" maxlength="3">
-    <button class="setup-mic-row" id="smb-${t}-dh"
-      onmousedown="setupRowPttStart('${t}','dh',event)" onmouseup="setupRowPttEnd(event)"
-      ontouchstart="setupRowPttStart('${t}','dh',event)" ontouchend="setupRowPttEnd(event)"
-      ontouchcancel="setupRowPttEnd(event)" title="Mantén: di nombre del DH">🎤</button>`;
-  c.appendChild(dh);
 }
 buildSetup('v'); buildSetup('l');
 
@@ -657,8 +644,6 @@ function startGame(){
         bat:i
       });
     }
-    const dhN = document.getElementById(`p-${t}-dh`).value.trim();
-    if(dhN) pl.push({name:dhN.toUpperCase(),pos:'DH',bat:'DH'});
     gs.teams[t].players = pl;
     gs.plays[t]={};
     pl.forEach((_,i)=>{ gs.plays[t][i]={}; });
@@ -756,7 +741,7 @@ function buildScoresheets(){
     const tbody=document.createElement('tbody');
     gs.teams[t].players.forEach((p,idx)=>{
       const tr=document.createElement('tr'); tr.id=`row-${t}-${idx}`;
-      tr.innerHTML=`<td class="player-cell" id="pc-${t}-${idx}"><div style="display:flex;align-items:center;justify-content:space-between;gap:3px"><div><span class="pname">${p.name}</span><span class="ppos">${p.bat==='DH'?'DH':p.bat} · ${p.pos}</span></div><button class="cambio-btn" id="cb-${t}-${idx}" onmousedown="subPttStart('${t}',${idx},event)" onmouseup="subPttEnd(event)" ontouchstart="subPttStart('${t}',${idx},event)" ontouchend="subPttEnd(event)" ontouchcancel="subPttEnd(event)" title="Mantén presionado: di entra [nombre] al [posición]">⇄</button></div></td>`;
+      tr.innerHTML=`<td class="player-cell" id="pc-${t}-${idx}"><div style="display:flex;align-items:center;justify-content:space-between;gap:3px"><div><span class="pname">${p.name}</span><span class="ppos">${p.bat} · ${p.pos}</span></div><button class="cambio-btn" id="cb-${t}-${idx}" onmousedown="subPttStart('${t}',${idx},event)" onmouseup="subPttEnd(event)" ontouchstart="subPttStart('${t}',${idx},event)" ontouchend="subPttEnd(event)" ontouchcancel="subPttEnd(event)" title="Mantén presionado: di entra [nombre] al [posición]">⇄</button></div></td>`;
       for(let i=1;i<=INNINGS;i++){
         const td=document.createElement('td'); td.className='dc'; td.id=`c-${t}-${idx}-${i}`;
         td.innerHTML=drawDiamond(null); td.onclick=()=>selectCell(t,idx,i,td); td.ondblclick=()=>showModal(t,idx,i);
