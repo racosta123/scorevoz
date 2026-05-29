@@ -191,6 +191,23 @@
   .confirm-no  { background:var(--red); color:#fff; }
 
   @media(max-width:768px){ .game-layout{grid-template-columns:1fr;} }
+
+  /* PITCH COUNTER BAR */
+  .pitch-bar { background:var(--bg2); padding:6px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .pitch-box { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:6px 12px; display:flex; align-items:center; gap:8px; flex:1; min-width:240px; }
+  .pitch-pitcher-name { font-family:'Oswald',sans-serif; font-size:0.82rem; color:var(--blue); letter-spacing:1px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px; }
+  .pitch-total { font-family:'Bebas Neue',sans-serif; font-size:2.4rem; color:var(--green); line-height:1; min-width:44px; text-align:center; }
+  .pitch-sbf { font-size:0.56rem; color:var(--text-dim); line-height:1.8; }
+  .btn-pc { border-radius:5px; font-family:'Bebas Neue',sans-serif; font-size:1rem; padding:5px 11px; cursor:pointer; letter-spacing:1px; transition:all 0.15s; }
+  .btn-pc-s { background:rgba(255,68,85,0.15); border:1px solid var(--red); color:var(--red); }
+  .btn-pc-b { background:rgba(51,153,255,0.12); border:1px solid var(--blue); color:var(--blue); }
+  .btn-pc-f { background:rgba(255,184,0,0.1); border:1px solid var(--amber); color:var(--amber); }
+  .btn-pc-plus { background:rgba(0,255,136,0.1); border:1px solid var(--green); color:var(--green); font-size:1.4rem; padding:4px 14px; }
+  /* HISTORIAL JUGADORES EN SCORESHEET */
+  .ph-entry { font-size:0.66rem; line-height:1.5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px; }
+  .ph-pos { font-size:0.52rem; color:var(--text-dim); margin-left:3px; }
+  .sub-btn-new { background:transparent; border:1px solid var(--border); border-radius:4px; color:var(--text-dim); font-size:0.6rem; padding:2px 5px; cursor:pointer; transition:all 0.15s; flex-shrink:0; line-height:1.2; }
+  .sub-btn-new:hover:not(:disabled) { border-color:var(--amber); color:var(--amber); }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -262,6 +279,26 @@
       </table>
     </div>
     <div class="inning-nav" id="innav"></div>
+    <div class="pitch-bar" id="pitch-bar">
+      <div class="pitch-box">
+        <div style="min-width:0"><div style="font-size:0.58rem;color:var(--text-dim);letter-spacing:1px;font-family:'Oswald'">VISITANTE</div><div class="pitch-pitcher-name" id="pc-name-v">—</div></div>
+        <div class="pitch-total" id="pc-total-v">0</div>
+        <div class="pitch-sbf" id="pc-sbf-v">S: 0<br>B: 0<br>F: 0</div>
+        <button class="btn-pc btn-pc-s" onclick="addPitch('v','strikes')">S</button>
+        <button class="btn-pc btn-pc-b" onclick="addPitch('v','balls')">B</button>
+        <button class="btn-pc btn-pc-f" onclick="addPitch('v','fouls')">F</button>
+        <button class="btn-pc btn-pc-plus" onclick="addPitch('v',null)">+</button>
+      </div>
+      <div class="pitch-box">
+        <div style="min-width:0"><div style="font-size:0.58rem;color:var(--text-dim);letter-spacing:1px;font-family:'Oswald'">LOCAL</div><div class="pitch-pitcher-name" id="pc-name-l">—</div></div>
+        <div class="pitch-total" id="pc-total-l">0</div>
+        <div class="pitch-sbf" id="pc-sbf-l">S: 0<br>B: 0<br>F: 0</div>
+        <button class="btn-pc btn-pc-s" onclick="addPitch('l','strikes')">S</button>
+        <button class="btn-pc btn-pc-b" onclick="addPitch('l','balls')">B</button>
+        <button class="btn-pc btn-pc-f" onclick="addPitch('l','fouls')">F</button>
+        <button class="btn-pc btn-pc-plus" onclick="addPitch('l',null)">+</button>
+      </div>
+    </div>
     <div class="game-layout">
       <div class="team-panel">
         <div class="team-header v">
@@ -312,6 +349,7 @@ let gs = {
   plays:{ v:{}, l:{} },
   scores:{ v:[], l:[] },
   subs:{ v:[], l:[] },
+  pitchCount:{ v:{total:0,strikes:0,balls:0,fouls:0}, l:{total:0,strikes:0,balls:0,fouls:0} },
   selected:null,
   lang:'es-MX'
 };
@@ -322,8 +360,8 @@ const PLAY_CATALOG = {
   // ── OUTS (van dentro de un círculo) ──
   outs:[
     // Ponches
-    { id:'KS',  label:'K ⚾ Ponche Swing',      sym:'KS',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche swing','strike out swing','abanicó','abaniq','chocolate','abanicar','whiff','abanico'] },
-    { id:'KL',  label:'KL Ponche Cantado',       sym:'KL',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche cantado','ponche mirando','ponche llamado','strike out looking','sin tirarle','sin mover','ponche viendo','parado','ponche parado','sin mover el bate'] },
+    { id:'KS',  label:'K ⚾ Ponche Swing',      sym:'KS',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche','ponche swing','strike out swing','abanicó','abaniq','chocolate','abanicar','whiff','abanico','morder el polvo','se lo comió'] },
+    { id:'KL',  label:'KL Ponche Cantado',       sym:'KL',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche cantado','ponche mirando','ponche llamado','strike out looking','sin tirarle','sin mover','ponche viendo','parado','ponche parado','sin mover el bate','ponche sin tirarle','tercer strike cantado','se quedó parado','se quedo parado','le cantaron el strike','strike tres cantado'] },
     // Fly outs
     { id:'F7',  label:'F7 Fly Left Field',       sym:'F7',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly izquierda','elevado izquierda','fly left'] },
     { id:'F8',  label:'F8 Fly Center',           sym:'F8',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly center','elevado centro','fly central'] },
@@ -341,7 +379,7 @@ const PLAY_CATALOG = {
     { id:'DP643',label:'DP 6-4-3 Doble Play',   sym:'643', bases:0, type:'out', ab:true,  color:'red',   voice:['doble play','double play','643','doble matanza'] },
     { id:'DP543',label:'DP 5-4-3 Doble Play',   sym:'543', bases:0, type:'out', ab:true,  color:'red',   voice:['doble play tercera','543'] },
     // Sacrificios
-    { id:'SH',  label:'SH Sacrificio Hit Toque', sym:'SH',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio hit','toque de sacrificio','bunt sacrificio','sacrificio toque','plancha'] },
+    { id:'SH',  label:'SH Sacrificio Hit Toque', sym:'SH',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio hit','toque de sacrificio','bunt sacrificio','sacrificio toque','plancha','toque de bola','bunt','toque corto','toque al cuadro','bunt de sacrificio','plancha de sacrificio'] },
     { id:'SF',  label:'SF Sacrificio Fly',       sym:'SF',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio fly','fly de sacrificio'] },
     // Infield fly, out regla
     { id:'IF',  label:'IF Infield Fly',          sym:'IF',  bases:0, type:'out', ab:true,  color:'red',   voice:['infield fly'] },
@@ -349,14 +387,16 @@ const PLAY_CATALOG = {
     { id:'GDP', label:'GDP Bateado DP',          sym:'GDP', bases:0, type:'out', ab:true,  color:'red',   voice:['bateado doble play','gdp'] },
     // Cogido robando
     { id:'CS',  label:'CS Cogido Robando',       sym:'CS',  bases:0, type:'out', ab:false, color:'red',   voice:['cogido robando','out robando','caught stealing','out en el intento','se la jalaron','atrapado robando'] },
+    { id:'RD',  label:'RD Tira y Tira / Rundown', sym:'RD', bases:0, type:'out', ab:false, color:'red',   voice:['tira y tira','rundown','pickle','atrapado entre bases','corredor atrapado','tierra de nadie'] },
+    { id:'TP',  label:'TP Triple Play / Triple Matanza', sym:'TP', bases:0, type:'out', ab:false, color:'red',   voice:['triple play','triple matanza'] },
   ],
 
   // ── HITS ──
   hits:[
-    { id:'1B',  label:'1B Sencillo',             sym:'1B',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['sencillo','single','hit sencillo','hit uno','una base','imparable','hit infield','texas leaguer'] },
-    { id:'2B',  label:'2B Doble',                sym:'2B',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['doble','double','dos bases','hit doble','tubey'] },
-    { id:'3B',  label:'3B Triple',               sym:'3B',  bases:3, type:'hit',  ab:true,  h:true, color:'green', voice:['triple','tres bases','hit triple','triplete'] },
-    { id:'HR',  label:'HR Jonrón',               sym:'HR',  bases:4, type:'hit',  ab:true,  h:true, color:'green', voice:['jonron','jonrón','home run','cuadrangular','cuadrangula','grand slam','bambinazo','toletazo','largo','se la llevó','cuadrangulo'] },
+    { id:'1B',  label:'1B Sencillo',             sym:'1B',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['sencillo','single','hit sencillo','hit uno','una base','imparable','hit infield','infield hit','texas leaguer','hit al cuadro'] },
+    { id:'2B',  label:'2B Doble',                sym:'2B',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['doble','double','dos bases','hit doble','tubey','tubei','two bagger','hit de dos'] },
+    { id:'3B',  label:'3B Triple',               sym:'3B',  bases:3, type:'hit',  ab:true,  h:true, color:'green', voice:['triple','tres bases','hit triple','triplete','tres esquinas','hit de tres'] },
+    { id:'HR',  label:'HR Jonrón',               sym:'HR',  bases:4, type:'hit',  ab:true,  h:true, color:'green', voice:['jonron','jonrón','home run','jonronazo','cuadrangular','cuadrangula','grand slam','bambinazo','toletazo','largo','se la llevó','cuadrangulo'] },
     { id:'IHR', label:'IHR Jonrón Inside Park',  sym:'IHR', bases:4, type:'hit',  ab:true,  h:true, color:'green', voice:['jonron dentro del parque','inside park','jonron interior'] },
     // Hits por zona
     { id:'LS',  label:'LS Hit Lado Izquierdo',   sym:'LS',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['hit lado izquierdo','hit izquierda','hit left side'] },
@@ -367,7 +407,7 @@ const PLAY_CATALOG = {
     { id:'LL',  label:'LL Hit Línea Izquierda',  sym:'LL',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['hit linea izquierda','hit línea izquierda'] },
     { id:'RL',  label:'RL Hit Línea Derecha',    sym:'RL',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['hit linea derecha','hit línea derecha'] },
     // Toque de hit
-    { id:'B',   label:'B  Bunt Hit',             sym:'B',   bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['bunt hit','toque de hit','toque hit','plancha hit'] },
+    { id:'B',   label:'B  Bunt Hit',             sym:'B',   bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['bunt hit','toque de hit','toque hit','plancha hit','toque por hit','bunt sorpresa','toque sorpresa'] },
   ],
 
   // ── EMBASADO SIN BATAZO ──
@@ -394,13 +434,13 @@ const PLAY_CATALOG = {
 
   // ── AVANCES / EVENTOS EN BASE ──
   advances:[
-    { id:'SB',  label:'SB Base Robada',           sym:'SB',  bases:null, type:'advance', ab:false, color:'amber', voice:['robo','robó','base robada','stolen base','sb','se robó','se robo'] },
+    { id:'SB',  label:'SB Base Robada',           sym:'SB',  bases:null, type:'advance', ab:false, color:'amber', voice:['robo','robó','base robada','stolen base','sb','se robó','se robo','robo exitoso'] },
     { id:'WP',  label:'WP Wild Pitch',            sym:'WP',  bases:null, type:'advance', ab:false, color:'amber', voice:['wild pitch','lanzamiento wild','tiro salvaje','wp','lanzamiento loco','lanzamiento descontrolado','tiro descontrolado'] },
-    { id:'PB',  label:'PB Passed Ball',           sym:'PB',  bases:null, type:'advance', ab:false, color:'amber', voice:['passed ball','pasbol','pb'] },
-    { id:'BK',  label:'BK Balk / Falta',          sym:'BK',  bases:null, type:'advance', ab:false, color:'amber', voice:['balk','falta lanzador','bk','engaño','infracción del lanzador','infraccion del lanzador'] },
+    { id:'PB',  label:'PB Passed Ball',           sym:'PB',  bases:null, type:'advance', ab:false, color:'amber', voice:['passed ball','pasbol','pelota pasada','pb'] },
+    { id:'BK',  label:'BK Balk / Falta',          sym:'BK',  bases:null, type:'advance', ab:false, color:'amber', voice:['balk','falta lanzador','falta del pitcher','bk','engaño','infracción del lanzador','infraccion del lanzador'] },
     { id:'T',   label:'T  Avance por Tiro',       sym:'T',   bases:null, type:'advance', ab:false, color:'amber', voice:['avance por tiro'] },
-    { id:'FC',  label:'FC Fielder\'s Choice',     sym:'FC',  bases:1,    type:'advance', ab:true,  color:'amber', voice:["fielder's choice",'fielder choice','jugada de eleccion','jugada elección','fc'] },
-    { id:'PC',  label:'PC Pisa y Corre',          sym:'PC',  bases:null, type:'advance', ab:false, color:'amber', voice:['pisa y corre','squeeze play','squeeze suicida','jugada de cuña','jugada de cuna','toque suicida'] },
+    { id:'FC',  label:'FC Fielder\'s Choice',     sym:'FC',  bases:1,    type:'advance', ab:true,  color:'amber', voice:["fielder's choice",'fielder choice','jugada de eleccion','jugada elección','jugada de elección','fc','bateo y corrido','hit and run'] },
+    { id:'PC',  label:'PC Pisa y Corre',          sym:'PC',  bases:null, type:'advance', ab:false, color:'amber', voice:['pisa y corre','squeeze play','squeeze suicida','jugada de cuña','jugada de cuna','toque suicida','tag up','espera y corre'] },
   ],
 
   // ── CARRERA / ESPECIAL ──
@@ -641,21 +681,8 @@ function parseSubVoice(text,team,outPidx){
 function applySubstitution(team,outPidx,inName,inPos){
   const inn=gs.currentInning||1;
   gs.subs[team].push({ inn, outPidx, inName, inPos });
-  const row=document.getElementById(`row-${team}-${outPidx}`);
-  if(!row) return;
-  const cell=row.querySelector('.player-cell');
-  cell.classList.add('player-subbed');
-  const ppos=cell.querySelector('.ppos');
-  const subTag=document.createElement('span');
-  subTag.className='sub-tag';
-  subTag.textContent=`↑ SALE E${inn}`;
-  ppos.after(subTag);
-  const subIn=document.createElement('span');
-  subIn.className='sub-in';
-  subIn.textContent=`↓ ${inName}${inPos?' · '+inPos:''}`;
-  subTag.after(subIn);
-  const btn=document.getElementById(`cb-${team}-${outPidx}`);
-  if(btn){ btn.textContent='✓'; btn.disabled=true; }
+  rebuildPlayerCell(team,outPidx);
+  showToast(`✓ E${inn}: entra ${inName}${inPos?' · '+inPos:''}`);
 }
 
 // ─── BUILD SETUP ──────────────────────────────────────────
@@ -700,6 +727,7 @@ function startGame(){
   document.getElementById('game-status').style.display='flex';
   document.getElementById('lang-toggle').style.display='block';
   document.getElementById('numeritos-btn').style.display='block';
+  document.getElementById('pitch-bar').style.display='flex';
   buildLineScore(); buildInningNav(); buildScoresheets(); updateScores();
 }
 
@@ -786,7 +814,7 @@ function buildScoresheets(){
     const tbody=document.createElement('tbody');
     gs.teams[t].players.forEach((p,idx)=>{
       const tr=document.createElement('tr'); tr.id=`row-${t}-${idx}`;
-      tr.innerHTML=`<td class="player-cell" id="pc-${t}-${idx}"><div style="display:flex;align-items:center;justify-content:space-between;gap:3px"><div><span class="pname">${p.name}</span><span class="ppos">${p.bat} · ${p.pos}</span></div><button class="cambio-btn" id="cb-${t}-${idx}" onmousedown="subPttStart('${t}',${idx},event)" onmouseup="subPttEnd(event)" ontouchstart="subPttStart('${t}',${idx},event)" ontouchend="subPttEnd(event)" ontouchcancel="subPttEnd(event)" title="Mantén presionado: di entra [nombre] al [posición]">⇄</button></div></td>`;
+      tr.innerHTML=`<td class="player-cell" id="pc-${t}-${idx}">${getPlayerCellInnerHTML(t,idx)}</td>`;
       for(let i=1;i<=INNINGS;i++){
         const td=document.createElement('td'); td.className='dc'; td.id=`c-${t}-${idx}-${i}`;
         td.innerHTML=drawDiamond(null); td.onclick=()=>selectCell(t,idx,i,td); td.ondblclick=()=>showModal(t,idx,i);
@@ -1867,6 +1895,81 @@ td{border:1px solid #ddd;padding:4px 4px;text-align:center;white-space:nowrap}
 <script>window.addEventListener('load',()=>setTimeout(()=>window.print(),500));<\/script>
 </body>
 </html>`;
+}
+
+// ─── CONTADOR DE LANZAMIENTOS ──────────────────────────────
+function addPitch(team,type){
+  gs.pitchCount[team].total++;
+  if(type) gs.pitchCount[team][type]++;
+  const el=document.getElementById(`pc-total-${team}`);
+  if(el) el.textContent=gs.pitchCount[team].total;
+  const sb=document.getElementById(`pc-sbf-${team}`);
+  if(sb) sb.innerHTML=`S: ${gs.pitchCount[team].strikes}<br>B: ${gs.pitchCount[team].balls}<br>F: ${gs.pitchCount[team].fouls}`;
+}
+
+function getCurrentPitcherName(){ return '—'; }
+
+// ─── HISTORIAL Y SUBMENÚ DE CAMBIO DE JUGADOR ─────────────
+function getPlayerCellInnerHTML(team,pidx){
+  const p=gs.teams[team].players[pidx];
+  const subs=gs.subs[team].filter(s=>s.outPidx===pidx).sort((a,b)=>a.inn-b.inn);
+  const entries=[{name:p.name,pos:p.pos,isTitular:true,inn:null},...subs.map(s=>({name:s.inName,pos:s.inPos,isTitular:false,inn:s.inn}))];
+  const entriesHTML=entries.map((pl,i)=>{
+    const isLast=i===entries.length-1;
+    const color=isLast?(pl.isTitular?'#fff':'var(--blue)'):'var(--red)';
+    const deco=isLast?'none':'line-through';
+    const opacity=isLast?1:0.45;
+    const posStr=pl.isTitular?`${p.bat} · ${pl.pos}`:`${pl.pos} E${pl.inn}`;
+    return `<div class="ph-entry" style="color:${color};text-decoration:${deco};opacity:${opacity}">${pl.name}<span class="ph-pos">${posStr}</span></div>`;
+  }).join('');
+  const canMore=subs.length<3;
+  const btnHtml=canMore
+    ?`<button class="sub-btn-new" id="cb-${team}-${pidx}" onclick="openSubModal('${team}',${pidx})" title="Cambio de jugador">⇄</button>`
+    :`<button class="sub-btn-new" id="cb-${team}-${pidx}" disabled style="border-color:var(--green);color:var(--green)" title="Máx cambios alcanzados">✓</button>`;
+  return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:3px"><div style="flex:1;min-width:0">${entriesHTML}</div>${btnHtml}</div>`;
+}
+
+function rebuildPlayerCell(team,pidx){
+  const cell=document.getElementById(`pc-${team}-${pidx}`);
+  if(!cell) return;
+  cell.innerHTML=getPlayerCellInnerHTML(team,pidx);
+}
+
+function openSubModal(team,pidx){
+  const p=gs.teams[team].players[pidx];
+  const subs=gs.subs[team].filter(s=>s.outPidx===pidx).sort((a,b)=>a.inn-b.inn);
+  const inn=gs.currentInning||1;
+  const entries=[{name:p.name,pos:p.pos,isTitular:true,inn:null},...subs.map(s=>({name:s.inName,pos:s.inPos,isTitular:false,inn:s.inn}))];
+  const histHTML=entries.map((pl,i)=>{
+    const isLast=i===entries.length-1;
+    const color=isLast?(pl.isTitular?'#fff':'var(--blue)'):'var(--red)';
+    const deco=isLast?'none':'line-through';
+    const statusText=!isLast?` ↑ SALIÓ E${pl.inn||''}`:pl.isTitular?' · TITULAR':` · E${pl.inn}`;
+    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><span style="color:${color};text-decoration:${deco};font-size:0.78rem;flex:1">${pl.name}</span><span style="font-size:0.58rem;color:var(--text-dim)">${pl.pos}${statusText}</span></div>`;
+  }).join('');
+  document.getElementById('mtitle').textContent=`CAMBIO — #${p.bat} ${p.pos}`;
+  const body=document.getElementById('mbody');
+  body.innerHTML=`
+    <div class="modal-section">HISTORIAL DE POSICIÓN</div>
+    <div style="padding:4px 0 10px">${histHTML}</div>
+    <div class="modal-section">ENTRA — ENTRADA ${inn}</div>
+    <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+      <input class="player-input" id="sub-modal-name" placeholder="Nombre del jugador" maxlength="25" style="flex:1">
+      <input class="pos-input" id="sub-modal-pos" placeholder="${p.pos}" maxlength="3" style="width:52px">
+    </div>
+    <button class="play-btn" onclick="applySubFromModal('${team}',${pidx},${inn})" style="width:100%;margin-top:10px;border-color:var(--green);color:var(--green)">✓ CONFIRMAR CAMBIO</button>`;
+  document.getElementById('modal').classList.add('show');
+}
+
+function applySubFromModal(team,pidx,inn){
+  const nameEl=document.getElementById('sub-modal-name');
+  if(!nameEl||!nameEl.value.trim()){ showToast('⚠️ Ingresa el nombre del jugador',true); return; }
+  const inName=toTitleCase(nameEl.value.trim());
+  const posEl=document.getElementById('sub-modal-pos');
+  const p=gs.teams[team].players[pidx];
+  const inPos=(posEl&&posEl.value.trim()?posEl.value.trim():p.pos).toUpperCase();
+  closeModal();
+  applySubstitution(team,pidx,inName,inPos);
 }
 
 // ─── TOAST ────────────────────────────────────────────────
