@@ -2400,6 +2400,14 @@ function showPlayerFicha(team,pidx){
   const lwStr=(lw>=0?'+':'')+lw.toFixed(2);
   const lwColor=lw>0?'var(--green)':lw<0?'var(--red)':'var(--text-dim)';
 
+  // ── Calificación OPS ──────────────────────────────────────
+  const opsRating=ops>=1.0?{lbl:'EXCELENTE', col:'var(--green)',   bg:'rgba(0,229,153,.08)',  bc:'rgba(0,229,153,.25)'}:
+                  ops>=0.8?{lbl:'MUY BUENO', col:'var(--cyan)',    bg:'rgba(0,191,255,.08)',  bc:'rgba(0,191,255,.25)'}:
+                  ops>=0.65?{lbl:'PROMEDIO',  col:'var(--amber)',   bg:'rgba(255,182,72,.08)', bc:'rgba(255,182,72,.25)'}:
+                            {lbl:'DEFICIENTE',col:'var(--red)',     bg:'rgba(255,77,103,.08)', bc:'rgba(255,77,103,.25)'};
+  // Si no hay AB ni BB no hay calificación útil
+  const hasPA=ab+bb+hbp>0;
+
   const INNINGS=gs.scores[team].length;
   let lineHTML='';
   for(let i=1;i<=INNINGS;i++){
@@ -2428,11 +2436,22 @@ function showPlayerFicha(team,pidx){
   const mbox=(lbl,val)=>
     `<div class="jug-metric-box"><div class="jug-metric-lbl">${lbl}</div><div class="jug-metric-val">${val}</div></div>`;
 
+  const ratingHTML=hasPA?`
+    <div style="display:flex;align-items:center;justify-content:space-between;background:${opsRating.bg};border:1px solid ${opsRating.bc};border-radius:12px;padding:10px 16px;margin-top:8px">
+      <div>
+        <div style="font-family:'Oswald',sans-serif;font-size:.65rem;color:var(--text-dim);letter-spacing:2px">CALIFICACIÓN OPS</div>
+        <div style="font-size:.58rem;color:var(--text-dim);margin-top:1px">OPS ${fmt3(ops)}</div>
+      </div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;color:${opsRating.col};letter-spacing:2px">${opsRating.lbl}</div>
+    </div>`:'';
+
   document.getElementById('jugador-content').innerHTML=`
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
       <button onclick="document.getElementById('jugador-content').innerHTML=buildPlayerListHTML()"
         style="background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-dim);font-size:.72rem;padding:4px 9px;cursor:pointer">‹ LISTA</button>
       <h3 style="margin:0;border:none;padding:0;flex:1">${curName}</h3>
+      <button onclick="downloadPlayerFichaPDF('${team}',${pidx})"
+        style="background:rgba(255,182,72,.12);border:1px solid var(--amber);border-radius:8px;color:var(--amber);font-family:'Bebas Neue',sans-serif;font-size:.85rem;letter-spacing:1px;padding:5px 11px;cursor:pointer;white-space:nowrap">📄 PDF</button>
     </div>
     <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
       <span style="background:rgba(255,255,255,.06);border-radius:8px;padding:3px 10px;font-family:'Oswald',sans-serif;font-size:.75rem;color:${tColor}">${gs.teams[team].name}</span>
@@ -2455,13 +2474,191 @@ function showPlayerFicha(team,pidx){
       ${mbox('AVG',fmt3(avg))}${mbox('OBP',fmt3(obp))}
       ${mbox('SLG',fmt3(slg))}${mbox('OPS',fmt3(ops))}
     </div>
-    <div class="jug-lw-box">
+    ${ratingHTML}
+    <div class="jug-lw-box" style="margin-top:8px">
       <div>
         <div style="font-family:'Oswald',sans-serif;font-size:.65rem;color:var(--text-dim);letter-spacing:2px">⚡ LINEAR WEIGHTS</div>
         <div style="font-size:.6rem;color:var(--text-dim);margin-top:2px">Valor estimado en carreras generadas</div>
       </div>
       <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;color:${lwColor};line-height:1">${lwStr}</div>
     </div>`;
+}
+
+function downloadPlayerFichaPDF(team,pidx){
+  if(!window.jspdf||!window.jspdf.jsPDF){ showToast('⚠️ jsPDF no cargó',true); return; }
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'letter'});
+  const PW=doc.internal.pageSize.getWidth();
+
+  // Paleta
+  const BG=[7,16,24], C1=[16,27,37], C2=[12,21,29], BRD=[30,48,72];
+  const GRN=[0,229,153], CYN=[0,191,255], AMB=[255,182,72], RED=[255,77,103];
+  const TXT=[255,255,255], DIM=[143,163,183];
+
+  const p=gs.teams[team].players[pidx];
+  const subs=(gs.subs[team]||[]).filter(s=>s.outPidx===pidx).sort((a,b)=>a.inn-b.inn);
+  const curName=subs.length>0?subs[subs.length-1].inName:p.name;
+  const curPos=subs.length>0?subs[subs.length-1].inPos:p.pos;
+  const tClr=team==='v'?CYN:GRN;
+
+  // ── Stats ─────────────────────────────────────────────────
+  const plays=gs.plays[team][pidx]||{};
+  let ab=0,h=0,r=0,rbi=0,d2=0,d3=0,hr=0,bb=0,hbp=0,k=0,sb=0,sf=0;
+  Object.entries(plays).forEach(([inn,pl])=>{
+    if(!pl) return;
+    if(pl.ab) ab++;
+    if(pl.h){ h++;
+      if(['2B','LC','RC','LL','RL'].includes(pl.sym)) d2++;
+      else if(pl.sym==='3B') d3++;
+      else if(pl.sym==='HR'||pl.sym==='IHR') hr++;
+    }
+    if(pl.scored) r++;
+    if(pl.sym==='BB'||pl.sym==='BBI') bb++;
+    if(pl.sym==='BG') hbp++;
+    if(pl.sym==='KS'||pl.sym==='KL') k++;
+    if(pl.sym==='SB') sb++;
+    if(pl.sym==='SF') sf++;
+    if(pl.type!=='out'&&pl.type!=='clear'){
+      if(pl.scored&&pl.type==='hit') rbi++;
+      for(let j=0;j<pidx;j++){
+        const jp=(gs.plays[team][j]||{})[inn];
+        if(jp&&jp.scored) rbi++;
+      }
+    }
+  });
+  const s1=Math.max(0,h-d2-d3-hr);
+  const tb=s1+d2*2+d3*3+hr*4;
+  const avg=ab>0?h/ab:0;
+  const den=ab+bb+hbp+sf;
+  const obp=den>0?(h+bb+hbp)/den:0;
+  const slg=ab>0?tb/ab:0;
+  const ops=obp+slg;
+  const f3=n=>n>0&&n<1?n.toFixed(3).slice(1):n.toFixed(3);
+
+  const LWV={'BB':0.55,'BBI':0.55,'BG':0.55,'1B':0.70,'LS':0.70,'RS':0.70,'MI':0.70,'B':0.70,
+    '2B':1.10,'LC':1.10,'RC':1.10,'LL':1.10,'RL':1.10,'3B':1.35,'HR':1.65,'IHR':1.65};
+  let lw=0;
+  Object.values(plays).forEach(pl=>{ if(!pl) return; if(LWV[pl.sym]!==undefined) lw+=LWV[pl.sym]; else if(pl.type==='out') lw-=0.25; });
+  const lwStr=(lw>=0?'+':'')+lw.toFixed(2);
+
+  const hasPA=ab+bb+hbp>0;
+  const rat=!hasPA?null:ops>=1.0?{lbl:'EXCELENTE',clr:GRN}:ops>=0.8?{lbl:'MUY BUENO',clr:CYN}:ops>=0.65?{lbl:'PROMEDIO',clr:AMB}:{lbl:'DEFICIENTE',clr:RED};
+
+  // ── Fondo ─────────────────────────────────────────────────
+  doc.setFillColor(...BG); doc.rect(0,0,PW,280,'F');
+
+  let y=14;
+
+  // ── Header banda ─────────────────────────────────────────
+  doc.setFillColor(...C1); doc.roundedRect(10,y,PW-20,22,3,3,'F');
+  doc.setFillColor(...tClr); doc.rect(10,y,3,22,'F');
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.setTextColor(...TXT);
+  doc.text(curName,18,y+8);
+  doc.setFontSize(8); doc.setTextColor(...tClr);
+  doc.text(gs.teams[team].name,18,y+14);
+  doc.setTextColor(...AMB); doc.setFont('helvetica','bold'); doc.setFontSize(10);
+  doc.text(curPos,PW-26,y+8,{align:'right'});
+  doc.setFontSize(7); doc.setTextColor(...DIM);
+  doc.text(`#${p.bat} · LÍNEA ${ab}-${h}`,PW-26,y+14,{align:'right'});
+  y+=28;
+
+  // ── Línea del juego ───────────────────────────────────────
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...GRN);
+  doc.text('LÍNEA DEL JUEGO',10,y); y+=4;
+  doc.setDrawColor(...BRD); doc.setLineWidth(0.2); doc.line(10,y,PW-10,y); y+=3;
+
+  const INNINGS=gs.scores[team].length;
+  const bw=(PW-20)/INNINGS;
+  for(let i=0;i<INNINGS;i++){
+    const pl=plays[i+1];
+    const x=10+i*bw;
+    doc.setFillColor(...C2); doc.roundedRect(x+0.5,y,bw-1,9,1,1,'F');
+    doc.setFontSize(5); doc.setTextColor(...DIM); doc.setFont('helvetica','normal');
+    doc.text(`E${i+1}`,x+bw/2,y+3.2,{align:'center'});
+    let symClr=DIM; let sym='—';
+    if(pl){ sym=pl.sym||'?';
+      if(pl.type==='out') symClr=RED;
+      else if(pl.type==='hit') symClr=GRN;
+      else if(pl.type==='walk') symClr=CYN;
+      else symClr=AMB;
+    }
+    doc.setFontSize(6); doc.setFont('helvetica','bold'); doc.setTextColor(...symClr);
+    doc.text(sym,x+bw/2,y+7.5,{align:'center'});
+  }
+  y+=13;
+
+  // ── Stats ─────────────────────────────────────────────────
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...GRN);
+  doc.text('ESTADÍSTICAS',10,y); y+=4;
+  doc.line(10,y,PW-10,y); y+=3;
+
+  const statCols=['AB','H','R','RBI','2B','3B','HR','BB','HBP','K','SB','TB'];
+  const statVals=[ab,h,r,rbi,d2,d3,hr,bb,hbp,k,sb,tb];
+  const statClrs={H:GRN,R:CYN,RBI:AMB,HR:RED,BB:CYN,K:RED};
+  const sw=(PW-20)/statCols.length;
+  statCols.forEach((lbl,i)=>{
+    const x=10+i*sw;
+    doc.setFillColor(...C1); doc.roundedRect(x+0.5,y,sw-1,10,1,1,'F');
+    doc.setFontSize(5); doc.setFont('helvetica','normal'); doc.setTextColor(...DIM);
+    doc.text(lbl,x+sw/2,y+3.5,{align:'center'});
+    const vc=statClrs[lbl]||TXT;
+    doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(...vc);
+    doc.text(String(statVals[i]),x+sw/2,y+8.5,{align:'center'});
+  });
+  y+=14;
+
+  // ── Métricas ──────────────────────────────────────────────
+  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...GRN);
+  doc.text('MÉTRICAS',10,y); y+=4;
+  doc.line(10,y,PW-10,y); y+=3;
+
+  const mCols=['AVG','OBP','SLG','OPS'];
+  const mVals=[f3(avg),f3(obp),f3(slg),f3(ops)];
+  const mw=(PW-20)/4;
+  mCols.forEach((lbl,i)=>{
+    const x=10+i*mw;
+    doc.setFillColor(0,45,30); doc.roundedRect(x+0.5,y,mw-1,12,1.5,1.5,'F');
+    doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(...GRN);
+    doc.text(lbl,x+mw/2,y+4.5,{align:'center'});
+    doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text(mVals[i],x+mw/2,y+10,{align:'center'});
+  });
+  y+=16;
+
+  // ── Calificación OPS ─────────────────────────────────────
+  if(rat){
+    doc.setFillColor(...C1); doc.roundedRect(10,y,PW-20,12,2,2,'F');
+    doc.setFillColor(...rat.clr); doc.rect(10,y,3,12,'F');
+    doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...DIM);
+    doc.text('CALIFICACIÓN OPS',18,y+5);
+    doc.setFontSize(7); doc.setTextColor(...DIM); doc.setFont('helvetica','normal');
+    doc.text(`OPS ${f3(ops)}`,18,y+9.5);
+    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(...rat.clr);
+    doc.text(rat.lbl,PW-12,y+8,{align:'right'});
+    y+=16;
+  }
+
+  // ── Linear Weights ────────────────────────────────────────
+  doc.setFillColor(0,25,40); doc.roundedRect(10,y,PW-20,12,2,2,'F');
+  doc.setFillColor(...CYN); doc.rect(10,y,3,12,'F');
+  doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(...DIM);
+  doc.text('⚡ LINEAR WEIGHTS',18,y+5);
+  doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.text('Valor estimado en carreras generadas',18,y+9.5);
+  const lwClrArr=lw>0?GRN:lw<0?RED:DIM;
+  doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(...lwClrArr);
+  doc.text(lwStr,PW-12,y+8.5,{align:'right'});
+  y+=16;
+
+  // ── Footer ────────────────────────────────────────────────
+  const today=new Date().toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'});
+  doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(...DIM);
+  doc.text(`ScoreVoz ⚾ · ${today}`,PW/2,y+4,{align:'center'});
+
+  const safeName=curName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
+  doc.save(`ficha_${safeName}.pdf`);
+  showToast(`📄 PDF de ${curName} descargado`);
 }
 
 // ─── TOAST ────────────────────────────────────────────────
