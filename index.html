@@ -40,10 +40,10 @@
   .player-input:focus { border-color:var(--green); }
   .pos-input { font-size:0.78rem; padding:6px 6px; width:100%; color:var(--amber); text-align:center; text-transform:uppercase; }
   .pos-input:focus { border-color:var(--amber); }
-  .players-grid { display:grid; grid-template-columns:26px 1fr 72px; gap:5px; align-items:center; margin-bottom:5px; }
+  .players-grid { display:grid; grid-template-columns:26px 1fr 60px 28px; gap:5px; align-items:center; margin-bottom:5px; }
   .bat-num { color:var(--green); font-size:0.8rem; text-align:center; font-weight:500; }
   .col-header { font-size:0.62rem; color:var(--text-dim); letter-spacing:1px; padding-bottom:4px; border-bottom:1px solid var(--border); margin-bottom:3px; }
-  .dh-row { background:rgba(255,184,0,0.05); border:1px dashed rgba(255,184,0,0.2); border-radius:6px; padding:4px; display:grid; grid-template-columns:26px 1fr 72px; gap:5px; align-items:center; margin-top:6px; }
+  .dh-row { background:rgba(255,184,0,0.05); border:1px dashed rgba(255,184,0,0.2); border-radius:6px; padding:4px; display:grid; grid-template-columns:26px 1fr 60px 28px; gap:5px; align-items:center; margin-top:6px; }
   .dh-label { font-size:0.58rem; color:var(--amber); text-align:center; letter-spacing:1px; }
   .btn-start { width:100%; margin-top:24px; background:var(--green); color:#000; border:none; border-radius:10px; font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:4px; padding:14px; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 20px rgba(0,255,136,0.3); }
   .btn-start:hover { background:var(--green-dim); transform:translateY(-2px); }
@@ -135,12 +135,10 @@
   .btn-register:hover:not(:disabled) { background:rgba(0,255,136,0.18); }
   .btn-register:disabled { border-color:var(--border); color:var(--text-dim); cursor:default; background:transparent; }
 
-  /* SETUP VOZ */
-  .setup-voice-row { display:flex; align-items:center; gap:8px; margin-top:8px; margin-bottom:4px; }
-  .setup-mic-btn { background:var(--green-dark); border:1px solid var(--green); border-radius:50%; width:34px; height:34px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.95rem; flex-shrink:0; transition:all 0.2s; }
-  .setup-mic-btn:hover { background:rgba(0,255,136,0.2); }
-  .setup-mic-btn.listening { animation:pulse 1s infinite; }
-  .setup-voice-st { font-size:0.67rem; color:var(--text-dim); font-style:italic; flex:1; }
+  /* SETUP VOZ POR FILA */
+  .setup-mic-row { background:var(--green-dark); border:1px solid var(--green); border-radius:50%; width:26px; height:26px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.72rem; flex-shrink:0; transition:all 0.2s; padding:0; }
+  .setup-mic-row:hover { background:rgba(0,255,136,0.2); }
+  .setup-mic-row.recording { background:rgba(255,68,85,0.15); border-color:var(--red); animation:pulse 1s infinite; }
 
   /* CAMBIO DE JUGADOR */
   .cambio-btn { background:transparent; border:1px solid var(--border); border-radius:4px; color:var(--text-dim); font-size:0.6rem; padding:2px 5px; cursor:pointer; transition:all 0.15s; flex-shrink:0; line-height:1.2; }
@@ -223,11 +221,7 @@
     <h3><span style="color:var(--blue)">▶ VISITANTE</span></h3>
     <input class="team-name-input" id="tn-v" placeholder="NOMBRE DEL EQUIPO VISITANTE" maxlength="30">
     <div class="players-grid">
-      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div>
-    </div>
-    <div class="setup-voice-row">
-      <button class="setup-mic-btn" id="smb-v" onmousedown="setupPttStart('v',event)" onmouseup="setupPttEnd(event)" ontouchstart="setupPttStart('v',event)" ontouchend="setupPttEnd(event)" ontouchcancel="setupPttEnd(event)" title="Mantén presionado y habla">🎤</button>
-      <span class="setup-voice-st" id="sms-v">Mantén presionado y di: "Primero va Juan Pérez al seis"</span>
+      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header"></div>
     </div>
     <div id="pl-v"></div>
   </div>
@@ -235,11 +229,7 @@
     <h3><span style="color:var(--amber)">▶ LOCAL</span></h3>
     <input class="team-name-input" id="tn-l" placeholder="NOMBRE DEL EQUIPO LOCAL" maxlength="30">
     <div class="players-grid">
-      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div>
-    </div>
-    <div class="setup-voice-row">
-      <button class="setup-mic-btn" id="smb-l" onmousedown="setupPttStart('l',event)" onmouseup="setupPttEnd(event)" ontouchstart="setupPttStart('l',event)" ontouchend="setupPttEnd(event)" ontouchcancel="setupPttEnd(event)" title="Mantén presionado y habla">🎤</button>
-      <span class="setup-voice-st" id="sms-l">Mantén presionado y di: "Primero va Juan Pérez al seis"</span>
+      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header"></div>
     </div>
     <div id="pl-l"></div>
   </div>
@@ -445,13 +435,13 @@ function toTitleCase(str){
   return str.split(' ').map(w=>w?w[0].toUpperCase()+w.slice(1):'').join(' ');
 }
 
-// ─── VOZ EN EL LINEUP (SETUP) — PUSH TO TALK ─────────────
-let setupRec=null, setupListeningTeam=null;
+// ─── VOZ EN EL LINEUP (SETUP) — PUSH TO TALK POR FILA ────
+let setupRec=null, setupListeningRow=null; // {team, row}
 
-function setupPttStart(team,e){
+function setupRowPttStart(team,row,e){
   e.preventDefault();
-  if(setupListeningTeam&&setupListeningTeam!==team) setupPttForceStop();
-  if(setupListeningTeam===team) return;
+  if(setupListeningRow&&!(setupListeningRow.team===team&&setupListeningRow.row===row)) setupRowPttForceStop();
+  if(setupListeningRow) return;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ showToast('⚠️ Navegador sin soporte de voz',true); return; }
   let sTranscript='';
@@ -459,81 +449,73 @@ function setupPttStart(team,e){
   setupRec.continuous=true; setupRec.interimResults=true; setupRec.lang=gs.lang;
   setupRec.onresult=ev=>{
     sTranscript=Array.from(ev.results).map(r=>r[0].transcript).join('');
-    document.getElementById(`sms-${team}`).textContent=`"${sTranscript}"`;
   };
   setupRec.onend=()=>{
     const txt=sTranscript.toLowerCase().trim();
     sTranscript='';
-    setupStopUI(team);
+    setupRowStopUI(team,row);
     if(txt){
-      const res=parseSetupVoice(txt,team);
-      document.getElementById(`sms-${team}`).textContent=res||'⚠️ No reconocido — intenta de nuevo';
-    } else {
-      document.getElementById(`sms-${team}`).textContent='Mantén presionado y di: "Primero va Juan Pérez al seis"';
+      const res=parseRowVoice(txt,team,row);
+      const btn=document.getElementById(`smb-${team}-${row}`);
+      if(btn){
+        btn.textContent=res?'✓':'⚠';
+        setTimeout(()=>{ btn.textContent='🎤'; },1800);
+      }
+      if(!res) showToast('⚠️ No reconocido — di: "Nombre al número"',true);
     }
   };
-  setupRec.onerror=ev=>{ sTranscript=''; setupStopUI(team); if(ev.error!=='aborted') showToast(`⚠️ ${ev.error}`,true); };
+  setupRec.onerror=ev=>{ sTranscript=''; setupRowStopUI(team,row); if(ev.error!=='aborted') showToast(`⚠️ ${ev.error}`,true); };
   setupRec.start();
-  setupListeningTeam=team;
-  const btn=document.getElementById(`smb-${team}`);
-  btn.classList.add('recording'); btn.textContent='🔴';
-  document.getElementById(`sms-${team}`).textContent='GRABANDO... suelta para procesar';
+  setupListeningRow={team,row};
+  const btn=document.getElementById(`smb-${team}-${row}`);
+  if(btn){ btn.classList.add('recording'); btn.textContent='🔴'; }
 }
 
-function setupPttEnd(e){
+function setupRowPttEnd(e){
   e.preventDefault();
-  if(!setupListeningTeam) return;
+  if(!setupListeningRow) return;
   try{ if(setupRec) setupRec.stop(); }catch(ex){}
 }
 
-function setupPttForceStop(){
-  if(setupListeningTeam) setupStopUI(setupListeningTeam);
+function setupRowPttForceStop(){
+  if(setupListeningRow) setupRowStopUI(setupListeningRow.team,setupListeningRow.row);
   try{ if(setupRec) setupRec.abort(); }catch(ex){}
 }
 
-function setupStopUI(team){
-  const btn=document.getElementById(`smb-${team}`);
+function setupRowStopUI(team,row){
+  const btn=document.getElementById(`smb-${team}-${row}`);
   if(btn){ btn.classList.remove('recording'); btn.textContent='🎤'; }
-  setupListeningTeam=null;
+  setupListeningRow=null;
 }
 
-function parseSetupVoice(text,team){
-  // Caso DH: "bateador designado [nombre]"
-  if(text.includes('bateador designado')||text.includes('designado')){
-    const name=text.replace(/bateador\s+designado|designado/g,'').trim();
+function parseRowVoice(text,team,row){
+  const t=text.toLowerCase().trim();
+  if(row==='dh'){
+    const name=t.replace(/bateador\s+designado|designado/g,'').trim();
     if(!name) return null;
     const fmt=toTitleCase(name);
     document.getElementById(`p-${team}-dh`).value=fmt;
     document.getElementById(`o-${team}-dh`).value='DH';
     return `✓ DH: ${fmt}`;
   }
-  // Caso normal: "[ordinal] va [nombre] al [posición]"
-  const ordKeys=Object.keys(ORDINAL_MAP).sort((a,b)=>b.length-a.length);
-  let batNum=null, ordUsed='';
-  for(const w of ordKeys){
-    if(text===w||text.startsWith(w+' ')){ batNum=ORDINAL_MAP[w]; ordUsed=w; break; }
-  }
-  if(!batNum) return null;
   const posKeys=Object.keys(POS_WORD_MAP).sort((a,b)=>b.length-a.length);
-  let posNum=null;
-  const alIdx=text.lastIndexOf(' al ');
-  let nameText=text.slice(ordUsed.length).trim();
-  if(alIdx>ordUsed.length){
-    const afterAl=text.slice(alIdx+4).trim();
+  let posNum=null, nameText=t;
+  const alIdx=t.lastIndexOf(' al ');
+  if(alIdx!==-1){
+    const afterAl=t.slice(alIdx+4).trim();
     for(const pw of posKeys){
-      if(afterAl===pw||afterAl.startsWith(pw+' ')||afterAl.startsWith(pw)){
-        posNum=POS_WORD_MAP[pw]; break;
-      }
+      if(afterAl===pw||afterAl.startsWith(pw+' ')||afterAl.startsWith(pw)){ posNum=POS_WORD_MAP[pw]; break; }
     }
-    nameText=text.slice(ordUsed.length,alIdx).trim();
+    if(posNum===null){ const n=parseInt(afterAl,10); if(n>=1&&n<=9) posNum=n; }
+    nameText=t.slice(0,alIdx).trim();
   }
   nameText=nameText.replace(/^(va|es|juega|batea)\s+/,'').trim();
   if(!nameText) return null;
   const fmt=toTitleCase(nameText);
   const posLabel=posNum?POS_ABBR[posNum-1]:'';
-  document.getElementById(`p-${team}-${batNum}`).value=fmt;
-  if(posLabel) document.getElementById(`o-${team}-${batNum}`).value=posLabel;
-  return `✓ #${batNum}: ${fmt}${posLabel?' · '+posLabel:''}`;
+  document.getElementById(`p-${team}-${row}`).value=fmt;
+  if(posLabel) document.getElementById(`o-${team}-${row}`).value=posLabel;
+  return `✓ #${row}: ${fmt}${posLabel?' · '+posLabel:''}`;
 }
 
 // ─── CAMBIOS DE JUGADORES — PUSH TO TALK ─────────────────
@@ -641,14 +623,22 @@ function buildSetup(t) {
     d.className = 'players-grid'; d.style.marginBottom='4px';
     d.innerHTML = `<div class="bat-num">${i}</div>
       <input class="player-input" id="p-${t}-${i}" placeholder="Nombre" maxlength="25">
-      <input class="pos-input" id="o-${t}-${i}" placeholder="POS" maxlength="3">`;
+      <input class="pos-input" id="o-${t}-${i}" placeholder="POS" maxlength="3">
+      <button class="setup-mic-row" id="smb-${t}-${i}"
+        onmousedown="setupRowPttStart('${t}',${i},event)" onmouseup="setupRowPttEnd(event)"
+        ontouchstart="setupRowPttStart('${t}',${i},event)" ontouchend="setupRowPttEnd(event)"
+        ontouchcancel="setupRowPttEnd(event)" title="Mantén: di nombre al número">🎤</button>`;
     c.appendChild(d);
   }
   const dh = document.createElement('div');
   dh.className = 'dh-row';
   dh.innerHTML = `<div class="dh-label">DH</div>
     <input class="player-input" id="p-${t}-dh" placeholder="Bateador Designado" maxlength="25">
-    <input class="pos-input" id="o-${t}-dh" value="DH" maxlength="3">`;
+    <input class="pos-input" id="o-${t}-dh" value="DH" maxlength="3">
+    <button class="setup-mic-row" id="smb-${t}-dh"
+      onmousedown="setupRowPttStart('${t}','dh',event)" onmouseup="setupRowPttEnd(event)"
+      ontouchstart="setupRowPttStart('${t}','dh',event)" ontouchend="setupRowPttEnd(event)"
+      ontouchcancel="setupRowPttEnd(event)" title="Mantén: di nombre del DH">🎤</button>`;
   c.appendChild(dh);
 }
 buildSetup('v'); buildSetup('l');
