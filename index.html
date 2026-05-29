@@ -203,6 +203,13 @@
   .ph-pos { font-size:0.52rem; color:var(--text-dim); margin-left:3px; }
   .sub-btn-new { background:transparent; border:1px solid var(--border); border-radius:4px; color:var(--text-dim); font-size:0.6rem; padding:2px 5px; cursor:pointer; transition:all 0.15s; flex-shrink:0; line-height:1.2; }
   .sub-btn-new:hover:not(:disabled) { border-color:var(--gold); color:var(--gold); }
+  /* MOVIMIENTO DE CORREDOR */
+  .run-btn { width:100%; padding:8px 10px; border-radius:6px; font-family:'Bebas Neue',sans-serif; font-size:1rem; cursor:pointer; transition:opacity .15s; }
+  .run-btn-adv   { background:rgba(68,153,238,.12); border:1px solid var(--blue); color:var(--blue); }
+  .run-btn-score { background:rgba(0,196,79,.2); border:1px solid var(--green); color:var(--green); }
+  .run-btn-out   { background:rgba(200,16,46,.15); border:1px solid var(--red); color:var(--red); }
+  .run-btn-back  { background:rgba(100,100,100,.12); border:1px solid var(--border); color:var(--text-dim); }
+  .run-btn:hover { opacity:.75; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -949,27 +956,49 @@ function drawDiamond(play){
   s+=base(D.third,D.home,gc);
 
   if(p && p.type!=='out' && p.type!=='clear'){
-    const b=p.bases||0;
-    const scored=p.scored||false;
-    if(b>=1) s+=base(D.home,D.first,hc,2.5);
-    if(b>=2) s+=base(D.first,D.second,hc,2.5);
-    if(b>=3) s+=base(D.second,D.third,hc,2.5);
-    if(scored||b>=4) s+=base(D.third,D.home,hc,2.5);
+    if(p.runnerOut){
+      const ob=p.runnerOutBase||0;
+      const ac='var(--amber)';
+      if(ob>=1) s+=base(D.home,D.first,ac,2.5);
+      if(ob>=2) s+=base(D.first,D.second,ac,2.5);
+      if(ob>=3) s+=base(D.second,D.third,ac,2.5);
+      if(ob>=4) s+=base(D.third,D.home,ac,2.5);
+    } else {
+      const b=p.bases||0;
+      const scored=p.scored||false;
+      if(b>=1) s+=base(D.home,D.first,hc,2.5);
+      if(b>=2) s+=base(D.first,D.second,hc,2.5);
+      if(b>=3) s+=base(D.second,D.third,hc,2.5);
+      if(scored||b>=4) s+=base(D.third,D.home,hc,2.5);
+    }
   }
 
   // Dots en bases
-  s+=dot(D.first, p&&(p.bases>=1&&p.type!=='out')?hc:gc);
-  s+=dot(D.second,p&&(p.bases>=2&&p.type!=='out')?hc:gc);
-  s+=dot(D.third, p&&(p.bases>=3&&p.type!=='out')?hc:gc);
-  s+=dot(D.home,  p&&(p.scored||p.bases>=4)?hc:'#2a3a50',4);
+  if(p && p.runnerOut){
+    const ob=p.runnerOutBase||0; const ac='var(--amber)';
+    s+=dot(D.first, ob>1?ac:ob===1?'var(--red)':gc);
+    s+=dot(D.second,ob>2?ac:ob===2?'var(--red)':gc);
+    s+=dot(D.third, ob>3?ac:ob===3?'var(--red)':gc);
+    s+=dot(D.home,  ob===4?'var(--red)':'#2a3a50',4);
+  } else {
+    s+=dot(D.first, p&&(p.bases>=1&&p.type!=='out')?hc:gc);
+    s+=dot(D.second,p&&(p.bases>=2&&p.type!=='out')?hc:gc);
+    s+=dot(D.third, p&&(p.bases>=3&&p.type!=='out')?hc:gc);
+    s+=dot(D.home,  p&&(p.scored||p.bases>=4)?hc:'#2a3a50',4);
+  }
 
   // OUT: círculo alrededor del centro
   if(p && p.type==='out'){
     s+=`<circle cx="27" cy="27" r="11" fill="none" stroke="var(--red)" stroke-width="1.8" opacity="0.85"/>`;
   }
 
+  // Corredor out en bases: círculo ámbar punteado
+  if(p && p.runnerOut){
+    s+=`<circle cx="27" cy="27" r="9" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="3 2" opacity="0.7"/>`;
+  }
+
   // Carrera anotada: círculo verde punteado
-  if(p && p.scored && p.type!=='out'){
+  if(p && p.scored && p.type!=='out' && !p.runnerOut){
     s+=`<circle cx="27" cy="27" r="9" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="3 2" opacity="0.7"/>`;
   }
 
@@ -986,6 +1015,10 @@ function drawDiamond(play){
 // ─── SELECCIÓN DE CELDA ───────────────────────────────────
 let selCell=null;
 function selectCell(team,pidx,inn,td){
+  const pl=gs.plays[team][pidx][inn];
+  if(pl && pl.type!=='out' && pl.type!=='clear' && !pl.scored && !pl.runnerOut){
+    showRunnerModal(team,pidx,inn); return;
+  }
   document.querySelectorAll('.dc.active').forEach(c=>c.classList.remove('active'));
   td.classList.add('active');
   selCell={team,pidx,inn,td};
@@ -1035,6 +1068,100 @@ function showModal(team,pidx,inn){
 }
 function closeModal(){ document.getElementById('modal').classList.remove('show'); }
 document.getElementById('modal').addEventListener('click',e=>{ if(e.target===document.getElementById('modal')) closeModal(); });
+
+// ─── MODAL MOVIMIENTO DE CORREDOR ────────────────────────────
+function showRunnerModal(team,pidx,inn){
+  const p=gs.teams[team].players[pidx];
+  const pl=gs.plays[team][pidx][inn];
+  const bn={1:'1ª base',2:'2ª base',3:'3ª base'};
+  document.getElementById('mtitle').textContent=`${p.name} · CORREDOR E${inn}`;
+  const body=document.getElementById('mbody'); body.innerHTML='';
+
+  const info=document.createElement('div');
+  info.innerHTML=`<div style="text-align:center;padding:6px 0 14px"><div style="color:var(--blue);font-size:0.7rem;letter-spacing:.1em;margin-bottom:4px">MOVIMIENTO DE CORREDOR</div><div style="color:var(--text-dim);font-size:0.78rem">Actualmente en <strong style="color:#fff">${bn[pl.bases]||'base'}</strong> · Entrada ${inn} · <em>${pl.sym}</em></div></div>`;
+  body.appendChild(info);
+
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px';
+
+  const moves=[
+    {a:'to2',  lbl:'▶ Avanzó a 2ª',  show:pl.bases<2, cls:'run-btn-adv',  full:false},
+    {a:'to3',  lbl:'▶▶ Avanzó a 3ª', show:pl.bases<3, cls:'run-btn-adv',  full:false},
+    {a:'score',lbl:'🏠 Anotó',        show:true,       cls:'run-btn-score', full:true},
+    {a:'out2', lbl:'✕ Out en 2ª',     show:pl.bases<2, cls:'run-btn-out',  full:false},
+    {a:'out3', lbl:'✕ Out en 3ª',     show:pl.bases<3, cls:'run-btn-out',  full:false},
+    {a:'outH', lbl:'✕ Out en Home',   show:true,       cls:'run-btn-out',  full:false},
+    {a:'back', lbl:'↩ Regresó',       show:true,       cls:'run-btn-back', full:true},
+  ];
+  moves.filter(m=>m.show).forEach(m=>{
+    const btn=document.createElement('button');
+    btn.className=`run-btn ${m.cls}`;
+    btn.textContent=m.lbl;
+    if(m.full) btn.style.gridColumn='1/-1';
+    btn.onclick=()=>{ applyRunnerMove(team,pidx,inn,m.a); closeModal(); };
+    grid.appendChild(btn);
+  });
+  body.appendChild(grid);
+
+  if('webkitSpeechRecognition' in window||'SpeechRecognition' in window){
+    const micBtn=document.createElement('button');
+    micBtn.id='runner-mic-btn';
+    micBtn.className='run-btn run-btn-back';
+    micBtn.style.cssText='margin-top:4px;font-size:0.9rem';
+    micBtn.textContent='🎙 Mantén para dictar';
+    micBtn.onmousedown=micBtn.ontouchstart=()=>startRunnerMic(team,pidx,inn);
+    micBtn.onmouseup=micBtn.onmouseleave=micBtn.ontouchend=()=>stopRunnerMic();
+    body.appendChild(micBtn);
+  }
+
+  document.getElementById('modal').classList.add('show');
+}
+
+function applyRunnerMove(team,pidx,inn,action){
+  const pl=gs.plays[team][pidx][inn];
+  if(!pl) return;
+  switch(action){
+    case 'to2':  pl.bases=Math.max(pl.bases,2); showToast('Corredor avanzó a 2ª'); break;
+    case 'to3':  pl.bases=Math.max(pl.bases,3); showToast('Corredor avanzó a 3ª'); break;
+    case 'score': pl.bases=Math.max(pl.bases,3); pl.scored=true; showToast('✓ Corredor anotó'); break;
+    case 'out2': pl.runnerOut=true; pl.runnerOutBase=2; showToast('Out en 2ª'); break;
+    case 'out3': pl.runnerOut=true; pl.runnerOutBase=3; showToast('Out en 3ª'); break;
+    case 'outH': pl.runnerOut=true; pl.runnerOutBase=4; showToast('Out en Home'); break;
+    case 'back': showToast('Corredor regresó a su base'); return;
+  }
+  refreshCell(team,pidx,inn);
+  gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
+  updateScores();
+}
+
+let _runnerRecog=null;
+function startRunnerMic(team,pidx,inn){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR) return;
+  _runnerRecog=new SR(); _runnerRecog.lang='es-ES'; _runnerRecog.interimResults=false;
+  _runnerRecog.onresult=e=>{
+    const txt=e.results[0][0].transcript.toLowerCase();
+    const a=parseRunnerVoice(txt);
+    if(a){ applyRunnerMove(team,pidx,inn,a); closeModal(); }
+    else showToast('No reconocí: '+txt);
+  };
+  _runnerRecog.start();
+  const b=document.getElementById('runner-mic-btn'); if(b) b.style.borderColor='var(--red)';
+}
+function stopRunnerMic(){
+  if(_runnerRecog){ try{_runnerRecog.stop();}catch(e){} _runnerRecog=null; }
+  const b=document.getElementById('runner-mic-btn'); if(b) b.style.borderColor='';
+}
+function parseRunnerVoice(t){
+  if(/anotó|anoto|carrera|score/.test(t)) return 'score';
+  if(/regres|volvió|volvio/.test(t)) return 'back';
+  if(/out.*home|home.*out|cuatro.*cinco|al home/.test(t)) return 'outH';
+  if(/out.*terc|terc.*out|tres.*out|cuatro.*cinco/.test(t)) return 'out3';
+  if(/out.*seg|seg.*out|dos.*out/.test(t)) return 'out2';
+  if(/terc|tres|third/.test(t)) return 'to3';
+  if(/seg|dos|second/.test(t)) return 'to2';
+  return null;
+}
 
 // ─── APLICAR JUGADA ───────────────────────────────────────
 function applyPlay(team,pidx,inn,play){
