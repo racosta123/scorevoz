@@ -1,0 +1,1523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScoreVoz ⚾</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e14; --bg2: #111820; --bg3: #1a2332;
+    --green: #00ff88; --green-dim: #00cc6a; --green-dark: #003322;
+    --amber: #ffb800; --red: #ff4455; --blue: #3399ff;
+    --text: #e8f0fe; --text-dim: #7a8fa6; --border: #1e3048; --card: #131c28;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Roboto Mono',monospace; min-height:100vh; }
+
+  header {
+    background:var(--bg2); border-bottom:2px solid var(--green);
+    padding:10px 20px; display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:100; box-shadow:0 4px 30px rgba(0,255,136,0.1);
+  }
+  .logo { font-family:'Bebas Neue',sans-serif; font-size:1.8rem; color:var(--green); letter-spacing:4px; text-shadow:0 0 20px rgba(0,255,136,0.4); }
+  .logo span { color:var(--amber); }
+  .inning-display { background:var(--green-dark); border:1px solid var(--green); border-radius:6px; padding:3px 12px; font-family:'Bebas Neue',sans-serif; font-size:1.3rem; color:var(--green); letter-spacing:2px; }
+
+  /* SETUP */
+  #setup-screen { max-width:720px; margin:50px auto; padding:0 20px; }
+  .setup-title { font-family:'Oswald',sans-serif; font-size:1.6rem; color:var(--green); margin-bottom:6px; letter-spacing:2px; }
+  .setup-sub { color:var(--text-dim); font-size:0.75rem; margin-bottom:32px; }
+  .team-setup { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .team-setup h3 { font-family:'Oswald',sans-serif; font-size:0.9rem; letter-spacing:3px; margin-bottom:14px; }
+  .team-name-input, .player-input, .pos-input {
+    background:var(--bg3); border:1px solid var(--border); border-radius:6px;
+    color:var(--text); font-family:'Roboto Mono',monospace; outline:none; transition:border-color 0.2s;
+  }
+  .team-name-input { width:100%; font-family:'Oswald',sans-serif; font-size:1.1rem; padding:9px 12px; margin-bottom:14px; letter-spacing:2px; }
+  .team-name-input:focus { border-color:var(--green); }
+  .player-input { font-size:0.78rem; padding:6px 8px; width:100%; }
+  .player-input:focus { border-color:var(--green); }
+  .pos-input { font-size:0.78rem; padding:6px 6px; width:100%; color:var(--amber); text-align:center; text-transform:uppercase; }
+  .pos-input:focus { border-color:var(--amber); }
+  .players-grid { display:grid; grid-template-columns:26px 1fr 72px; gap:5px; align-items:center; margin-bottom:5px; }
+  .bat-num { color:var(--green); font-size:0.8rem; text-align:center; font-weight:500; }
+  .col-header { font-size:0.62rem; color:var(--text-dim); letter-spacing:1px; padding-bottom:4px; border-bottom:1px solid var(--border); margin-bottom:3px; }
+  .dh-row { background:rgba(255,184,0,0.05); border:1px dashed rgba(255,184,0,0.2); border-radius:6px; padding:4px; display:grid; grid-template-columns:26px 1fr 72px; gap:5px; align-items:center; margin-top:6px; }
+  .dh-label { font-size:0.58rem; color:var(--amber); text-align:center; letter-spacing:1px; }
+  .btn-start { width:100%; margin-top:24px; background:var(--green); color:#000; border:none; border-radius:10px; font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:4px; padding:14px; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 20px rgba(0,255,136,0.3); }
+  .btn-start:hover { background:var(--green-dim); transform:translateY(-2px); }
+
+  /* GAME */
+  #game-screen { display:none; padding:12px; }
+  .game-content { padding-bottom:100px; }
+
+  .line-score-bar { background:var(--bg2); padding:7px 14px; border-bottom:1px solid var(--border); overflow-x:auto; }
+  .ls-table { border-collapse:collapse; font-size:0.7rem; }
+  .ls-table td, .ls-table th { padding:3px 7px; text-align:center; border:1px solid var(--border); white-space:nowrap; }
+  .ls-table th { background:var(--bg3); color:var(--text-dim); font-family:'Oswald',sans-serif; letter-spacing:1px; }
+  .ls-runs { color:var(--green); font-weight:700; }
+  .ls-current { background:rgba(0,255,136,0.08) !important; }
+
+  .inning-nav { display:flex; gap:5px; padding:8px 14px; background:var(--bg2); border-bottom:1px solid var(--border); overflow-x:auto; }
+  .inn-btn { background:var(--bg3); border:1px solid var(--border); border-radius:5px; color:var(--text-dim); font-family:'Oswald',sans-serif; font-size:0.8rem; padding:3px 10px; cursor:pointer; letter-spacing:1px; transition:all 0.15s; white-space:nowrap; }
+  .inn-btn:hover { border-color:var(--green); color:var(--green); }
+  .inn-btn.current { background:var(--green-dark); border-color:var(--green); color:var(--green); }
+
+  .game-layout { display:grid; grid-template-columns:1fr 1fr; gap:14px; max-width:1400px; margin:12px auto 0; }
+  .team-panel { background:var(--card); border-radius:10px; overflow:hidden; border:1px solid var(--border); }
+  .team-header { padding:8px 14px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); }
+  .team-header.v { background:rgba(51,153,255,0.08); border-left:3px solid var(--blue); }
+  .team-header.l { background:rgba(255,184,0,0.08); border-left:3px solid var(--amber); }
+  .team-name-d { font-family:'Bebas Neue',sans-serif; font-size:1.3rem; letter-spacing:3px; }
+  .team-score-d { font-family:'Bebas Neue',sans-serif; font-size:1.8rem; color:var(--green); }
+
+  .scoresheet-wrap { overflow-x:auto; }
+  table.scoresheet { width:100%; border-collapse:collapse; font-size:0.68rem; }
+  table.scoresheet th { background:var(--bg3); color:var(--text-dim); font-family:'Oswald',sans-serif; letter-spacing:1px; font-size:0.62rem; padding:5px 3px; text-align:center; border:1px solid var(--border); white-space:nowrap; }
+  table.scoresheet th.ph { text-align:left; padding-left:7px; min-width:100px; }
+  table.scoresheet td { border:1px solid var(--border); text-align:center; vertical-align:middle; padding:1px; }
+  .player-cell { text-align:left; padding:3px 7px; }
+  .pname { font-size:0.72rem; color:var(--text); display:block; }
+  .ppos { font-size:0.58rem; color:var(--amber); }
+  .stat-cell { font-size:0.68rem; color:var(--text-dim); min-width:26px; padding:3px; }
+  .stat-avg { color:var(--green); font-weight:500; }
+
+  /* DIAMOND CELL */
+  .dc {
+    width:54px; height:54px; cursor:pointer; position:relative;
+    transition:background 0.15s;
+  }
+  .dc:hover { background:rgba(0,255,136,0.05); }
+  .dc.active { background:rgba(0,255,136,0.1); outline:2px solid var(--green); outline-offset:-2px; }
+  .dc svg { width:100%; height:100%; }
+
+  /* La etiqueta de jugada dentro del diamante */
+  .play-lbl {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    font-size:0.58rem; font-weight:700; white-space:nowrap; pointer-events:none;
+    text-shadow:0 0 4px rgba(0,0,0,0.9);
+  }
+  /* OUT = círculo rojo con texto */
+  .play-lbl.out-lbl { color:var(--red); }
+  /* HIT = texto verde */
+  .play-lbl.hit-lbl { color:var(--green); }
+  /* BB/HBP = texto azul */
+  .play-lbl.walk-lbl { color:var(--blue); }
+  /* otros = amber */
+  .play-lbl.other-lbl { color:var(--amber); }
+
+  /* VOICE PANEL */
+  .voice-panel {
+    position:fixed; bottom:0; left:0; right:0;
+    background:var(--bg2); border-top:2px solid var(--green);
+    padding:10px 20px; display:flex; align-items:center; gap:14px;
+    z-index:200; box-shadow:0 -8px 40px rgba(0,0,0,0.5);
+  }
+  .voice-btn {
+    width:52px; height:52px; border-radius:50%;
+    border:2px solid var(--green); background:var(--green-dark);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:all 0.2s; flex-shrink:0;
+  }
+  .voice-btn:hover { background:rgba(0,255,136,0.15); }
+  .voice-btn.listening { animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(0,255,136,0.4)} 50%{box-shadow:0 0 0 10px rgba(0,255,136,0)} }
+  .mic-icon { font-size:1.3rem; }
+  .voice-status { flex:1; }
+  .voice-label { font-size:0.62rem; color:var(--text-dim); letter-spacing:2px; margin-bottom:3px; font-family:'Oswald',sans-serif; }
+  .voice-transcript { font-size:0.82rem; color:var(--text); min-height:20px; font-style:italic; }
+  .voice-result { font-size:0.72rem; color:var(--green); min-height:16px; margin-top:2px; }
+  .selected-info { background:var(--bg3); border:1px solid var(--border); border-radius:7px; padding:7px 12px; font-size:0.68rem; color:var(--text-dim); min-width:150px; text-align:center; }
+  .selected-info strong { display:block; color:var(--amber); font-family:'Oswald',sans-serif; font-size:0.85rem; letter-spacing:1px; margin-bottom:1px; }
+  #lang-toggle { cursor:pointer; font-size:0.68rem; color:var(--text-dim); border:1px solid var(--border); border-radius:5px; padding:3px 9px; margin-left:8px; }
+  .btn-register { background:var(--green-dark); border:1px solid var(--green); border-radius:5px; color:var(--green); font-family:'Oswald',sans-serif; font-size:0.68rem; letter-spacing:1px; padding:6px 10px; cursor:pointer; transition:all 0.15s; white-space:nowrap; width:100%; }
+  .btn-register:hover:not(:disabled) { background:rgba(0,255,136,0.18); }
+  .btn-register:disabled { border-color:var(--border); color:var(--text-dim); cursor:default; background:transparent; }
+
+  /* SETUP VOZ */
+  .setup-voice-row { display:flex; align-items:center; gap:8px; margin-top:8px; margin-bottom:4px; }
+  .setup-mic-btn { background:var(--green-dark); border:1px solid var(--green); border-radius:50%; width:34px; height:34px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.95rem; flex-shrink:0; transition:all 0.2s; }
+  .setup-mic-btn:hover { background:rgba(0,255,136,0.2); }
+  .setup-mic-btn.listening { animation:pulse 1s infinite; }
+  .setup-voice-st { font-size:0.67rem; color:var(--text-dim); font-style:italic; flex:1; }
+
+  /* CAMBIO DE JUGADOR */
+  .cambio-btn { background:transparent; border:1px solid var(--border); border-radius:4px; color:var(--text-dim); font-size:0.6rem; padding:2px 5px; cursor:pointer; transition:all 0.15s; flex-shrink:0; line-height:1.2; }
+  .cambio-btn:hover { border-color:var(--amber); color:var(--amber); }
+  .cambio-btn.active { border-color:var(--green); color:var(--green); animation:pulse 1s infinite; }
+  .cambio-btn:disabled { border-color:var(--green); color:var(--green); cursor:default; }
+
+  /* SUSTITUCIÓN EN SCORESHEET */
+  .sub-tag { display:block; font-size:0.54rem; color:var(--red); margin-top:2px; letter-spacing:0.3px; }
+  .sub-in  { display:block; font-size:0.6rem;  color:var(--green); margin-top:1px; }
+  .player-subbed .pname { text-decoration:line-through; opacity:0.55; }
+
+  /* MODAL */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:300; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 0.2s; }
+  .modal-overlay.show { opacity:1; pointer-events:all; }
+  .modal { background:var(--bg2); border:1px solid var(--green); border-radius:12px; padding:20px; max-width:420px; width:92%; box-shadow:0 20px 60px rgba(0,0,0,0.6); max-height:90vh; overflow-y:auto; }
+  .modal h3 { font-family:'Oswald',sans-serif; font-size:1rem; letter-spacing:2px; color:var(--green); margin-bottom:12px; }
+  .modal-section { font-size:0.62rem; color:var(--text-dim); letter-spacing:2px; margin:12px 0 6px; font-family:'Oswald',sans-serif; border-bottom:1px solid var(--border); padding-bottom:3px; }
+  .play-buttons { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
+  .play-btn { background:var(--bg3); border:1px solid var(--border); border-radius:7px; color:var(--text); font-family:'Roboto Mono',monospace; font-size:0.72rem; padding:9px 6px; cursor:pointer; transition:all 0.15s; text-align:center; }
+  .play-btn:hover { border-color:var(--green); color:var(--green); background:var(--green-dark); }
+  .play-btn.out-btn:hover { border-color:var(--red); color:var(--red); background:rgba(255,68,85,0.1); }
+  .play-btn.hit-btn:hover { border-color:var(--green); color:var(--green); }
+  .play-btn.walk-btn:hover { border-color:var(--blue); color:var(--blue); background:rgba(51,153,255,0.1); }
+  .modal-close { width:100%; margin-top:10px; background:transparent; border:1px solid var(--border); border-radius:7px; color:var(--text-dim); font-family:'Roboto Mono',monospace; font-size:0.78rem; padding:9px; cursor:pointer; transition:all 0.15s; }
+  .modal-close:hover { border-color:var(--red); color:var(--red); }
+
+  /* TOAST */
+  .toast { position:fixed; top:72px; right:16px; background:var(--bg2); border:1px solid var(--green); border-radius:8px; padding:10px 16px; font-size:0.78rem; color:var(--green); z-index:500; transform:translateX(120%); transition:transform 0.3s; max-width:260px; box-shadow:0 4px 20px rgba(0,0,0,0.4); }
+  .toast.show { transform:translateX(0); }
+  .toast.error { border-color:var(--red); color:var(--red); }
+
+  /* PUSH TO TALK */
+  @keyframes pulse-red { 0%,100%{box-shadow:0 0 0 0 rgba(255,68,85,0.55)} 50%{box-shadow:0 0 0 14px rgba(255,68,85,0)} }
+  .voice-btn.recording { border-color:var(--red) !important; background:rgba(255,68,85,0.18) !important; animation:pulse-red 0.7s infinite !important; }
+  .setup-mic-btn.recording { border-color:var(--red); background:rgba(255,68,85,0.18); animation:pulse-red 0.7s infinite; }
+  .cambio-btn.recording { border-color:var(--red); color:var(--red); animation:pulse-red 0.7s infinite; }
+
+  /* BANNER DE CONFIRMACIÓN */
+  #confirm-banner { position:fixed; top:0; left:0; right:0; z-index:450; background:var(--amber); color:#000; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; transform:translateY(-110%); transition:transform 0.25s cubic-bezier(0.4,0,0.2,1); box-shadow:0 6px 32px rgba(0,0,0,0.55); }
+  #confirm-banner.show { transform:translateY(0); }
+  .confirm-text { font-family:'Oswald',sans-serif; font-size:1.25rem; font-weight:600; letter-spacing:1px; flex:1; line-height:1.3; }
+  .confirm-btns { display:flex; gap:10px; flex-shrink:0; }
+  .confirm-btn { border:none; border-radius:10px; font-family:'Bebas Neue',sans-serif; font-size:1.35rem; letter-spacing:2px; padding:13px 26px; cursor:pointer; min-width:84px; transition:filter 0.15s; }
+  .confirm-btn:hover { filter:brightness(0.88); }
+  .confirm-yes { background:#00c93e; color:#000; }
+  .confirm-no  { background:var(--red); color:#fff; }
+
+  @media(max-width:768px){ .game-layout{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+
+<div id="confirm-banner">
+  <div class="confirm-text" id="confirm-text">¿Confirmas la jugada?</div>
+  <div class="confirm-btns">
+    <button class="confirm-btn confirm-yes" onclick="confirmYes()">✅ SÍ</button>
+    <button class="confirm-btn confirm-no"  onclick="confirmNo()">❌ NO</button>
+  </div>
+</div>
+
+<header>
+  <div class="logo">Score<span>Voz</span> ⚾</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <div id="game-status" style="display:none;align-items:center;gap:8px">
+      <span style="color:var(--text-dim);font-size:0.65rem;letter-spacing:1px">ENTRADA</span>
+      <div class="inning-display" id="inning-label">1</div>
+    </div>
+    <button id="numeritos-btn" onclick="openNumeritos()" style="display:none;background:var(--amber);color:#000;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(255,184,0,0.3)">📊 NUMERITOS</button>
+    <div id="lang-toggle" style="display:none" onclick="toggleLang()">🎤 ES</div>
+  </div>
+</header>
+
+<!-- SETUP -->
+<div id="setup-screen">
+  <div class="setup-title">⚾ NUEVA ANOTACIÓN</div>
+  <div class="setup-sub">INGRESA EQUIPOS Y ALINEACIONES</div>
+  <div class="team-setup">
+    <h3><span style="color:var(--blue)">▶ VISITANTE</span></h3>
+    <input class="team-name-input" id="tn-v" placeholder="NOMBRE DEL EQUIPO VISITANTE" maxlength="30">
+    <div class="players-grid">
+      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div>
+    </div>
+    <div class="setup-voice-row">
+      <button class="setup-mic-btn" id="smb-v" onmousedown="setupPttStart('v',event)" onmouseup="setupPttEnd(event)" ontouchstart="setupPttStart('v',event)" ontouchend="setupPttEnd(event)" ontouchcancel="setupPttEnd(event)" title="Mantén presionado y habla">🎤</button>
+      <span class="setup-voice-st" id="sms-v">Mantén presionado y di: "Primero va Juan Pérez al seis"</span>
+    </div>
+    <div id="pl-v"></div>
+  </div>
+  <div class="team-setup">
+    <h3><span style="color:var(--amber)">▶ LOCAL</span></h3>
+    <input class="team-name-input" id="tn-l" placeholder="NOMBRE DEL EQUIPO LOCAL" maxlength="30">
+    <div class="players-grid">
+      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div>
+    </div>
+    <div class="setup-voice-row">
+      <button class="setup-mic-btn" id="smb-l" onmousedown="setupPttStart('l',event)" onmouseup="setupPttEnd(event)" ontouchstart="setupPttStart('l',event)" ontouchend="setupPttEnd(event)" ontouchcancel="setupPttEnd(event)" title="Mantén presionado y habla">🎤</button>
+      <span class="setup-voice-st" id="sms-l">Mantén presionado y di: "Primero va Juan Pérez al seis"</span>
+    </div>
+    <div id="pl-l"></div>
+  </div>
+  <button class="btn-start" onclick="startGame()">⚡ INICIAR JUEGO</button>
+</div>
+
+<!-- GAME -->
+<div id="game-screen">
+  <div class="game-content">
+    <div class="line-score-bar">
+      <table class="ls-table" id="lst">
+        <thead><tr id="lsh"><th style="text-align:left;min-width:80px">EQUIPO</th></tr></thead>
+        <tbody>
+          <tr id="lsrv"><td id="lsnv" style="text-align:left;font-family:'Oswald';letter-spacing:2px;color:var(--blue)">—</td></tr>
+          <tr id="lsrl"><td id="lsnl" style="text-align:left;font-family:'Oswald';letter-spacing:2px;color:var(--amber)">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="inning-nav" id="innav"></div>
+    <div class="game-layout">
+      <div class="team-panel">
+        <div class="team-header v">
+          <span class="team-name-d" style="color:var(--blue)" id="dnv">VISITANTE</span>
+          <span class="team-score-d" id="scv">0</span>
+        </div>
+        <div class="scoresheet-wrap"><table class="scoresheet" id="sv"></table></div>
+      </div>
+      <div class="team-panel">
+        <div class="team-header l">
+          <span class="team-name-d" style="color:var(--amber)" id="dnl">LOCAL</span>
+          <span class="team-score-d" id="scl">0</span>
+        </div>
+        <div class="scoresheet-wrap"><table class="scoresheet" id="sl"></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VOICE PANEL -->
+<div class="voice-panel" id="vpanel" style="display:none">
+  <button class="voice-btn" id="vbtn" onmousedown="pttStart(event)" onmouseup="pttEnd(event)" ontouchstart="pttStart(event)" ontouchend="pttEnd(event)" ontouchcancel="pttEnd(event)"><span class="mic-icon" id="mic-icon">🎤</span></button>
+  <div class="voice-status">
+    <div class="voice-label">RECONOCIMIENTO DE VOZ</div>
+    <div class="voice-transcript" id="vtr">Selecciona una casilla, luego mantén presionado el micrófono y habla...</div>
+    <div class="voice-result" id="vrs"></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:5px;min-width:150px">
+    <div class="selected-info" id="selinfo"><strong>— SIN SELECCIÓN —</strong><span>Toca una casilla</span></div>
+    <button id="reg-btn" class="btn-register" onclick="openModalForSelected()" disabled>+ REGISTRAR JUGADA</button>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="mtitle">REGISTRAR JUGADA</h3>
+    <div id="mbody"></div>
+    <button class="modal-close" onclick="closeModal()">✕ CANCELAR</button>
+  </div>
+</div>
+
+<script>
+// ─── ESTADO ────────────────────────────────────────────────
+let INNINGS = 9;
+let gs = {
+  teams:{ v:{name:'',players:[]}, l:{name:'',players:[]} },
+  plays:{ v:{}, l:{} },
+  scores:{ v:[], l:[] },
+  subs:{ v:[], l:[] },
+  selected:null,
+  lang:'es-MX'
+};
+
+// ─── CATÁLOGO OFICIAL DE JUGADAS ───────────────────────────
+// Basado en: PDF Guía FCBS 2023, Diario Libre simbología, out27.com
+const PLAY_CATALOG = {
+  // ── OUTS (van dentro de un círculo) ──
+  outs:[
+    // Ponches
+    { id:'KS',  label:'K ⚾ Ponche Swing',      sym:'KS',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche swing','strike out swing','abanicó','abaniq'] },
+    { id:'KL',  label:'KL Ponche Cantado',       sym:'KL',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche cantado','ponche mirando','ponche llamado','strike out looking','sin tirarle','sin mover'] },
+    // Fly outs
+    { id:'F7',  label:'F7 Fly Left Field',       sym:'F7',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly izquierda','elevado izquierda','fly left'] },
+    { id:'F8',  label:'F8 Fly Center',           sym:'F8',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly center','elevado centro','fly central'] },
+    { id:'F9',  label:'F9 Fly Right Field',      sym:'F9',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly derecha','elevado derecha','fly right'] },
+    { id:'P',   label:'P  Pop Fly Infield',      sym:'P',   bases:0, type:'out', ab:true,  color:'red',   voice:['pop fly','pop','palomita'] },
+    { id:'L',   label:'L  Línea Atrapada',       sym:'L',   bases:0, type:'out', ab:true,  color:'red',   voice:['línea atrapada','linea atrapada','line drive out'] },
+    { id:'FF',  label:'FF Foul Fly',             sym:'FF',  bases:0, type:'out', ab:true,  color:'red',   voice:['foul fly','fly foul'] },
+    // Ground outs
+    { id:'R63', label:'R63 Rodado SS→1B',        sym:'63',  bases:0, type:'out', ab:true,  color:'red',   voice:['rodado short','rolata short','rola short','ground out short'] },
+    { id:'R43', label:'R43 Rodado 2B→1B',        sym:'43',  bases:0, type:'out', ab:true,  color:'red',   voice:['rodado segunda','rolata segunda','rola segunda'] },
+    { id:'R53', label:'R53 Rodado 3B→1B',        sym:'53',  bases:0, type:'out', ab:true,  color:'red',   voice:['rodado tercera','rolata tercera','rola tercera'] },
+    { id:'R13', label:'R13 Rodado P→1B',         sym:'13',  bases:0, type:'out', ab:true,  color:'red',   voice:['rodado pitcher','rola pitcher'] },
+    { id:'R33', label:'R33 Rodado 1B no asist',  sym:'3',   bases:0, type:'out', ab:true,  color:'red',   voice:['rodado primera sin asistencia','foul line primera'] },
+    // Doble play
+    { id:'DP643',label:'DP 6-4-3 Doble Play',   sym:'643', bases:0, type:'out', ab:true,  color:'red',   voice:['doble play','double play','643'] },
+    { id:'DP543',label:'DP 5-4-3 Doble Play',   sym:'543', bases:0, type:'out', ab:true,  color:'red',   voice:['doble play tercera','543'] },
+    // Sacrificios
+    { id:'SH',  label:'SH Sacrificio Hit Toque', sym:'SH',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio hit','toque de sacrificio','bunt sacrificio','sacrificio toque'] },
+    { id:'SF',  label:'SF Sacrificio Fly',       sym:'SF',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio fly','fly de sacrificio'] },
+    // Infield fly, out regla
+    { id:'IF',  label:'IF Infield Fly',          sym:'IF',  bases:0, type:'out', ab:true,  color:'red',   voice:['infield fly'] },
+    { id:'OR',  label:'OR Out por Regla',        sym:'OR',  bases:0, type:'out', ab:true,  color:'red',   voice:['out por regla','out regla'] },
+    { id:'GDP', label:'GDP Bateado DP',          sym:'GDP', bases:0, type:'out', ab:true,  color:'red',   voice:['bateado doble play','gdp'] },
+    // Cogido robando
+    { id:'CS',  label:'CS Cogido Robando',       sym:'CS',  bases:0, type:'out', ab:false, color:'red',   voice:['cogido robando','out robando','caught stealing'] },
+  ],
+
+  // ── HITS ──
+  hits:[
+    { id:'1B',  label:'1B Sencillo',             sym:'1B',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['sencillo','single','hit sencillo','hit uno','una base'] },
+    { id:'2B',  label:'2B Doble',                sym:'2B',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['doble','double','dos bases','hit doble'] },
+    { id:'3B',  label:'3B Triple',               sym:'3B',  bases:3, type:'hit',  ab:true,  h:true, color:'green', voice:['triple','tres bases','hit triple'] },
+    { id:'HR',  label:'HR Jonrón',               sym:'HR',  bases:4, type:'hit',  ab:true,  h:true, color:'green', voice:['jonron','jonrón','home run','cuadrangular','cuadrangula','grand slam','bambinazo'] },
+    { id:'IHR', label:'IHR Jonrón Inside Park',  sym:'IHR', bases:4, type:'hit',  ab:true,  h:true, color:'green', voice:['jonron dentro del parque','inside park','jonron interior'] },
+    // Hits por zona
+    { id:'LS',  label:'LS Hit Lado Izquierdo',   sym:'LS',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['hit lado izquierdo','hit izquierda','hit left side'] },
+    { id:'RS',  label:'RS Hit Lado Derecho',     sym:'RS',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['hit lado derecho','hit derecha','hit right side'] },
+    { id:'MI',  label:'MI Hit Medio Cuadro',     sym:'MI',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['hit medio','hit cuadro','hit middle'] },
+    { id:'LC',  label:'LC Hit Left-Center',      sym:'LC',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['hit left center','hit izquierda centro'] },
+    { id:'RC',  label:'RC Hit Right-Center',     sym:'RC',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['hit right center','hit derecha centro'] },
+    { id:'LL',  label:'LL Hit Línea Izquierda',  sym:'LL',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['hit linea izquierda','hit línea izquierda'] },
+    { id:'RL',  label:'RL Hit Línea Derecha',    sym:'RL',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['hit linea derecha','hit línea derecha'] },
+    // Toque de hit
+    { id:'B',   label:'B  Bunt Hit',             sym:'B',   bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['bunt hit','toque de hit','toque hit'] },
+  ],
+
+  // ── EMBASADO SIN BATAZO ──
+  walks:[
+    { id:'BB',  label:'BB Base por Bolas',        sym:'BB',  bases:1, type:'walk', ab:false, color:'blue',  voice:['base por bolas','walk','cuatro bolas','boleto','bb'] },
+    { id:'BBI', label:'BBI Base Intencional',     sym:'BBI', bases:1, type:'walk', ab:false, color:'blue',  voice:['base intencional','intencional','base por bolas intencional','bbi'] },
+    { id:'BG',  label:'BG Base por Golpe/HBP',   sym:'BG',  bases:1, type:'walk', ab:false, color:'blue',  voice:['golpe','golpeado','pelotazo','hit by pitch','hbp','base por golpe'] },
+    { id:'INT', label:'INT Interferencia',        sym:'INT', bases:1, type:'walk', ab:false, color:'blue',  voice:['interferencia'] },
+    { id:'OB',  label:'OB Obstrucción',           sym:'OB',  bases:1, type:'walk', ab:false, color:'blue',  voice:['obstruccion','obstrucción'] },
+  ],
+
+  // ── ERRORES ──
+  errors:[
+    { id:'E3',  label:'E3 Error Primera',         sym:'E3',  bases:1, type:'error', ab:true, color:'amber', voice:['error primera','error en primera','error 1b'] },
+    { id:'E4',  label:'E4 Error Segunda',         sym:'E4',  bases:1, type:'error', ab:true, color:'amber', voice:['error segunda','error en segunda','error 2b'] },
+    { id:'E5',  label:'E5 Error Tercera',         sym:'E5',  bases:1, type:'error', ab:true, color:'amber', voice:['error tercera','error en tercera','error 3b'] },
+    { id:'E6',  label:'E6 Error Short Stop',      sym:'E6',  bases:1, type:'error', ab:true, color:'amber', voice:['error short','error parador','error ss','error 6'] },
+    { id:'E7',  label:'E7 Error Left Field',      sym:'E7',  bases:1, type:'error', ab:true, color:'amber', voice:['error izquierda','error left','error jardín izquierdo'] },
+    { id:'E8',  label:'E8 Error Center Field',    sym:'E8',  bases:1, type:'error', ab:true, color:'amber', voice:['error centro','error center','error jardín central'] },
+    { id:'E9',  label:'E9 Error Right Field',     sym:'E9',  bases:1, type:'error', ab:true, color:'amber', voice:['error derecha','error right','error jardín derecho'] },
+    { id:'E1',  label:'E1 Error Pitcher',         sym:'E1',  bases:1, type:'error', ab:true, color:'amber', voice:['error pitcher','error lanzador'] },
+    { id:'E2',  label:'E2 Error Catcher',         sym:'E2',  bases:1, type:'error', ab:true, color:'amber', voice:['error catcher','error receptor'] },
+  ],
+
+  // ── AVANCES / EVENTOS EN BASE ──
+  advances:[
+    { id:'SB',  label:'SB Base Robada',           sym:'SB',  bases:null, type:'advance', ab:false, color:'amber', voice:['robo','robó','base robada','stolen base','sb'] },
+    { id:'WP',  label:'WP Wild Pitch',            sym:'WP',  bases:null, type:'advance', ab:false, color:'amber', voice:['wild pitch','lanzamiento wild','tiro salvaje','wp'] },
+    { id:'PB',  label:'PB Passed Ball',           sym:'PB',  bases:null, type:'advance', ab:false, color:'amber', voice:['passed ball','pasbol','pb'] },
+    { id:'BK',  label:'BK Balk / Falta',          sym:'BK',  bases:null, type:'advance', ab:false, color:'amber', voice:['balk','falta lanzador','bk'] },
+    { id:'T',   label:'T  Avance por Tiro',       sym:'T',   bases:null, type:'advance', ab:false, color:'amber', voice:['avance por tiro'] },
+    { id:'FC',  label:'FC Fielder\'s Choice',     sym:'FC',  bases:1,    type:'advance', ab:true,  color:'amber', voice:["fielder's choice",'fielder choice','jugada de eleccion','jugada elección','fc'] },
+    { id:'PC',  label:'PC Pisa y Corre',          sym:'PC',  bases:null, type:'advance', ab:false, color:'amber', voice:['pisa y corre','squeeze play'] },
+  ],
+
+  // ── CARRERA / ESPECIAL ──
+  special:[
+    { id:'RUN', label:'✓ Anotó Carrera',          sym:'R',   bases:null, type:'score',   ab:false, color:'green', voice:['anoto','anotó','carrera','scored'] },
+    { id:'CLR', label:'✕ Borrar Jugada',          sym:'',    bases:null, type:'clear',   ab:false, color:'red',   voice:['borrar','borra','limpiar','clear','eliminar'] },
+  ]
+};
+
+// Flatlist para voice matching
+const ALL_PLAYS = [
+  ...PLAY_CATALOG.outs, ...PLAY_CATALOG.hits,
+  ...PLAY_CATALOG.walks, ...PLAY_CATALOG.errors,
+  ...PLAY_CATALOG.advances, ...PLAY_CATALOG.special
+];
+
+// ─── MAPAS PARA VOZ EN SETUP ──────────────────────────────
+// Ordinals en español/inglés → número de turno al bate
+const ORDINAL_MAP = {
+  'primer':1,'primero':1,'primera':1,
+  'segundo':2,'segunda':2,
+  'tercer':3,'tercero':3,
+  'cuarto':4,'cuarta':4,
+  'quinto':5,'quinta':5,
+  'sexto':6,'sexta':6,
+  'séptimo':7,'septimo':7,'séptima':7,'septima':7,
+  'octavo':8,'octava':8,
+  'noveno':9,'novena':9,
+};
+// Palabras de posición → número de posición (1-9)
+const POS_WORD_MAP = {
+  'pitcher':1,'lanzador':1,'uno':1,
+  'catcher':2,'receptor':2,'dos':2,
+  'primera base':3,'primera':3,'tres':3,
+  'segunda base':4,'segunda':4,'cuatro':4,
+  'tercera base':5,'tercera':5,'cinco':5,
+  'short stop':6,'shortstop':6,'parador':6,'short':6,'seis':6,
+  'jardín izquierdo':7,'left field':7,'izquierda':7,'left':7,'siete':7,
+  'jardín central':8,'jardín centro':8,'center field':8,'centro':8,'center':8,'central':8,'ocho':8,
+  'jardín derecho':9,'right field':9,'derecha':9,'right':9,'nueve':9,
+};
+const POS_ABBR = ['P','C','1B','2B','3B','SS','LF','CF','RF'];
+
+function toTitleCase(str){
+  return str.split(' ').map(w=>w?w[0].toUpperCase()+w.slice(1):'').join(' ');
+}
+
+// ─── VOZ EN EL LINEUP (SETUP) — PUSH TO TALK ─────────────
+let setupRec=null, setupListeningTeam=null;
+
+function setupPttStart(team,e){
+  e.preventDefault();
+  if(setupListeningTeam&&setupListeningTeam!==team) setupPttForceStop();
+  if(setupListeningTeam===team) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ showToast('⚠️ Navegador sin soporte de voz',true); return; }
+  let sTranscript='';
+  setupRec=new SR();
+  setupRec.continuous=true; setupRec.interimResults=true; setupRec.lang=gs.lang;
+  setupRec.onresult=ev=>{
+    sTranscript=Array.from(ev.results).map(r=>r[0].transcript).join('');
+    document.getElementById(`sms-${team}`).textContent=`"${sTranscript}"`;
+  };
+  setupRec.onend=()=>{
+    const txt=sTranscript.toLowerCase().trim();
+    sTranscript='';
+    setupStopUI(team);
+    if(txt){
+      const res=parseSetupVoice(txt,team);
+      document.getElementById(`sms-${team}`).textContent=res||'⚠️ No reconocido — intenta de nuevo';
+    } else {
+      document.getElementById(`sms-${team}`).textContent='Mantén presionado y di: "Primero va Juan Pérez al seis"';
+    }
+  };
+  setupRec.onerror=ev=>{ sTranscript=''; setupStopUI(team); if(ev.error!=='aborted') showToast(`⚠️ ${ev.error}`,true); };
+  setupRec.start();
+  setupListeningTeam=team;
+  const btn=document.getElementById(`smb-${team}`);
+  btn.classList.add('recording'); btn.textContent='🔴';
+  document.getElementById(`sms-${team}`).textContent='GRABANDO... suelta para procesar';
+}
+
+function setupPttEnd(e){
+  e.preventDefault();
+  if(!setupListeningTeam) return;
+  try{ if(setupRec) setupRec.stop(); }catch(ex){}
+}
+
+function setupPttForceStop(){
+  if(setupListeningTeam) setupStopUI(setupListeningTeam);
+  try{ if(setupRec) setupRec.abort(); }catch(ex){}
+}
+
+function setupStopUI(team){
+  const btn=document.getElementById(`smb-${team}`);
+  if(btn){ btn.classList.remove('recording'); btn.textContent='🎤'; }
+  setupListeningTeam=null;
+}
+
+function parseSetupVoice(text,team){
+  // Caso DH: "bateador designado [nombre]"
+  if(text.includes('bateador designado')||text.includes('designado')){
+    const name=text.replace(/bateador\s+designado|designado/g,'').trim();
+    if(!name) return null;
+    const fmt=toTitleCase(name);
+    document.getElementById(`p-${team}-dh`).value=fmt;
+    document.getElementById(`o-${team}-dh`).value='DH';
+    return `✓ DH: ${fmt}`;
+  }
+  // Caso normal: "[ordinal] va [nombre] al [posición]"
+  const ordKeys=Object.keys(ORDINAL_MAP).sort((a,b)=>b.length-a.length);
+  let batNum=null, ordUsed='';
+  for(const w of ordKeys){
+    if(text===w||text.startsWith(w+' ')){ batNum=ORDINAL_MAP[w]; ordUsed=w; break; }
+  }
+  if(!batNum) return null;
+  const posKeys=Object.keys(POS_WORD_MAP).sort((a,b)=>b.length-a.length);
+  let posNum=null;
+  const alIdx=text.lastIndexOf(' al ');
+  let nameText=text.slice(ordUsed.length).trim();
+  if(alIdx>ordUsed.length){
+    const afterAl=text.slice(alIdx+4).trim();
+    for(const pw of posKeys){
+      if(afterAl===pw||afterAl.startsWith(pw+' ')||afterAl.startsWith(pw)){
+        posNum=POS_WORD_MAP[pw]; break;
+      }
+    }
+    nameText=text.slice(ordUsed.length,alIdx).trim();
+  }
+  nameText=nameText.replace(/^(va|es|juega|batea)\s+/,'').trim();
+  if(!nameText) return null;
+  const fmt=toTitleCase(nameText);
+  const posLabel=posNum?POS_ABBR[posNum-1]:'';
+  document.getElementById(`p-${team}-${batNum}`).value=fmt;
+  if(posLabel) document.getElementById(`o-${team}-${batNum}`).value=posLabel;
+  return `✓ #${batNum}: ${fmt}${posLabel?' · '+posLabel:''}`;
+}
+
+// ─── CAMBIOS DE JUGADORES — PUSH TO TALK ─────────────────
+let subRec=null, subInfo=null;
+
+function subPttStart(team,pidx,e){
+  e.preventDefault();
+  if(subInfo&&!(subInfo.team===team&&subInfo.pidx===pidx)) subPttForceStop();
+  if(subInfo) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ showToast('⚠️ Navegador sin soporte de voz',true); return; }
+  let sTranscript='';
+  subRec=new SR();
+  subRec.continuous=true; subRec.interimResults=true; subRec.lang=gs.lang;
+  subRec.onresult=ev=>{
+    sTranscript=Array.from(ev.results).map(r=>r[0].transcript).join('');
+  };
+  subRec.onend=()=>{
+    const txt=sTranscript.toLowerCase().trim();
+    sTranscript='';
+    subStopUI(team,pidx);
+    if(txt){
+      const res=parseSubVoice(txt,team,pidx);
+      if(res){
+        const lbl=`Cambio: entra ${res.inName}${res.inPos?' · '+res.inPos:''}`;
+        showConfirmBanner(lbl,{type:'sub',team,pidx,inName:res.inName,inPos:res.inPos});
+      } else {
+        showToast('⚠️ No reconocido — di: "entra [nombre] al [posición]"',true);
+      }
+    }
+  };
+  subRec.onerror=ev=>{ sTranscript=''; subStopUI(team,pidx); if(ev.error!=='aborted') showToast(`⚠️ ${ev.error}`,true); };
+  subRec.start();
+  subInfo={team,pidx};
+  const btn=document.getElementById(`cb-${team}-${pidx}`);
+  if(btn){ btn.classList.add('recording'); btn.textContent='🔴'; }
+}
+
+function subPttEnd(e){
+  e.preventDefault();
+  if(!subInfo) return;
+  try{ if(subRec) subRec.stop(); }catch(ex){}
+}
+
+function subPttForceStop(){
+  if(subInfo) subStopUI(subInfo.team,subInfo.pidx);
+  try{ if(subRec) subRec.abort(); }catch(ex){}
+}
+
+function subStopUI(team,pidx){
+  const btn=document.getElementById(`cb-${team}-${pidx}`);
+  if(btn){ btn.classList.remove('recording'); btn.textContent='⇄'; }
+  subInfo=null;
+}
+
+function parseSubVoice(text,team,outPidx){
+  const entraIdx=text.indexOf('entra');
+  if(entraIdx===-1) return null;
+  let afterEntra=text.slice(entraIdx+5).trim();
+  const posKeys=Object.keys(POS_WORD_MAP).sort((a,b)=>b.length-a.length);
+  let inPos='', namePart=afterEntra;
+  const alIdx=afterEntra.indexOf(' al ');
+  if(alIdx!==-1){
+    const afterAl=afterEntra.slice(alIdx+4).trim();
+    for(const pw of posKeys){
+      if(afterAl===pw||afterAl.startsWith(pw)){ inPos=POS_ABBR[POS_WORD_MAP[pw]-1]; break; }
+    }
+    namePart=afterEntra.slice(0,alIdx).trim();
+  }
+  // Ignorar "y [nombre] se mueve al..." si viene pegado al nombre
+  const yIdx=namePart.indexOf(' y ');
+  if(yIdx!==-1) namePart=namePart.slice(0,yIdx).trim();
+  if(!namePart) return null;
+  // Heredar posición del jugador que sale si no se especificó
+  if(!inPos){ const op=gs.teams[team].players[outPidx]; if(op) inPos=op.pos; }
+  return { inName:toTitleCase(namePart), inPos };
+}
+
+function applySubstitution(team,outPidx,inName,inPos){
+  const inn=gs.currentInning||1;
+  gs.subs[team].push({ inn, outPidx, inName, inPos });
+  const row=document.getElementById(`row-${team}-${outPidx}`);
+  if(!row) return;
+  const cell=row.querySelector('.player-cell');
+  cell.classList.add('player-subbed');
+  const ppos=cell.querySelector('.ppos');
+  const subTag=document.createElement('span');
+  subTag.className='sub-tag';
+  subTag.textContent=`↑ SALE E${inn}`;
+  ppos.after(subTag);
+  const subIn=document.createElement('span');
+  subIn.className='sub-in';
+  subIn.textContent=`↓ ${inName}${inPos?' · '+inPos:''}`;
+  subTag.after(subIn);
+  const btn=document.getElementById(`cb-${team}-${outPidx}`);
+  if(btn){ btn.textContent='✓'; btn.disabled=true; }
+}
+
+// ─── BUILD SETUP ──────────────────────────────────────────
+function buildSetup(t) {
+  const c = document.getElementById(`pl-${t}`);
+  c.innerHTML = '';
+  for(let i=1;i<=9;i++){
+    const d = document.createElement('div');
+    d.className = 'players-grid'; d.style.marginBottom='4px';
+    d.innerHTML = `<div class="bat-num">${i}</div>
+      <input class="player-input" id="p-${t}-${i}" placeholder="Nombre" maxlength="25">
+      <input class="pos-input" id="o-${t}-${i}" placeholder="POS" maxlength="3">`;
+    c.appendChild(d);
+  }
+  const dh = document.createElement('div');
+  dh.className = 'dh-row';
+  dh.innerHTML = `<div class="dh-label">DH</div>
+    <input class="player-input" id="p-${t}-dh" placeholder="Bateador Designado" maxlength="25">
+    <input class="pos-input" id="o-${t}-dh" value="DH" maxlength="3">`;
+  c.appendChild(dh);
+}
+buildSetup('v'); buildSetup('l');
+
+function startGame(){
+  ['v','l'].forEach(t=>{
+    gs.teams[t].name = (document.getElementById(`tn-${t}`).value.trim()||( t==='v'?'VISITANTE':'LOCAL')).toUpperCase();
+    const pl=[];
+    for(let i=1;i<=9;i++){
+      pl.push({
+        name:(document.getElementById(`p-${t}-${i}`).value.trim()||`JUGADOR ${i}`).toUpperCase(),
+        pos:(document.getElementById(`o-${t}-${i}`).value.trim()||'—').toUpperCase(),
+        bat:i
+      });
+    }
+    const dhN = document.getElementById(`p-${t}-dh`).value.trim();
+    if(dhN) pl.push({name:dhN.toUpperCase(),pos:'DH',bat:'DH'});
+    gs.teams[t].players = pl;
+    gs.plays[t]={};
+    pl.forEach((_,i)=>{ gs.plays[t][i]={}; });
+    gs.scores[t] = Array(INNINGS).fill(0);
+  });
+  document.getElementById('setup-screen').style.display='none';
+  document.getElementById('game-screen').style.display='block';
+  document.getElementById('vpanel').style.display='flex';
+  document.getElementById('game-status').style.display='flex';
+  document.getElementById('lang-toggle').style.display='block';
+  document.getElementById('numeritos-btn').style.display='block';
+  buildLineScore(); buildInningNav(); buildScoresheets(); updateScores();
+}
+
+// ─── LINE SCORE ───────────────────────────────────────────
+function buildLineScore(){
+  document.getElementById('lsnv').textContent = gs.teams.v.name;
+  document.getElementById('lsnl').textContent = gs.teams.l.name;
+  const h=document.getElementById('lsh');
+  const rv=document.getElementById('lsrv');
+  const rl=document.getElementById('lsrl');
+  for(let i=1;i<=INNINGS;i++){
+    const th=document.createElement('th'); th.textContent=i; th.id=`lsh${i}`; h.appendChild(th);
+    const tv=document.createElement('td'); tv.textContent='0'; tv.id=`lsv${i}`; rv.appendChild(tv);
+    const tl=document.createElement('td'); tl.textContent='0'; tl.id=`lsl${i}`; rl.appendChild(tl);
+  }
+  ['R','H','E'].forEach(s=>{
+    const th=document.createElement('th'); th.textContent=s; th.style.color=s==='R'?'var(--green)':'var(--text-dim)'; h.appendChild(th);
+    const tv=document.createElement('td'); tv.id=`lsv${s}`; tv.className=s==='R'?'ls-runs':''; tv.textContent='0'; rv.appendChild(tv);
+    const tl=document.createElement('td'); tl.id=`lsl${s}`; tl.className=s==='R'?'ls-runs':''; tl.textContent='0'; rl.appendChild(tl);
+  });
+}
+
+// ─── INNING NAV ───────────────────────────────────────────
+function buildInningNav(){
+  const nav=document.getElementById('innav'); nav.innerHTML='';
+  for(let i=1;i<=INNINGS;i++) addInnBtn(nav,i);
+  const ex=document.createElement('button'); ex.className='inn-btn'; ex.textContent='+ EXTRA'; ex.onclick=addExtra; nav.appendChild(ex);
+}
+function addInnBtn(nav,n){
+  const b=document.createElement('button'); b.className='inn-btn'+(n===1?' current':'');
+  b.id=`ib${n}`; b.textContent=`E${n}`; b.onclick=()=>setInning(n);
+  nav.insertBefore(b,nav.lastElementChild);
+}
+function setInning(n){
+  gs.currentInning=n;
+  document.getElementById('inning-label').textContent=n;
+  document.querySelectorAll('.inn-btn').forEach(b=>b.classList.remove('current'));
+  const b=document.getElementById(`ib${n}`); if(b) b.classList.add('current');
+  highlightInn();
+}
+function addExtra(){
+  INNINGS++;
+  gs.scores.v.push(0); gs.scores.l.push(0);
+  const h=document.getElementById('lsh'),rv=document.getElementById('lsrv'),rl=document.getElementById('lsrl');
+  const ih=h.children[h.children.length-3];
+  const th=document.createElement('th'); th.textContent=INNINGS; th.id=`lsh${INNINGS}`; h.insertBefore(th,ih);
+  const iv=rv.children[rv.children.length-3];
+  const tv=document.createElement('td'); tv.textContent='0'; tv.id=`lsv${INNINGS}`; rv.insertBefore(tv,iv);
+  const il=rl.children[rl.children.length-3];
+  const tl=document.createElement('td'); tl.textContent='0'; tl.id=`lsl${INNINGS}`; rl.insertBefore(tl,il);
+  ['v','l'].forEach(t=>addInnCol(t,INNINGS));
+  addInnBtn(document.getElementById('innav'),INNINGS);
+  setInning(INNINGS);
+}
+function addInnCol(team,n){
+  const tbl=document.getElementById(`s${team}`);
+  const hr=tbl.querySelector('thead tr');
+  const ins=hr.children[hr.children.length-7];
+  const th=document.createElement('th'); th.textContent=n; th.style.minWidth='56px'; hr.insertBefore(th,ins);
+  gs.teams[team].players.forEach((_,idx)=>{
+    const tr=document.getElementById(`row-${team}-${idx}`);
+    const stat=tr.querySelector('.stat-cell');
+    const td=document.createElement('td'); td.className='dc'; td.id=`c-${team}-${idx}-${n}`;
+    td.innerHTML=drawDiamond(null); td.onclick=()=>selectCell(team,idx,n,td); td.ondblclick=()=>showModal(team,idx,n);
+    tr.insertBefore(td,stat);
+  });
+}
+
+// ─── SCORESHEETS ──────────────────────────────────────────
+function buildScoresheets(){
+  ['v','l'].forEach(t=>{
+    const tbl=document.getElementById(`s${t}`);
+    tbl.innerHTML='';
+    const thead=document.createElement('thead');
+    const hr=document.createElement('tr');
+    hr.innerHTML=`<th class="ph">JUGADOR</th>`;
+    for(let i=1;i<=INNINGS;i++){
+      const th=document.createElement('th'); th.textContent=i; th.style.minWidth='56px'; hr.appendChild(th);
+    }
+    ['AB','H','RBI','BB','K','AVG'].forEach(s=>{
+      const th=document.createElement('th'); th.textContent=s; hr.appendChild(th);
+    });
+    thead.appendChild(hr); tbl.appendChild(thead);
+    const tbody=document.createElement('tbody');
+    gs.teams[t].players.forEach((p,idx)=>{
+      const tr=document.createElement('tr'); tr.id=`row-${t}-${idx}`;
+      tr.innerHTML=`<td class="player-cell" id="pc-${t}-${idx}"><div style="display:flex;align-items:center;justify-content:space-between;gap:3px"><div><span class="pname">${p.name}</span><span class="ppos">${p.bat==='DH'?'DH':p.bat} · ${p.pos}</span></div><button class="cambio-btn" id="cb-${t}-${idx}" onmousedown="subPttStart('${t}',${idx},event)" onmouseup="subPttEnd(event)" ontouchstart="subPttStart('${t}',${idx},event)" ontouchend="subPttEnd(event)" ontouchcancel="subPttEnd(event)" title="Mantén presionado: di entra [nombre] al [posición]">⇄</button></div></td>`;
+      for(let i=1;i<=INNINGS;i++){
+        const td=document.createElement('td'); td.className='dc'; td.id=`c-${t}-${idx}-${i}`;
+        td.innerHTML=drawDiamond(null); td.onclick=()=>selectCell(t,idx,i,td); td.ondblclick=()=>showModal(t,idx,i);
+        tr.appendChild(td);
+      }
+      ['ab','h','rbi','bb','k'].forEach(s=>{
+        const td=document.createElement('td'); td.className='stat-cell'; td.id=`st-${t}-${idx}-${s}`; td.textContent='0'; tr.appendChild(td);
+      });
+      const ta=document.createElement('td'); ta.className='stat-cell stat-avg'; ta.id=`st-${t}-${idx}-avg`; ta.textContent='.000'; tr.appendChild(ta);
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody);
+    document.getElementById(`dn${t}`).textContent=gs.teams[t].name;
+  });
+  setInning(1);
+}
+
+// ─── DIAMANTE SVG ─────────────────────────────────────────
+// Puntos del diamante: home=abajo, 1B=derecha, 2B=arriba, 3B=izquierda
+const D = { home:[27,46], first:[46,27], second:[27,8], third:[8,27] };
+
+function drawDiamond(play){
+  const p=play;
+  const gc='#1e3048'; // gris base
+  const hc='var(--green)'; // verde activo
+
+  // líneas base
+  const base=(a,b,c,w=1.5)=>`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
+  const dot=(pt,c,r=3.5)=>`<circle cx="${pt[0]}" cy="${pt[1]}" r="${r}" fill="${c}"/>`;
+
+  let s=`<svg viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg">`;
+
+  // Fondo líneas
+  s+=base(D.home,D.first,gc);
+  s+=base(D.first,D.second,gc);
+  s+=base(D.second,D.third,gc);
+  s+=base(D.third,D.home,gc);
+
+  if(p && p.type!=='out' && p.type!=='clear'){
+    const b=p.bases||0;
+    const scored=p.scored||false;
+    if(b>=1) s+=base(D.home,D.first,hc,2.5);
+    if(b>=2) s+=base(D.first,D.second,hc,2.5);
+    if(b>=3) s+=base(D.second,D.third,hc,2.5);
+    if(scored||b>=4) s+=base(D.third,D.home,hc,2.5);
+  }
+
+  // Dots en bases
+  s+=dot(D.first, p&&(p.bases>=1&&p.type!=='out')?hc:gc);
+  s+=dot(D.second,p&&(p.bases>=2&&p.type!=='out')?hc:gc);
+  s+=dot(D.third, p&&(p.bases>=3&&p.type!=='out')?hc:gc);
+  s+=dot(D.home,  p&&(p.scored||p.bases>=4)?hc:'#2a3a50',4);
+
+  // OUT: círculo alrededor del centro
+  if(p && p.type==='out'){
+    s+=`<circle cx="27" cy="27" r="11" fill="none" stroke="var(--red)" stroke-width="1.8" opacity="0.85"/>`;
+  }
+
+  // Carrera anotada: círculo verde punteado
+  if(p && p.scored && p.type!=='out'){
+    s+=`<circle cx="27" cy="27" r="9" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="3 2" opacity="0.7"/>`;
+  }
+
+  s+=`</svg>`;
+
+  // Etiqueta
+  if(p && p.sym && p.type!=='clear'){
+    const cls = p.type==='out'?'out-lbl':p.type==='hit'?'hit-lbl':p.type==='walk'?'walk-lbl':'other-lbl';
+    s+=`<div class="play-lbl ${cls}">${p.sym}</div>`;
+  }
+  return s;
+}
+
+// ─── SELECCIÓN DE CELDA ───────────────────────────────────
+let selCell=null;
+function selectCell(team,pidx,inn,td){
+  document.querySelectorAll('.dc.active').forEach(c=>c.classList.remove('active'));
+  td.classList.add('active');
+  selCell={team,pidx,inn,td};
+  gs.selected=selCell;
+  const p=gs.teams[team].players[pidx];
+  document.getElementById('selinfo').innerHTML=`<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
+  document.getElementById('reg-btn').disabled=false;
+}
+
+function openModalForSelected(){
+  if(!gs.selected) return;
+  showModal(gs.selected.team,gs.selected.pidx,gs.selected.inn);
+}
+
+// ─── MODAL ───────────────────────────────────────────────
+function showModal(team,pidx,inn){
+  const p=gs.teams[team].players[pidx];
+  document.getElementById('mtitle').textContent=`${p.name} · ENTRADA ${inn}`;
+  const body=document.getElementById('mbody'); body.innerHTML='';
+
+  const sections=[
+    {title:'PONCHES',    plays:PLAY_CATALOG.outs.filter(p=>['KS','KL'].includes(p.id))},
+    {title:'GROUND OUTS',plays:PLAY_CATALOG.outs.filter(p=>p.id.startsWith('R'))},
+    {title:'FLY OUTS',   plays:PLAY_CATALOG.outs.filter(p=>['F7','F8','F9','P','L','FF','IF'].includes(p.id))},
+    {title:'DOBLE PLAY / OTROS OUTS', plays:PLAY_CATALOG.outs.filter(p=>['DP643','DP543','SH','SF','CS','OR','GDP'].includes(p.id))},
+    {title:'HITS',       plays:PLAY_CATALOG.hits.filter(p=>['1B','2B','3B','HR','IHR','B'].includes(p.id))},
+    {title:'HITS POR ZONA', plays:PLAY_CATALOG.hits.filter(p=>['LS','RS','MI','LC','RC','LL','RL'].includes(p.id))},
+    {title:'BASE SIN BATAZO', plays:PLAY_CATALOG.walks},
+    {title:'ERRORES',    plays:PLAY_CATALOG.errors},
+    {title:'AVANCES / EVENTOS', plays:PLAY_CATALOG.advances},
+    {title:'ESPECIAL',   plays:PLAY_CATALOG.special},
+  ];
+
+  sections.forEach(sec=>{
+    const lbl=document.createElement('div'); lbl.className='modal-section'; lbl.textContent=sec.title; body.appendChild(lbl);
+    const grid=document.createElement('div'); grid.className='play-buttons';
+    sec.plays.forEach(pl=>{
+      const btn=document.createElement('button');
+      btn.className=`play-btn ${pl.type==='out'?'out-btn':pl.type==='hit'?'hit-btn':pl.type==='walk'?'walk-btn':''}`;
+      btn.textContent=pl.label;
+      btn.onclick=()=>{ applyPlay(team,pidx,inn,pl); closeModal(); };
+      grid.appendChild(btn);
+    });
+    body.appendChild(grid);
+  });
+  document.getElementById('modal').classList.add('show');
+}
+function closeModal(){ document.getElementById('modal').classList.remove('show'); }
+document.getElementById('modal').addEventListener('click',e=>{ if(e.target===document.getElementById('modal')) closeModal(); });
+
+// ─── APLICAR JUGADA ───────────────────────────────────────
+function applyPlay(team,pidx,inn,play){
+  if(play.type==='clear'){
+    delete gs.plays[team][pidx][inn];
+    refreshCell(team,pidx,inn);
+    updateStats(team,pidx);
+    updateScores();
+    showToast('Jugada borrada');
+    return;
+  }
+  if(play.type==='score'){
+    if(!gs.plays[team][pidx][inn]) gs.plays[team][pidx][inn]={sym:'R',bases:0,type:'advance'};
+    gs.plays[team][pidx][inn].scored=true;
+  } else {
+    const bases = play.bases===4?3:(play.bases||0);
+    const scored = play.bases===4;
+    gs.plays[team][pidx][inn]={ sym:play.sym, bases, scored, type:play.type, ab:play.ab, h:play.h||false };
+  }
+  refreshCell(team,pidx,inn);
+  gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
+  updateScores();
+  showToast(`✓ ${play.label}`);
+}
+
+function refreshCell(team,pidx,inn){
+  const td=document.getElementById(`c-${team}-${pidx}-${inn}`);
+  if(!td) return;
+  const pl=gs.plays[team][pidx][inn];
+  td.innerHTML=drawDiamond(pl||null);
+  td.classList.toggle('filled',!!pl);
+}
+
+// ─── ESTADÍSTICAS ─────────────────────────────────────────
+function updateStats(team,pidx){
+  const plays=gs.plays[team][pidx];
+  let ab=0,h=0,rbi=0,bb=0,k=0;
+  Object.entries(plays).forEach(([inn,p])=>{
+    if(!p) return;
+    if(p.ab) ab++;
+    if(p.h)  h++;
+    if(p.type==='walk') bb++;
+    if(p.sym==='KS'||p.sym==='KL') k++;
+    // RBI: carreras que este bateador impulsó en esta entrada.
+    // Si su jugada no fue un out, cuenta los corredores anteriores en el orden
+    // de bateo (índice < pidx) que anotaron en la misma entrada.
+    // Un jonrón (play.scored + type==='hit') también se impulsa a sí mismo.
+    if(p.type!=='out'&&p.type!=='clear'){
+      if(p.scored&&p.type==='hit') rbi++; // jonrón: se impulsa a sí mismo
+      for(let j=0;j<pidx;j++){
+        const jp=(gs.plays[team][j]||{})[inn];
+        if(jp&&jp.scored) rbi++;
+      }
+    }
+  });
+  const avg=ab>0?(h/ab).toFixed(3).replace('0.','.'):'.000';
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  set(`st-${team}-${pidx}-ab`,ab);
+  set(`st-${team}-${pidx}-h`,h);
+  set(`st-${team}-${pidx}-rbi`,rbi);
+  set(`st-${team}-${pidx}-bb`,bb);
+  set(`st-${team}-${pidx}-k`,k);
+  set(`st-${team}-${pidx}-avg`,avg);
+}
+
+function updateScores(){
+  ['v','l'].forEach(t=>{
+    const sc=Array(gs.scores[t].length).fill(0);
+    gs.teams[t].players.forEach((_,idx)=>{
+      Object.entries(gs.plays[t][idx]||{}).forEach(([inn,pl])=>{
+        if(pl&&pl.scored){ const i=parseInt(inn)-1; if(i>=0&&i<sc.length) sc[i]++; }
+      });
+    });
+    gs.scores[t]=sc;
+    let total=0, hits=0, errors=0;
+    sc.forEach((r,i)=>{
+      total+=r;
+      const el=document.getElementById(`ls${t==='v'?'v':'l'}${i+1}`);
+      if(el) el.textContent=r;
+    });
+    // Contar hits y errores
+    gs.teams[t].players.forEach((_,idx)=>{
+      Object.values(gs.plays[t][idx]||{}).forEach(pl=>{
+        if(pl){ if(pl.h) hits++; if(pl.type==='error') errors++; }
+      });
+    });
+    document.getElementById(`sc${t}`).textContent=total;
+    const r=document.getElementById(`ls${t==='v'?'v':'l'}R`); if(r) r.textContent=total;
+    const hel=document.getElementById(`ls${t==='v'?'v':'l'}H`); if(hel) hel.textContent=hits;
+    const eel=document.getElementById(`ls${t==='v'?'v':'l'}E`); if(eel) eel.textContent=errors;
+  });
+  highlightInn();
+}
+
+function highlightInn(){
+  document.querySelectorAll('.ls-current').forEach(el=>el.classList.remove('ls-current'));
+  ['v','l'].forEach(t=>{
+    const el=document.getElementById(`ls${t==='v'?'v':'l'}${gs.currentInning}`);
+    if(el) el.classList.add('ls-current');
+  });
+}
+
+// ─── VOZ (PUSH TO TALK) ───────────────────────────────────
+let rec=null, listening=false, pendingTranscript='';
+
+function initRec(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ showToast('⚠️ Navegador sin soporte de voz',true); return null; }
+  const r=new SR();
+  // continuous=true: el rec no se auto-detiene; esperamos al soltar el botón
+  r.continuous=true; r.interimResults=true; r.lang=gs.lang;
+  r.onresult=e=>{
+    pendingTranscript=Array.from(e.results).map(x=>x[0].transcript).join('');
+    document.getElementById('vtr').textContent=pendingTranscript;
+  };
+  r.onend=()=>{
+    const txt=pendingTranscript.toLowerCase().trim();
+    pendingTranscript='';
+    pttStopUI();
+    if(txt) interpretVoice(txt);
+    else document.getElementById('vtr').textContent='No se captó audio — intenta de nuevo';
+  };
+  r.onerror=e=>{ pendingTranscript=''; pttStopUI(); if(e.error!=='aborted') showToast(`⚠️ ${e.error}`,true); };
+  return r;
+}
+
+function pttStart(e){
+  e.preventDefault();
+  if(!gs.selected){ showToast('⚠️ Selecciona una casilla primero',true); return; }
+  if(listening) return;
+  try{
+    if(!rec) rec=initRec();
+    if(!rec) return;
+    rec.lang=gs.lang;
+    rec.start();
+  }catch(ex){
+    rec=initRec();
+    if(!rec) return;
+    try{ rec.start(); }catch(ex2){ return; }
+  }
+  listening=true;
+  pendingTranscript='';
+  document.getElementById('vbtn').classList.add('recording');
+  document.getElementById('mic-icon').textContent='🔴';
+  document.getElementById('vtr').textContent='GRABANDO... suelta para procesar';
+  document.getElementById('vrs').textContent='';
+}
+
+function pttEnd(e){
+  e.preventDefault();
+  if(!listening) return;
+  try{ if(rec) rec.stop(); }catch(ex){}
+}
+
+function pttStopUI(){
+  listening=false;
+  const btn=document.getElementById('vbtn');
+  btn.classList.remove('recording');
+  btn.classList.remove('listening');
+  document.getElementById('mic-icon').textContent='🎤';
+}
+
+function toggleLang(){
+  gs.lang=gs.lang==='es-MX'?'en-US':'es-MX';
+  document.getElementById('lang-toggle').textContent=`🎤 ${gs.lang==='es-MX'?'ES':'EN'}`;
+  if(rec) rec.lang=gs.lang;
+  showToast(`Idioma: ${gs.lang==='es-MX'?'Español':'English'}`);
+}
+
+// ─── CONFIRMACIÓN ─────────────────────────────────────────
+let pendingAction=null;
+
+function showConfirmBanner(label,action){
+  pendingAction=action;
+  document.getElementById('confirm-text').textContent=`¿Confirmas: ${label}?`;
+  document.getElementById('confirm-banner').classList.add('show');
+}
+
+function confirmYes(){
+  if(!pendingAction) return;
+  const a=pendingAction;
+  hideBanner();
+  if(a.type==='play'){
+    applyPlay(a.team,a.pidx,a.inn,a.play);
+    document.getElementById('vrs').textContent=`✓ ${a.play.label||a.play.sym}`;
+  } else if(a.type==='sub'){
+    applySubstitution(a.team,a.pidx,a.inName,a.inPos);
+  }
+}
+
+function confirmNo(){
+  hideBanner();
+  showToast('Cancelado — intenta de nuevo');
+}
+
+function hideBanner(){
+  pendingAction=null;
+  document.getElementById('confirm-banner').classList.remove('show');
+}
+
+function interpretVoice(text){
+  document.getElementById('vtr').textContent=`"${text}"`;
+  const {team,pidx,inn}=gs.selected;
+  let matched=null;
+
+  // Busca en el catálogo completo por palabras clave de voz
+  for(const play of ALL_PLAYS){
+    if(!play.voice) continue;
+    for(const kw of play.voice){
+      if(text.includes(kw)){ matched=play; break; }
+    }
+    if(matched) break;
+  }
+
+  // Detección de error con posición específica (ej: "error del short avanzó a segunda")
+  if(!matched && text.includes('error')){
+    let sym='E?', bases=1;
+    if(text.includes('short')||text.includes('parador')||text.includes('ss')) sym='E6';
+    else if(text.includes('primera')||text.includes('first')||text.includes('1b')) sym='E3';
+    else if(text.includes('segunda')||text.includes('second')||text.includes('2b')) sym='E4';
+    else if(text.includes('tercera')||text.includes('third')||text.includes('3b')) sym='E5';
+    else if(text.includes('pitcher')||text.includes('lanzador')) sym='E1';
+    else if(text.includes('catcher')||text.includes('receptor')) sym='E2';
+    else if(text.includes('izquierda')||text.includes('left')) sym='E7';
+    else if(text.includes('centro')||text.includes('center')) sym='E8';
+    else if(text.includes('derecha')||text.includes('right')) sym='E9';
+    if(text.includes('segunda')||text.includes('second')) bases=2;
+    else if(text.includes('tercera')||text.includes('third')) bases=3;
+    matched={...PLAY_CATALOG.errors[0], sym, label:`Error ${sym}`, bases, type:'error', ab:true};
+  }
+
+  // Detección de ground out con posiciones (ej: "rodado de short a primera")
+  if(!matched && (text.includes('rodado')||text.includes('rolata')||text.includes('rola'))){
+    let sym='63';
+    if(text.includes('short')) sym='63';
+    else if(text.includes('segunda')||text.includes('second')) sym='43';
+    else if(text.includes('tercera')||text.includes('third')) sym='53';
+    else if(text.includes('pitcher')) sym='13';
+    matched={...PLAY_CATALOG.outs[0],sym,label:`Rodado ${sym}`,bases:0,type:'out',ab:true};
+  }
+
+  if(matched){
+    document.getElementById('vrs').textContent=`? ${matched.sym}`;
+    const pname=gs.teams[team].players[pidx].name;
+    showConfirmBanner(`${matched.label} — ${pname}`,{type:'play',team,pidx,inn,play:matched});
+  } else {
+    document.getElementById('vrs').textContent='⚠️ No reconocido';
+    showToast('⚠️ No se reconoció la jugada. Intenta de nuevo.',true);
+  }
+}
+
+// ─── NUMERITOS FINALES (REPORTE PDF) ──────────────────────
+function openNumeritos(){
+  const html=generateReportHTML();
+  const w=window.open('','_blank','width=980,height=820');
+  if(!w){ showToast('⚠️ Activa ventanas emergentes para el reporte',true); return; }
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+}
+
+function generateReportHTML(){
+  const vn=gs.teams.v.name, ln=gs.teams.l.name;
+  const totalV=gs.scores.v.reduce((a,b)=>a+b,0);
+  const totalL=gs.scores.l.reduce((a,b)=>a+b,0);
+  const today=new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  // ── Formateadores ──
+  const fmt3=n=>{
+    if(!isFinite(n)||isNaN(n)) return '---';
+    if(n===0) return '.000';
+    if(n>0&&n<1) return n.toFixed(3).slice(1);
+    return n.toFixed(3);
+  };
+  const fmt2=n=>(!isFinite(n)||isNaN(n))?'---':n.toFixed(2);
+  const fmt1=n=>(!isFinite(n)||isNaN(n))?'---':n.toFixed(1);
+
+  // ── Estadísticas de bateo completas ──
+  const getBat=(team,pidx)=>{
+    const plays=gs.plays[team][pidx]||{};
+    let ab=0,h=0,r=0,rbi=0,d2=0,d3=0,hr=0,bb=0,hbp=0,k=0,sb=0,sf=0;
+    Object.entries(plays).forEach(([inn,p])=>{
+      if(!p) return;
+      if(p.ab) ab++;
+      if(p.h){
+        h++;
+        if(['2B','LC','RC','LL','RL'].includes(p.sym)) d2++;
+        else if(p.sym==='3B') d3++;
+        else if(p.sym==='HR'||p.sym==='IHR') hr++;
+      }
+      if(p.scored) r++;
+      if(p.sym==='BB'||p.sym==='BBI') bb++;
+      if(p.sym==='BG') hbp++;
+      if(p.sym==='KS'||p.sym==='KL') k++;
+      if(p.sym==='SB') sb++;
+      if(p.sym==='SF') sf++;
+      if(p.type!=='out'&&p.type!=='clear'){
+        if(p.scored&&p.type==='hit') rbi++;
+        for(let j=0;j<pidx;j++){
+          const jp=(gs.plays[team][j]||{})[inn];
+          if(jp&&jp.scored) rbi++;
+        }
+      }
+    });
+    const s1=Math.max(0,h-d2-d3-hr);
+    const avg=ab>0?h/ab:0;
+    const den=ab+bb+hbp+sf;
+    const obp=den>0?(h+bb+hbp)/den:0;
+    const slg=ab>0?(s1+d2*2+d3*3+hr*4)/ab:0;
+    return{ab,h,r,rbi,d2,d3,hr,bb,hbp,k,sb,avg,obp,slg,ops:obp+slg};
+  };
+
+  // ── Escalas OPS ──
+  const opsC=o=>o>=0.9?'#006600':o>=0.8?'#1a55cc':o>=0.7?'#886600':'#cc0000';
+  const opsL=o=>o>=0.9?'Excelente':o>=0.8?'Muy Bueno':o>=0.7?'Promedio':'Deficiente';
+
+  // ── Valores lineales ──
+  const LW={'BB':0.55,'BBI':0.55,'BG':0.55,'1B':0.70,'LS':0.70,'RS':0.70,'MI':0.70,'B':0.70,
+    '2B':1.10,'LC':1.10,'RC':1.10,'LL':1.10,'RL':1.10,'3B':1.35,'HR':1.65,'IHR':1.65};
+  const getLW=(team,pidx)=>{
+    let val=0;
+    Object.values(gs.plays[team][pidx]||{}).forEach(p=>{
+      if(!p) return;
+      if(LW[p.sym]!==undefined) val+=LW[p.sym];
+      else if(p.type==='out') val-=0.25;
+    });
+    return val;
+  };
+
+  // ── Turnos de pitcheo ──
+  const vWins=totalV>totalL, lWins=totalL>totalV;
+  const getPitchStints=pitcherTeam=>{
+    const batTeam=pitcherTeam==='v'?'l':'v';
+    const players=gs.teams[pitcherTeam].players;
+    const stints=[];
+    const spIdx=players.findIndex(p=>p.pos==='P');
+    if(spIdx>=0){
+      const spSub=gs.subs[pitcherTeam].find(s=>s.outPidx===spIdx);
+      stints.push({name:players[spIdx].name,from:1,to:spSub?spSub.inn-1:INNINGS,role:'AB'});
+      gs.subs[pitcherTeam].filter(s=>s.inPos==='P').sort((a,b)=>a.inn-b.inn)
+        .forEach(s=>stints.push({name:s.inName,from:s.inn,to:INNINGS,role:'RP'}));
+    } else {
+      stints.push({name:'LANZADOR',from:1,to:INNINGS,role:'AB'});
+    }
+    const teamWins=(pitcherTeam==='v'&&vWins)||(pitcherTeam==='l'&&lWins);
+    const teamLoses=(pitcherTeam==='v'&&lWins)||(pitcherTeam==='l'&&vWins);
+    return stints.map((st,i)=>{
+      let h=0,r=0,bb=0,k=0,hr=0;
+      gs.teams[batTeam].players.forEach((_,pidx)=>{
+        for(let inn=st.from;inn<=st.to;inn++){
+          const p=(gs.plays[batTeam][pidx]||{})[inn];
+          if(!p) return;
+          if(p.h) h++;
+          if(p.scored) r++;
+          if(p.sym==='BB'||p.sym==='BBI') bb++;
+          if(p.sym==='KS'||p.sym==='KL') k++;
+          if(p.sym==='HR'||p.sym==='IHR') hr++;
+        }
+      });
+      const ip=Math.max(1,st.to-st.from+1);
+      return{...st,ip,h,r,er:r,bb,k,hr,
+        era:r*9/ip, whip:(h+bb)/ip, k9:k*9/ip, bb9:bb*9/ip,
+        dec:i===0&&teamWins?'W':i===0&&teamLoses?'L':''
+      };
+    });
+  };
+  const eraC=e=>e<2?'#006600':e<3?'#1a55cc':e<4?'#886600':e<5?'#cc6600':'#cc0000';
+  const eraL=e=>e<2?'Élite':e<3?'Excelente':e<4?'Bueno':e<5?'Promedio':'Deficiente';
+  const whipC=w=>w<1?'#006600':w<1.15?'#1a55cc':w<1.30?'#886600':w>1.50?'#cc0000':'#665500';
+  const whipL=w=>w<1?'Élite':w<1.15?'Excelente':w<1.30?'Bueno':w>1.50?'Deficiente':'Aceptable';
+
+  // ── Sección 1: Line Score ──
+  const innH=Array.from({length:INNINGS},(_,i)=>`<th>${i+1}</th>`).join('');
+  const lsRows=['v','l'].map(t=>{
+    let hits=0,errors=0;
+    gs.teams[t].players.forEach((_,idx)=>Object.values(gs.plays[t][idx]||{}).forEach(p=>{
+      if(p){if(p.h)hits++;if(p.type==='error')errors++;}
+    }));
+    const cells=gs.scores[t].map(r=>`<td>${r}</td>`).join('');
+    const tot=gs.scores[t].reduce((a,b)=>a+b,0);
+    const cls=t==='v'?'vis':'loc';
+    return`<tr><td class="tcol ${cls}">${gs.teams[t].name}</td>${cells}<td class="rhe">${tot}</td><td class="rhe">${hits}</td><td class="rhe">${errors}</td></tr>`;
+  }).join('');
+
+  // ── Sección 2: Bateo ──
+  const batRows=['v','l'].map(t=>{
+    const cls=t==='v'?'vis':'loc';
+    const rows=gs.teams[t].players.map((p,idx)=>{
+      const s=getBat(t,idx);
+      return`<tr>
+        <td class="pcol ${cls}">${p.name} <span class="pbadge">${p.pos}</span></td>
+        <td>${s.ab}</td><td>${s.h}</td><td>${s.r}</td><td>${s.rbi}</td>
+        <td>${s.d2}</td><td>${s.d3}</td><td>${s.hr}</td>
+        <td>${s.bb}</td><td>${s.hbp}</td><td>${s.k}</td><td>${s.sb}</td>
+        <td>${fmt3(s.avg)}</td><td>${fmt3(s.obp)}</td><td>${fmt3(s.slg)}</td>
+        <td style="font-weight:700;color:${opsC(s.ops)}">${fmt3(s.ops)}</td>
+      </tr>`;
+    }).join('');
+    const tot=gs.teams[t].players.reduce((acc,_,idx)=>{
+      const s=getBat(t,idx);
+      return{ab:acc.ab+s.ab,h:acc.h+s.h,r:acc.r+s.r,rbi:acc.rbi+s.rbi,
+        d2:acc.d2+s.d2,d3:acc.d3+s.d3,hr:acc.hr+s.hr,bb:acc.bb+s.bb,
+        hbp:acc.hbp+s.hbp,k:acc.k+s.k,sb:acc.sb+s.sb};
+    },{ab:0,h:0,r:0,rbi:0,d2:0,d3:0,hr:0,bb:0,hbp:0,k:0,sb:0});
+    const tAvg=tot.ab>0?tot.h/tot.ab:0;
+    return`<tr class="ghdr ${cls}"><td colspan="16">${gs.teams[t].name}</td></tr>
+${rows}
+<tr class="gtot"><td class="pcol">TOTALES</td>
+  <td>${tot.ab}</td><td>${tot.h}</td><td>${tot.r}</td><td>${tot.rbi}</td>
+  <td>${tot.d2}</td><td>${tot.d3}</td><td>${tot.hr}</td>
+  <td>${tot.bb}</td><td>${tot.hbp}</td><td>${tot.k}</td><td>${tot.sb}</td>
+  <td>${fmt3(tAvg)}</td><td>—</td><td>—</td><td>—</td></tr>`;
+  }).join('');
+
+  // ── Sección 3: Pitcheo ──
+  const pitRows=['v','l'].map(t=>{
+    const cls=t==='v'?'vis':'loc';
+    return getPitchStints(t).map(st=>{
+      const dc=st.dec==='W'?'dec-w':st.dec==='L'?'dec-l':'';
+      return`<tr>
+        <td class="pcol ${cls}">${st.name} <span class="pbadge">${st.role}</span>${st.dec?` <span class="dec ${dc}">${st.dec}</span>`:''}</td>
+        <td>${st.ip}</td><td>${st.h}</td><td>${st.r}</td><td>${st.er}</td>
+        <td>${st.bb}</td><td>${st.k}</td><td>${st.hr}</td>
+        <td style="color:${eraC(st.era)};font-weight:700">${fmt2(st.era)}<br><span class="slbl">${eraL(st.era)}</span></td>
+        <td style="color:${whipC(st.whip)}">${fmt2(st.whip)}<br><span class="slbl">${whipL(st.whip)}</span></td>
+        <td>${fmt1(st.k9)}</td><td>${fmt1(st.bb9)}</td>
+      </tr>`;
+    }).join('');
+  }).join('');
+
+  // ── Sección 4: Líneas individuales ──
+  const indivHTML=['v','l'].map(t=>{
+    const cls=t==='v'?'vis':'loc';
+    const lines=gs.teams[t].players.map((p,idx)=>{
+      const s=getBat(t,idx);
+      const extras=[];
+      if(s.d2)  extras.push(`${s.d2} 2B`);
+      if(s.d3)  extras.push(`${s.d3} 3B`);
+      if(s.hr)  extras.push(`${s.hr} HR`);
+      if(s.rbi) extras.push(`${s.rbi} RBI`);
+      if(s.r)   extras.push(`${s.r} R`);
+      if(s.bb)  extras.push(`${s.bb} BB`);
+      if(s.hbp) extras.push(`${s.hbp} HBP`);
+      if(s.k)   extras.push(`${s.k} K`);
+      if(s.sb)  extras.push(`${s.sb} SB`);
+      return`<div class="iline">
+        <span class="iname ${cls}">${p.name}</span>
+        <span class="ihit">${s.h}-${s.ab}${extras.length?', '+extras.join(', '):''}</span>
+        <span class="istats">AVG ${fmt3(s.avg)} | OBP ${fmt3(s.obp)} | SLG ${fmt3(s.slg)} | OPS <b style="color:${opsC(s.ops)}">${fmt3(s.ops)} (${opsL(s.ops)})</b></span>
+      </div>`;
+    }).join('');
+    return`<div class="tblock"><div class="tlbl ${cls}">${gs.teams[t].name}</div>${lines}</div>`;
+  }).join('');
+
+  // ── Sección 5: Linear Weights ──
+  const allLW=['v','l'].map(t=>
+    gs.teams[t].players.map((_,idx)=>({team:t,idx,val:getLW(t,idx)}))
+  ).flat().sort((a,b)=>b.val-a.val);
+
+  const lwRows=allLW.map(({team,idx,val})=>{
+    const p=gs.teams[team].players[idx];
+    const cls=team==='v'?'vis':'loc';
+    const barW=Math.min(Math.abs(val)*38,180);
+    return`<tr>
+      <td class="pcol ${cls}">${p.name} <span class="pbadge">${gs.teams[team].name}</span></td>
+      <td style="font-weight:700;color:${val>=0?'#006600':'#cc0000'}">${val>=0?'+':''}${val.toFixed(2)}</td>
+      <td class="barcell"><div class="bar" style="width:${barW}px;background:${val>=0?'#00aa44':'#dd2244'}"></div></td>
+    </tr>`;
+  }).join('');
+
+  // ── HTML COMPLETO ─────────────────────────────────────────
+  return`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Numeritos Finales — ${vn} vs ${ln}</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Roboto+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#e4e4e4;color:#111;font-family:'Roboto Mono',monospace;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{background:#fff;max-width:940px;margin:0 auto;padding:28px 34px}
+/* Header */
+.rpt-hdr{text-align:center;border-bottom:3px solid #111;padding-bottom:14px;margin-bottom:22px}
+.rpt-title{font-family:'Bebas Neue',sans-serif;font-size:2.6rem;letter-spacing:7px}
+.rpt-sub{font-family:'Oswald',sans-serif;font-size:1.1rem;letter-spacing:3px;color:#444;margin-top:3px}
+.rpt-date{font-size:0.72rem;color:#999;margin-top:2px}
+.matchup{display:flex;align-items:center;justify-content:center;gap:22px;margin-top:14px}
+.mn{font-family:'Oswald',sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:3px}
+.ms{font-family:'Bebas Neue',sans-serif;font-size:3.2rem;line-height:1}
+.msep{font-size:1.2rem;color:#bbb}
+/* Sections */
+.section{margin-bottom:26px}
+.sec-title{font-family:'Oswald',sans-serif;font-size:0.82rem;letter-spacing:3px;background:#111;color:#fff;padding:5px 10px;margin-bottom:8px}
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:10px}
+th{background:#2a2a2a;color:#fff;font-family:'Oswald',sans-serif;letter-spacing:1px;padding:5px 4px;text-align:center;white-space:nowrap}
+td{border:1px solid #ddd;padding:4px 4px;text-align:center;white-space:nowrap}
+.pcol{text-align:left;padding-left:7px;min-width:140px;font-size:10px}
+.tcol{text-align:left;padding-left:8px;font-family:'Oswald',sans-serif;font-weight:600;font-size:11px;letter-spacing:1px;min-width:110px}
+.pbadge{font-size:8px;color:#888;margin-left:3px;border:1px solid #ccc;border-radius:2px;padding:0 2px}
+.ghdr td{font-family:'Oswald',sans-serif;font-size:0.82rem;letter-spacing:2px;padding:4px 8px;font-weight:700}
+.gtot td{font-weight:700;background:#f4f4f4;border-top:2px solid #888}
+.rhe{font-weight:700;background:#fafafa}
+.vis{color:#1a3a8a}.loc{color:#7a3800}
+.ghdr.vis td{background:#e8f0ff}.ghdr.loc td{background:#fff3e5}
+/* Decisions */
+.dec{font-weight:900;font-size:9px;margin-left:4px;border-radius:3px;padding:1px 4px}
+.dec-w{background:#c8ffd0;color:#005500}.dec-l{background:#ffd0d0;color:#aa0000}
+.slbl{font-size:8px;font-style:italic;display:block;line-height:1.4}
+/* Scale boxes */
+.scale-box{display:flex;gap:12px;flex-wrap:wrap;padding:6px 10px;background:#f5f5f5;border:1px solid #ddd;border-radius:4px;margin-top:6px;font-size:9px;align-items:center}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;flex-shrink:0}
+/* Individual lines */
+.tblock{margin-bottom:12px}
+.tlbl{font-family:'Oswald',sans-serif;font-size:0.82rem;letter-spacing:2px;font-weight:700;padding:3px 0;border-bottom:1px solid #ccc;margin-bottom:5px}
+.iline{display:flex;flex-wrap:wrap;gap:4px 10px;padding:4px 4px;border-bottom:1px dashed #e8e8e8;align-items:baseline;font-size:10px}
+.iname{font-family:'Oswald',sans-serif;font-weight:600;font-size:11px;min-width:140px}
+.ihit{color:#222;min-width:160px}.istats{color:#555}
+/* Linear weights */
+.barcell{border:none;text-align:left;padding:2px 6px}
+.bar{height:11px;border-radius:3px;min-width:2px}
+@media print{body{background:#fff}.page{padding:16px;max-width:100%}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="rpt-hdr">
+  <div class="rpt-title">NUMERITOS FINALES ⚾</div>
+  <div class="rpt-sub">${vn} vs ${ln}</div>
+  <div class="rpt-date">${today} · ${INNINGS} entradas jugadas</div>
+  <div class="matchup">
+    <span class="mn vis">${vn}</span>
+    <span class="ms">${totalV}</span>
+    <span class="msep">—</span>
+    <span class="ms">${totalL}</span>
+    <span class="mn loc">${ln}</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-title">1 — BOX SCORE · LINE SCORE (R-H-E)</div>
+  <table>
+    <thead><tr><th style="text-align:left">EQUIPO</th>${innH}<th>R</th><th>H</th><th>E</th></tr></thead>
+    <tbody>${lsRows}</tbody>
+  </table>
+</div>
+
+<div class="section">
+  <div class="sec-title">2 — ESTADÍSTICAS DE BATEO</div>
+  <table>
+    <thead><tr>
+      <th style="text-align:left">JUGADOR</th>
+      <th>AB</th><th>H</th><th>R</th><th>RBI</th>
+      <th>2B</th><th>3B</th><th>HR</th>
+      <th>BB</th><th>HBP</th><th>K</th><th>SB</th>
+      <th>AVG</th><th>OBP</th><th>SLG</th><th>OPS</th>
+    </tr></thead>
+    <tbody>${batRows}</tbody>
+  </table>
+  <div class="scale-box">
+    <b>OPS:</b>
+    <span><span class="dot" style="background:#006600"></span>.900+ Excelente</span>
+    <span><span class="dot" style="background:#1a55cc"></span>.800–.899 Muy Bueno</span>
+    <span><span class="dot" style="background:#886600"></span>.700–.799 Promedio</span>
+    <span><span class="dot" style="background:#cc0000"></span>&lt;.600 Deficiente</span>
+    <span style="color:#888;margin-left:6px">AVG=H/AB · OBP=(H+BB+HBP)/(AB+BB+HBP+SF) · SLG=(1B+2B×2+3B×3+HR×4)/AB · OPS=OBP+SLG</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-title">3 — ESTADÍSTICAS DE PITCHEO</div>
+  <table>
+    <thead><tr>
+      <th style="text-align:left">LANZADOR</th>
+      <th>IP</th><th>H</th><th>R</th><th>ER</th>
+      <th>BB</th><th>K</th><th>HR</th>
+      <th>ERA</th><th>WHIP</th><th>K/9</th><th>BB/9</th>
+    </tr></thead>
+    <tbody>${pitRows}</tbody>
+  </table>
+  <div class="scale-box">
+    <b>ERA:</b>
+    <span style="color:#006600">&lt;2.00 Élite</span>
+    <span style="color:#1a55cc">2–3 Excelente</span>
+    <span style="color:#886600">3–4 Bueno</span>
+    <span style="color:#cc6600">4–5 Promedio</span>
+    <span style="color:#cc0000">&gt;5 Deficiente</span>
+    &nbsp;&nbsp;<b>WHIP:</b>
+    <span style="color:#006600">&lt;1.00 Élite</span>
+    <span style="color:#1a55cc">1.00–1.15 Excelente</span>
+    <span style="color:#886600">1.15–1.30 Bueno</span>
+    <span style="color:#cc0000">&gt;1.50 Deficiente</span>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-title">4 — LÍNEA INDIVIDUAL POR BATEADOR</div>
+  ${indivHTML}
+</div>
+
+<div class="section">
+  <div class="sec-title">5 — VALORES LINEALES (Linear Weights) — ordenados de mayor a menor</div>
+  <table>
+    <thead><tr>
+      <th style="text-align:left">JUGADOR</th>
+      <th style="min-width:90px">VALOR (runs)</th>
+      <th style="text-align:left;padding-left:6px">BARRA</th>
+    </tr></thead>
+    <tbody>${lwRows}</tbody>
+  </table>
+  <div class="scale-box">
+    BB/HBP = +0.55 &nbsp;·&nbsp; 1B = +0.70 &nbsp;·&nbsp; 2B = +1.10 &nbsp;·&nbsp; 3B = +1.35 &nbsp;·&nbsp; HR = +1.65 &nbsp;·&nbsp; Out = −0.25
+  </div>
+</div>
+
+</div>
+<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),500));<\/script>
+</body>
+</html>`;
+}
+
+// ─── TOAST ────────────────────────────────────────────────
+function showToast(msg,err=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show'+(err?' error':'');
+  setTimeout(()=>{ t.className='toast'; },3000);
+}
+</script>
+</body>
+</html>
