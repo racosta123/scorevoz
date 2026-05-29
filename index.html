@@ -508,10 +508,13 @@ function parseRowVoice(text,team,row){
   const t=text.toLowerCase().trim();
   const posKeys=Object.keys(POS_WORD_MAP).sort((a,b)=>b.length-a.length);
   let posLabel='', nameText=t;
-  // Greedy regex: captura el ÚLTIMO "al" como separador
-  const m=t.match(/^(.*)\s+al\s+(.+)$/);
-  if(m){
-    const afterAl=m[2].trim();
+
+  // Separar por " al " (espacio-al-espacio); el ÚLTIMO "al" es el separador de posición
+  const parts=t.split(/\s+al\s+/i);
+  if(parts.length>=2){
+    const afterAl=parts[parts.length-1].trim();
+    nameText=parts.slice(0,-1).join(' al ').trim();
+
     if(/^(designado|dh)/.test(afterAl)){
       posLabel='DH';
     } else {
@@ -522,17 +525,17 @@ function parseRowVoice(text,team,row){
       if(posNum===null){ const n=parseInt(afterAl,10); if(n>=1&&n<=9) posNum=n; }
       if(posNum!==null) posLabel=POS_ABBR[posNum-1];
     }
-    nameText=m[1].trim();
   }
+
   nameText=nameText.replace(/^(va|es|juega|batea)\s+/,'').trim();
   if(!nameText) return null;
   const fmt=toTitleCase(nameText);
-  // Sync DH pill si se detectó posición DH
+
   if(posLabel==='DH'){
     if(hasDH(team,row)){ showToast('⚠️ Ya hay un DH en este equipo',true); posLabel=''; }
     else {
       const dhBtn=document.getElementById(`dh-${team}-${row}`);
-      if(dhBtn&&!dhBtn.classList.contains('active')){ dhBtn.classList.add('active'); }
+      if(dhBtn&&!dhBtn.classList.contains('active')) dhBtn.classList.add('active');
       document.getElementById(`o-${team}-${row}`).style.color='var(--amber)';
     }
   }
