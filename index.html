@@ -40,7 +40,10 @@
   .player-input:focus { border-color:var(--green); }
   .pos-input { font-size:0.78rem; padding:6px 6px; width:100%; color:var(--amber); text-align:center; text-transform:uppercase; }
   .pos-input:focus { border-color:var(--amber); }
-  .players-grid { display:grid; grid-template-columns:26px 1fr 60px 28px; gap:5px; align-items:center; margin-bottom:5px; }
+  .players-grid { display:grid; grid-template-columns:26px 1fr 50px 24px 28px; gap:5px; align-items:center; margin-bottom:5px; }
+  .dh-pill { font-size:0.52rem; font-family:'Roboto Mono',monospace; background:transparent; border:1px solid var(--border); border-radius:3px; color:var(--text-dim); cursor:pointer; letter-spacing:1px; padding:0; width:24px; height:24px; transition:all 0.15s; flex-shrink:0; }
+  .dh-pill:hover { border-color:var(--amber); color:var(--amber); }
+  .dh-pill.active { background:var(--amber); color:#000; border-color:var(--amber); font-weight:700; }
   .bat-num { color:var(--green); font-size:0.8rem; text-align:center; font-weight:500; }
   .col-header { font-size:0.62rem; color:var(--text-dim); letter-spacing:1px; padding-bottom:4px; border-bottom:1px solid var(--border); margin-bottom:3px; }
   .dh-row { background:rgba(255,184,0,0.05); border:1px dashed rgba(255,184,0,0.2); border-radius:6px; padding:4px; display:grid; grid-template-columns:26px 1fr 60px 28px; gap:5px; align-items:center; margin-top:6px; }
@@ -223,7 +226,7 @@
     <h3><span style="color:var(--blue)">▶ VISITANTE</span></h3>
     <input class="team-name-input" id="tn-v" placeholder="NOMBRE DEL EQUIPO VISITANTE" maxlength="30">
     <div class="players-grid">
-      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header"></div>
+      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div>
     </div>
     <div id="pl-v"></div>
   </div>
@@ -231,7 +234,7 @@
     <h3><span style="color:var(--amber)">▶ LOCAL</span></h3>
     <input class="team-name-input" id="tn-l" placeholder="NOMBRE DEL EQUIPO LOCAL" maxlength="30">
     <div class="players-grid">
-      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header"></div>
+      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div>
     </div>
     <div id="pl-l"></div>
   </div>
@@ -490,6 +493,30 @@ function setupRowStopUI(team,row){
   setupListeningRow=null;
 }
 
+function hasDH(team, exceptRow){
+  for(let i=1;i<=9;i++){
+    if(i===exceptRow) continue;
+    const btn=document.getElementById(`dh-${team}-${i}`);
+    if(btn&&btn.classList.contains('active')) return true;
+  }
+  return false;
+}
+
+function toggleDH(team, row, btn){
+  const posInput=document.getElementById(`o-${team}-${row}`);
+  if(btn.classList.contains('active')){
+    btn.classList.remove('active');
+    posInput.value=posInput.dataset.prev||'';
+    posInput.style.color='';
+  } else {
+    if(hasDH(team,row)){ showToast('⚠️ Ya hay un DH en este equipo — desactiva el anterior primero',true); return; }
+    btn.classList.add('active');
+    posInput.dataset.prev=posInput.value!=='DH'?posInput.value:'';
+    posInput.value='DH';
+    posInput.style.color='var(--amber)';
+  }
+}
+
 function parseRowVoice(text,team,row){
   const t=text.toLowerCase().trim();
   const posKeys=Object.keys(POS_WORD_MAP).sort((a,b)=>b.length-a.length);
@@ -513,6 +540,15 @@ function parseRowVoice(text,team,row){
   nameText=nameText.replace(/^(va|es|juega|batea)\s+/,'').trim();
   if(!nameText) return null;
   const fmt=toTitleCase(nameText);
+  // Sync DH pill si se detectó posición DH
+  if(posLabel==='DH'){
+    if(hasDH(team,row)){ showToast('⚠️ Ya hay un DH en este equipo',true); posLabel=''; }
+    else {
+      const dhBtn=document.getElementById(`dh-${team}-${row}`);
+      if(dhBtn&&!dhBtn.classList.contains('active')){ dhBtn.classList.add('active'); }
+      document.getElementById(`o-${team}-${row}`).style.color='var(--amber)';
+    }
+  }
   document.getElementById(`p-${team}-${row}`).value=fmt;
   if(posLabel) document.getElementById(`o-${team}-${row}`).value=posLabel;
   return `✓ #${row}: ${fmt}${posLabel?' · '+posLabel:''}`;
@@ -624,6 +660,7 @@ function buildSetup(t) {
     d.innerHTML = `<div class="bat-num">${i}</div>
       <input class="player-input" id="p-${t}-${i}" placeholder="Nombre" maxlength="25">
       <input class="pos-input" id="o-${t}-${i}" placeholder="POS" maxlength="3">
+      <button class="dh-pill" id="dh-${t}-${i}" onclick="toggleDH('${t}',${i},this)" title="Bateador Designado">DH</button>
       <button class="setup-mic-row" id="smb-${t}-${i}"
         onmousedown="setupRowPttStart('${t}',${i},event)" onmouseup="setupRowPttEnd(event)"
         ontouchstart="setupRowPttStart('${t}',${i},event)" ontouchend="setupRowPttEnd(event)"
