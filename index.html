@@ -5,18 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ScoreVoz ⚾</title>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0a0a0a; --bg2: #0f0f0f; --bg3: #181818; --card: #0d0d0d;
-    --red: #C8102E; --red-dim: #9c0c22; --red-dark: rgba(200,16,46,0.12);
+    --bg: #071018; --bg2: #101b25; --bg3: #0c151d; --card: #101b25;
+    --red: #ff4d67; --red-dim: #cc3d52; --red-dark: rgba(255,77,103,0.12);
     --navy: #003087; --navy-bg: rgba(0,48,135,0.12);
-    --gold: #FFB81C; --gold-dim: #c98b14;
-    --green: #00c44f; --green-dim: #009c3e; --green-dark: #001e0f;
-    --amber: #FFB81C; --blue: #4499ee;
-    --text: #f2f2f2; --text-dim: #686868; --border: #1e1e1e;
+    --gold: #ffb648; --gold-dim: #cc9238;
+    --green: #00e599; --green-dim: #00cc7a; --green-dark: #003322;
+    --amber: #ffb648; --blue: #00bfff;
+    --text: #ffffff; --text-dim: #8fa3b7; --border: rgba(255,255,255,0.08);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg); color:var(--text); font-family:'Roboto Mono',monospace; min-height:100vh; }
+  body { background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; }
 
   header {
     background:#000; border-bottom:3px solid var(--red);
@@ -32,11 +33,11 @@
   #setup-screen { max-width:720px; margin:50px auto; padding:0 20px; }
   .setup-title { font-family:'Oswald',sans-serif; font-size:1.6rem; color:#fff; margin-bottom:6px; letter-spacing:3px; }
   .setup-sub { color:var(--text-dim); font-size:0.75rem; margin-bottom:32px; }
-  .team-setup { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:16px; }
+  .team-setup { background:linear-gradient(180deg,#101b25,#0c151d); border:1px solid rgba(255,255,255,.08); border-radius:34px; box-shadow:0 20px 60px rgba(0,0,0,.45); padding:20px; margin-bottom:16px; }
   .team-setup h3 { font-family:'Oswald',sans-serif; font-size:0.9rem; letter-spacing:3px; margin-bottom:14px; }
   .team-name-input, .player-input, .pos-input {
     background:var(--bg3); border:1px solid var(--border); border-radius:5px;
-    color:var(--text); font-family:'Roboto Mono',monospace; outline:none; transition:border-color 0.2s;
+    color:var(--text); font-family:'Inter',sans-serif; outline:none; transition:border-color 0.2s;
   }
   .team-name-input { width:100%; font-family:'Oswald',sans-serif; font-size:1.1rem; padding:9px 12px; margin-bottom:14px; letter-spacing:2px; }
   .team-name-input:focus { border-color:var(--red); }
@@ -45,7 +46,7 @@
   .pos-input { font-size:0.78rem; padding:6px 6px; width:100%; color:var(--gold); text-align:center; text-transform:uppercase; }
   .pos-input:focus { border-color:var(--gold); }
   .players-grid { display:grid; grid-template-columns:26px 1fr 50px 24px 28px; gap:5px; align-items:center; margin-bottom:5px; }
-  .dh-pill { font-size:0.52rem; font-family:'Roboto Mono',monospace; background:transparent; border:1px solid var(--border); border-radius:3px; color:var(--text-dim); cursor:pointer; letter-spacing:1px; padding:0; width:24px; height:24px; transition:all 0.15s; flex-shrink:0; }
+  .dh-pill { font-size:0.52rem; font-family:'Inter',sans-serif; background:transparent; border:1px solid var(--border); border-radius:3px; color:var(--text-dim); cursor:pointer; letter-spacing:1px; padding:0; width:24px; height:24px; transition:all 0.15s; flex-shrink:0; }
   .dh-pill:hover { border-color:var(--gold); color:var(--gold); }
   .dh-pill.active { background:var(--gold); color:#000; border-color:var(--gold); font-weight:700; }
   .bat-num { color:var(--red); font-size:0.8rem; text-align:center; font-weight:700; }
@@ -76,7 +77,7 @@
 
   /* GAME LAYOUT */
   .game-layout { display:grid; grid-template-columns:1fr 1fr; gap:12px; max-width:1400px; margin:12px auto 0; padding:0 12px; }
-  .team-panel { background:var(--card); border-radius:8px; overflow:hidden; border:1px solid var(--border); }
+  .team-panel { background:linear-gradient(180deg,#101b25,#0c151d); border:1px solid rgba(255,255,255,.08); border-radius:34px; box-shadow:0 20px 60px rgba(0,0,0,.45); overflow:hidden; }
   .team-header { padding:10px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); }
   .team-header.v { background:var(--navy-bg); border-left:4px solid var(--navy); }
   .team-header.l { background:var(--red-dark); border-left:4px solid var(--red); }
@@ -148,12 +149,12 @@
   .modal h3 { font-family:'Oswald',sans-serif; font-size:1rem; letter-spacing:2px; color:#fff; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--border); }
   .modal-section { font-size:0.62rem; color:var(--text-dim); letter-spacing:2px; margin:12px 0 6px; font-family:'Oswald',sans-serif; border-bottom:1px solid var(--border); padding-bottom:3px; }
   .play-buttons { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
-  .play-btn { background:var(--bg3); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:'Roboto Mono',monospace; font-size:0.72rem; padding:9px 6px; cursor:pointer; transition:all 0.15s; text-align:center; }
+  .play-btn { background:var(--bg3); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:'Inter',sans-serif; font-size:0.72rem; padding:9px 6px; cursor:pointer; transition:all 0.15s; text-align:center; }
   .play-btn:hover { border-color:var(--gold); color:var(--gold); background:rgba(255,184,28,0.08); }
   .play-btn.out-btn:hover { border-color:#ff3347; color:#ff3347; background:rgba(255,51,71,0.08); }
   .play-btn.hit-btn:hover { border-color:var(--green); color:var(--green); background:rgba(0,196,79,0.08); }
   .play-btn.walk-btn:hover { border-color:#4499ee; color:#4499ee; background:rgba(68,153,238,0.08); }
-  .modal-close { width:100%; margin-top:10px; background:transparent; border:1px solid var(--border); border-radius:6px; color:var(--text-dim); font-family:'Roboto Mono',monospace; font-size:0.78rem; padding:9px; cursor:pointer; transition:all 0.15s; }
+  .modal-close { width:100%; margin-top:10px; background:transparent; border:1px solid var(--border); border-radius:6px; color:var(--text-dim); font-family:'Inter',sans-serif; font-size:0.78rem; padding:9px; cursor:pointer; transition:all 0.15s; }
   .modal-close:hover { border-color:#ff3347; color:#ff3347; }
 
   /* TOAST */
@@ -171,7 +172,7 @@
   .pitcher-section{margin-top:14px;padding:12px;background:rgba(0,48,135,0.06);border:1px solid rgba(0,48,135,0.2);border-left:3px solid var(--navy);border-radius:6px;}
   .pitcher-section-label{font-family:'Oswald',sans-serif;font-size:0.72rem;letter-spacing:2px;color:var(--blue);margin-bottom:8px;}
   .pitcher-row-wrap{display:flex;align-items:center;gap:6px;}
-  .pitcher-batea-toggle{font-size:0.58rem;font-family:'Roboto Mono',monospace;background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text-dim);cursor:pointer;letter-spacing:1px;padding:4px 7px;white-space:nowrap;transition:all 0.15s;flex-shrink:0;}
+  .pitcher-batea-toggle{font-size:0.58rem;font-family:'Inter',sans-serif;background:transparent;border:1px solid var(--border);border-radius:3px;color:var(--text-dim);cursor:pointer;letter-spacing:1px;padding:4px 7px;white-space:nowrap;transition:all 0.15s;flex-shrink:0;}
   .pitcher-batea-toggle:hover{border-color:var(--blue);color:var(--blue);}
   .pitcher-batea-toggle.active{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700;}
 
@@ -2072,7 +2073,7 @@ ${rows}
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Roboto+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#e4e4e4;color:#111;font-family:'Roboto Mono',monospace;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{background:#e4e4e4;color:#111;font-family:'Inter',sans-serif;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .page{background:#fff;max-width:940px;margin:0 auto;padding:28px 34px}
 /* Header */
 .rpt-hdr{text-align:center;border-bottom:3px solid #111;padding-bottom:14px;margin-bottom:22px}
