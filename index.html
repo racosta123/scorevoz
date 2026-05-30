@@ -307,7 +307,6 @@
         <button class="btn-pc btn-pc-s" onclick="addPitch('v','strikes')">S</button>
         <button class="btn-pc btn-pc-b" onclick="addPitch('v','balls')">B</button>
         <button class="btn-pc btn-pc-f" onclick="addPitch('v','fouls')">F</button>
-        <button class="btn-pc btn-pc-plus" onclick="addPitch('v',null)">+</button>
       </div>
       <div class="pitch-box">
         <div style="min-width:0"><div style="font-size:0.58rem;color:var(--text-dim);letter-spacing:1px;font-family:'Oswald'">LOCAL</div><div class="pitch-pitcher-name" id="pc-name-l">—</div></div>
@@ -316,7 +315,6 @@
         <button class="btn-pc btn-pc-s" onclick="addPitch('l','strikes')">S</button>
         <button class="btn-pc btn-pc-b" onclick="addPitch('l','balls')">B</button>
         <button class="btn-pc btn-pc-f" onclick="addPitch('l','fouls')">F</button>
-        <button class="btn-pc btn-pc-plus" onclick="addPitch('l',null)">+</button>
       </div>
     </div>
     <div class="game-layout">
@@ -400,14 +398,14 @@ const PLAY_CATALOG = {
     { id:'L',   label:'L  Línea Atrapada',       sym:'L',   bases:0, type:'out', ab:true,  color:'red',   voice:['línea atrapada','linea atrapada','line drive out'] },
     { id:'FF',  label:'FF Foul Fly',             sym:'FF',  bases:0, type:'out', ab:true,  color:'red',   voice:['foul fly','fly foul'] },
     // Ground outs
-    { id:'R63', label:'R63 Rodado SS→1B',        sym:'63',  bases:0, type:'out', ab:true,  color:'red',   voice:['rodado short','rolata short','rola short','ground out short'] },
-    { id:'R43', label:'R43 Rodado 2B→1B',        sym:'43',  bases:0, type:'out', ab:true,  color:'red',   voice:['rodado segunda','rolata segunda','rola segunda'] },
-    { id:'R53', label:'R53 Rodado 3B→1B',        sym:'53',  bases:0, type:'out', ab:true,  color:'red',   voice:['rodado tercera','rolata tercera','rola tercera'] },
-    { id:'R13', label:'R13 Rodado P→1B',         sym:'13',  bases:0, type:'out', ab:true,  color:'red',   voice:['rodado pitcher','rola pitcher'] },
+    { id:'R63', label:'R63 Rodado SS→1B',        sym:'6-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado short','rolata short','rola short','ground out short'] },
+    { id:'R43', label:'R43 Rodado 2B→1B',        sym:'4-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado segunda','rolata segunda','rola segunda'] },
+    { id:'R53', label:'R53 Rodado 3B→1B',        sym:'5-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado tercera','rolata tercera','rola tercera'] },
+    { id:'R13', label:'R13 Rodado P→1B',         sym:'1-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado pitcher','rola pitcher'] },
     { id:'R33', label:'R33 Rodado 1B no asist',  sym:'3',   bases:0, type:'out', ab:true,  color:'red',   voice:['rodado primera sin asistencia','foul line primera'] },
     // Doble play
-    { id:'DP643',label:'DP 6-4-3 Doble Play',   sym:'643', bases:0, type:'out', ab:true,  color:'red',   voice:['doble play','double play','643','doble matanza'] },
-    { id:'DP543',label:'DP 5-4-3 Doble Play',   sym:'543', bases:0, type:'out', ab:true,  color:'red',   voice:['doble play tercera','543'] },
+    { id:'DP643',label:'DP 6-4-3 Doble Play',   sym:'6-4-3',bases:0, type:'out', ab:true,  color:'red',   voice:['doble play','double play','643','doble matanza'] },
+    { id:'DP543',label:'DP 5-4-3 Doble Play',   sym:'5-4-3',bases:0, type:'out', ab:true,  color:'red',   voice:['doble play tercera','543'] },
     // Sacrificios
     { id:'SH',  label:'SH Sacrificio Hit Toque', sym:'SH',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio hit','toque de sacrificio','bunt sacrificio','sacrificio toque','plancha','toque de bola','bunt','toque corto','toque al cuadro','bunt de sacrificio','plancha de sacrificio'] },
     { id:'SF',  label:'SF Sacrificio Fly',       sym:'SF',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio fly','fly de sacrificio'] },
@@ -1304,16 +1302,10 @@ function pttStart(e){
   e.preventDefault();
   if(!gs.selected){ showToast('⚠️ Selecciona una casilla primero',true); return; }
   if(listening) return;
-  try{
-    if(!rec) rec=initRec();
-    if(!rec) return;
-    rec.lang=gs.lang;
-    rec.start();
-  }catch(ex){
-    rec=initRec();
-    if(!rec) return;
-    try{ rec.start(); }catch(ex2){ return; }
-  }
+  rec=initRec();
+  if(!rec) return;
+  rec.lang=gs.lang;
+  try{ rec.start(); }catch(ex){ showToast('⚠️ Error al iniciar micrófono — vuelve a intentar',true); return; }
   listening=true;
   pendingTranscript='';
   document.getElementById('vbtn').classList.add('recording');
@@ -1330,6 +1322,7 @@ function pttEnd(e){
 
 function pttStopUI(){
   listening=false;
+  rec=null;
   const btn=document.getElementById('vbtn');
   btn.classList.remove('recording');
   btn.classList.remove('listening');
@@ -1407,11 +1400,11 @@ function interpretVoice(text){
 
   // Detección de ground out con posiciones (ej: "rodado de short a primera")
   if(!matched && (text.includes('rodado')||text.includes('rolata')||text.includes('rola'))){
-    let sym='63';
-    if(text.includes('short')) sym='63';
-    else if(text.includes('segunda')||text.includes('second')) sym='43';
-    else if(text.includes('tercera')||text.includes('third')) sym='53';
-    else if(text.includes('pitcher')) sym='13';
+    let sym='6-3';
+    if(text.includes('short')) sym='6-3';
+    else if(text.includes('segunda')||text.includes('second')) sym='4-3';
+    else if(text.includes('tercera')||text.includes('third')) sym='5-3';
+    else if(text.includes('pitcher')) sym='1-3';
     matched={...PLAY_CATALOG.outs[0],sym,label:`Rodado ${sym}`,bases:0,type:'out',ab:true};
   }
 
@@ -1865,367 +1858,7 @@ function openNumeritos(){
   showToast(`📊 PDF descargado: ${fname}`);
 }
 
-function _oldReportHTML_removed(){
-  const vn=gs.teams.v.name, ln=gs.teams.l.name;
-  const totalV=gs.scores.v.reduce((a,b)=>a+b,0);
-  const totalL=gs.scores.l.reduce((a,b)=>a+b,0);
-  const today=new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-
-  // ── Formateadores ──
-  const fmt3=n=>{
-    if(!isFinite(n)||isNaN(n)) return '---';
-    if(n===0) return '.000';
-    if(n>0&&n<1) return n.toFixed(3).slice(1);
-    return n.toFixed(3);
-  };
-  const fmt2=n=>(!isFinite(n)||isNaN(n))?'---':n.toFixed(2);
-  const fmt1=n=>(!isFinite(n)||isNaN(n))?'---':n.toFixed(1);
-
-  // ── Estadísticas de bateo completas ──
-  const getBat=(team,pidx)=>{
-    const plays=gs.plays[team][pidx]||{};
-    let ab=0,h=0,r=0,rbi=0,d2=0,d3=0,hr=0,bb=0,hbp=0,k=0,sb=0,sf=0;
-    Object.entries(plays).forEach(([inn,p])=>{
-      if(!p) return;
-      if(p.ab) ab++;
-      if(p.h){
-        h++;
-        if(['2B','LC','RC','LL','RL'].includes(p.sym)) d2++;
-        else if(p.sym==='3B') d3++;
-        else if(p.sym==='HR'||p.sym==='IHR') hr++;
-      }
-      if(p.scored) r++;
-      if(p.sym==='BB'||p.sym==='BBI') bb++;
-      if(p.sym==='BG') hbp++;
-      if(p.sym==='KS'||p.sym==='KL') k++;
-      if(p.sym==='SB') sb++;
-      if(p.sym==='SF') sf++;
-      if(p.type!=='out'&&p.type!=='clear'){
-        if(p.scored&&p.type==='hit') rbi++;
-        for(let j=0;j<pidx;j++){
-          const jp=(gs.plays[team][j]||{})[inn];
-          if(jp&&jp.scored) rbi++;
-        }
-      }
-    });
-    const s1=Math.max(0,h-d2-d3-hr);
-    const avg=ab>0?h/ab:0;
-    const den=ab+bb+hbp+sf;
-    const obp=den>0?(h+bb+hbp)/den:0;
-    const slg=ab>0?(s1+d2*2+d3*3+hr*4)/ab:0;
-    return{ab,h,r,rbi,d2,d3,hr,bb,hbp,k,sb,avg,obp,slg,ops:obp+slg};
-  };
-
-  // ── Escalas OPS ──
-  const opsC=o=>o>=0.9?'#006600':o>=0.8?'#1a55cc':o>=0.7?'#886600':'#cc0000';
-  const opsL=o=>o>=0.9?'Excelente':o>=0.8?'Muy Bueno':o>=0.7?'Promedio':'Deficiente';
-
-  // ── Valores lineales ──
-  const LW={'BB':0.55,'BBI':0.55,'BG':0.55,'1B':0.70,'LS':0.70,'RS':0.70,'MI':0.70,'B':0.70,
-    '2B':1.10,'LC':1.10,'RC':1.10,'LL':1.10,'RL':1.10,'3B':1.35,'HR':1.65,'IHR':1.65};
-  const getLW=(team,pidx)=>{
-    let val=0;
-    Object.values(gs.plays[team][pidx]||{}).forEach(p=>{
-      if(!p) return;
-      if(LW[p.sym]!==undefined) val+=LW[p.sym];
-      else if(p.type==='out') val-=0.25;
-    });
-    return val;
-  };
-
-  // ── Turnos de pitcheo ──
-  const vWins=totalV>totalL, lWins=totalL>totalV;
-  const getPitchStints=pitcherTeam=>{
-    const batTeam=pitcherTeam==='v'?'l':'v';
-    const players=gs.teams[pitcherTeam].players;
-    const stints=[];
-    const spIdx=players.findIndex(p=>p.pos==='P');
-    if(spIdx>=0){
-      const spSub=gs.subs[pitcherTeam].find(s=>s.outPidx===spIdx);
-      stints.push({name:players[spIdx].name,from:1,to:spSub?spSub.inn-1:INNINGS,role:'AB'});
-      gs.subs[pitcherTeam].filter(s=>s.inPos==='P').sort((a,b)=>a.inn-b.inn)
-        .forEach(s=>stints.push({name:s.inName,from:s.inn,to:INNINGS,role:'RP'}));
-    } else {
-      stints.push({name:'LANZADOR',from:1,to:INNINGS,role:'AB'});
-    }
-    const teamWins=(pitcherTeam==='v'&&vWins)||(pitcherTeam==='l'&&lWins);
-    const teamLoses=(pitcherTeam==='v'&&lWins)||(pitcherTeam==='l'&&vWins);
-    return stints.map((st,i)=>{
-      let h=0,r=0,bb=0,k=0,hr=0;
-      gs.teams[batTeam].players.forEach((_,pidx)=>{
-        for(let inn=st.from;inn<=st.to;inn++){
-          const p=(gs.plays[batTeam][pidx]||{})[inn];
-          if(!p) return;
-          if(p.h) h++;
-          if(p.scored) r++;
-          if(p.sym==='BB'||p.sym==='BBI') bb++;
-          if(p.sym==='KS'||p.sym==='KL') k++;
-          if(p.sym==='HR'||p.sym==='IHR') hr++;
-        }
-      });
-      const ip=Math.max(1,st.to-st.from+1);
-      return{...st,ip,h,r,er:r,bb,k,hr,
-        era:r*9/ip, whip:(h+bb)/ip, k9:k*9/ip, bb9:bb*9/ip,
-        dec:i===0&&teamWins?'W':i===0&&teamLoses?'L':''
-      };
-    });
-  };
-  const eraC=e=>e<2?'#006600':e<3?'#1a55cc':e<4?'#886600':e<5?'#cc6600':'#cc0000';
-  const eraL=e=>e<2?'Élite':e<3?'Excelente':e<4?'Bueno':e<5?'Promedio':'Deficiente';
-  const whipC=w=>w<1?'#006600':w<1.15?'#1a55cc':w<1.30?'#886600':w>1.50?'#cc0000':'#665500';
-  const whipL=w=>w<1?'Élite':w<1.15?'Excelente':w<1.30?'Bueno':w>1.50?'Deficiente':'Aceptable';
-
-  // ── Sección 1: Line Score ──
-  const innH=Array.from({length:INNINGS},(_,i)=>`<th>${i+1}</th>`).join('');
-  const lsRows=['v','l'].map(t=>{
-    let hits=0,errors=0;
-    gs.teams[t].players.forEach((_,idx)=>Object.values(gs.plays[t][idx]||{}).forEach(p=>{
-      if(p){if(p.h)hits++;if(p.type==='error')errors++;}
-    }));
-    const cells=gs.scores[t].map(r=>`<td>${r}</td>`).join('');
-    const tot=gs.scores[t].reduce((a,b)=>a+b,0);
-    const cls=t==='v'?'vis':'loc';
-    return`<tr><td class="tcol ${cls}">${gs.teams[t].name}</td>${cells}<td class="rhe">${tot}</td><td class="rhe">${hits}</td><td class="rhe">${errors}</td></tr>`;
-  }).join('');
-
-  // ── Sección 2: Bateo ──
-  const batRows=['v','l'].map(t=>{
-    const cls=t==='v'?'vis':'loc';
-    const rows=gs.teams[t].players.map((p,idx)=>{
-      const s=getBat(t,idx);
-      return`<tr>
-        <td class="pcol ${cls}">${p.name} <span class="pbadge">${p.pos}</span></td>
-        <td>${s.ab}</td><td>${s.h}</td><td>${s.r}</td><td>${s.rbi}</td>
-        <td>${s.d2}</td><td>${s.d3}</td><td>${s.hr}</td>
-        <td>${s.bb}</td><td>${s.hbp}</td><td>${s.k}</td><td>${s.sb}</td>
-        <td>${fmt3(s.avg)}</td><td>${fmt3(s.obp)}</td><td>${fmt3(s.slg)}</td>
-        <td style="font-weight:700;color:${opsC(s.ops)}">${fmt3(s.ops)}</td>
-      </tr>`;
-    }).join('');
-    const tot=gs.teams[t].players.reduce((acc,_,idx)=>{
-      const s=getBat(t,idx);
-      return{ab:acc.ab+s.ab,h:acc.h+s.h,r:acc.r+s.r,rbi:acc.rbi+s.rbi,
-        d2:acc.d2+s.d2,d3:acc.d3+s.d3,hr:acc.hr+s.hr,bb:acc.bb+s.bb,
-        hbp:acc.hbp+s.hbp,k:acc.k+s.k,sb:acc.sb+s.sb};
-    },{ab:0,h:0,r:0,rbi:0,d2:0,d3:0,hr:0,bb:0,hbp:0,k:0,sb:0});
-    const tAvg=tot.ab>0?tot.h/tot.ab:0;
-    return`<tr class="ghdr ${cls}"><td colspan="16">${gs.teams[t].name}</td></tr>
-${rows}
-<tr class="gtot"><td class="pcol">TOTALES</td>
-  <td>${tot.ab}</td><td>${tot.h}</td><td>${tot.r}</td><td>${tot.rbi}</td>
-  <td>${tot.d2}</td><td>${tot.d3}</td><td>${tot.hr}</td>
-  <td>${tot.bb}</td><td>${tot.hbp}</td><td>${tot.k}</td><td>${tot.sb}</td>
-  <td>${fmt3(tAvg)}</td><td>—</td><td>—</td><td>—</td></tr>`;
-  }).join('');
-
-  // ── Sección 3: Pitcheo ──
-  const pitRows=['v','l'].map(t=>{
-    const cls=t==='v'?'vis':'loc';
-    return getPitchStints(t).map(st=>{
-      const dc=st.dec==='W'?'dec-w':st.dec==='L'?'dec-l':'';
-      return`<tr>
-        <td class="pcol ${cls}">${st.name} <span class="pbadge">${st.role}</span>${st.dec?` <span class="dec ${dc}">${st.dec}</span>`:''}</td>
-        <td>${st.ip}</td><td>${st.h}</td><td>${st.r}</td><td>${st.er}</td>
-        <td>${st.bb}</td><td>${st.k}</td><td>${st.hr}</td>
-        <td style="color:${eraC(st.era)};font-weight:700">${fmt2(st.era)}<br><span class="slbl">${eraL(st.era)}</span></td>
-        <td style="color:${whipC(st.whip)}">${fmt2(st.whip)}<br><span class="slbl">${whipL(st.whip)}</span></td>
-        <td>${fmt1(st.k9)}</td><td>${fmt1(st.bb9)}</td>
-      </tr>`;
-    }).join('');
-  }).join('');
-
-  // ── Sección 4: Líneas individuales ──
-  const indivHTML=['v','l'].map(t=>{
-    const cls=t==='v'?'vis':'loc';
-    const lines=gs.teams[t].players.map((p,idx)=>{
-      const s=getBat(t,idx);
-      const extras=[];
-      if(s.d2)  extras.push(`${s.d2} 2B`);
-      if(s.d3)  extras.push(`${s.d3} 3B`);
-      if(s.hr)  extras.push(`${s.hr} HR`);
-      if(s.rbi) extras.push(`${s.rbi} RBI`);
-      if(s.r)   extras.push(`${s.r} R`);
-      if(s.bb)  extras.push(`${s.bb} BB`);
-      if(s.hbp) extras.push(`${s.hbp} HBP`);
-      if(s.k)   extras.push(`${s.k} K`);
-      if(s.sb)  extras.push(`${s.sb} SB`);
-      return`<div class="iline">
-        <span class="iname ${cls}">${p.name}</span>
-        <span class="ihit">${s.h}-${s.ab}${extras.length?', '+extras.join(', '):''}</span>
-        <span class="istats">AVG ${fmt3(s.avg)} | OBP ${fmt3(s.obp)} | SLG ${fmt3(s.slg)} | OPS <b style="color:${opsC(s.ops)}">${fmt3(s.ops)} (${opsL(s.ops)})</b></span>
-      </div>`;
-    }).join('');
-    return`<div class="tblock"><div class="tlbl ${cls}">${gs.teams[t].name}</div>${lines}</div>`;
-  }).join('');
-
-  // ── Sección 5: Linear Weights ──
-  const allLW=['v','l'].map(t=>
-    gs.teams[t].players.map((_,idx)=>({team:t,idx,val:getLW(t,idx)}))
-  ).flat().sort((a,b)=>b.val-a.val);
-
-  const lwRows=allLW.map(({team,idx,val})=>{
-    const p=gs.teams[team].players[idx];
-    const cls=team==='v'?'vis':'loc';
-    const barW=Math.min(Math.abs(val)*38,180);
-    return`<tr>
-      <td class="pcol ${cls}">${p.name} <span class="pbadge">${gs.teams[team].name}</span></td>
-      <td style="font-weight:700;color:${val>=0?'#006600':'#cc0000'}">${val>=0?'+':''}${val.toFixed(2)}</td>
-      <td class="barcell"><div class="bar" style="width:${barW}px;background:${val>=0?'#00aa44':'#dd2244'}"></div></td>
-    </tr>`;
-  }).join('');
-
-  // ── HTML COMPLETO ─────────────────────────────────────────
-  return`<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Numeritos Finales — ${vn} vs ${ln}</title>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Roboto+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#e4e4e4;color:#111;font-family:'Inter',sans-serif;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.page{background:#fff;max-width:940px;margin:0 auto;padding:28px 34px}
-/* Header */
-.rpt-hdr{text-align:center;border-bottom:3px solid #111;padding-bottom:14px;margin-bottom:22px}
-.rpt-title{font-family:'Bebas Neue',sans-serif;font-size:2.6rem;letter-spacing:7px}
-.rpt-sub{font-family:'Oswald',sans-serif;font-size:1.1rem;letter-spacing:3px;color:#444;margin-top:3px}
-.rpt-date{font-size:0.72rem;color:#999;margin-top:2px}
-.matchup{display:flex;align-items:center;justify-content:center;gap:22px;margin-top:14px}
-.mn{font-family:'Oswald',sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:3px}
-.ms{font-family:'Bebas Neue',sans-serif;font-size:3.2rem;line-height:1}
-.msep{font-size:1.2rem;color:#bbb}
-/* Sections */
-.section{margin-bottom:26px}
-.sec-title{font-family:'Oswald',sans-serif;font-size:0.82rem;letter-spacing:3px;background:#111;color:#fff;padding:5px 10px;margin-bottom:8px}
-/* Tables */
-table{width:100%;border-collapse:collapse;font-size:10px}
-th{background:#2a2a2a;color:#fff;font-family:'Oswald',sans-serif;letter-spacing:1px;padding:5px 4px;text-align:center;white-space:nowrap}
-td{border:1px solid #ddd;padding:4px 4px;text-align:center;white-space:nowrap}
-.pcol{text-align:left;padding-left:7px;min-width:140px;font-size:10px}
-.tcol{text-align:left;padding-left:8px;font-family:'Oswald',sans-serif;font-weight:600;font-size:11px;letter-spacing:1px;min-width:110px}
-.pbadge{font-size:8px;color:#888;margin-left:3px;border:1px solid #ccc;border-radius:2px;padding:0 2px}
-.ghdr td{font-family:'Oswald',sans-serif;font-size:0.82rem;letter-spacing:2px;padding:4px 8px;font-weight:700}
-.gtot td{font-weight:700;background:#f4f4f4;border-top:2px solid #888}
-.rhe{font-weight:700;background:#fafafa}
-.vis{color:#1a3a8a}.loc{color:#7a3800}
-.ghdr.vis td{background:#e8f0ff}.ghdr.loc td{background:#fff3e5}
-/* Decisions */
-.dec{font-weight:900;font-size:9px;margin-left:4px;border-radius:3px;padding:1px 4px}
-.dec-w{background:#c8ffd0;color:#005500}.dec-l{background:#ffd0d0;color:#aa0000}
-.slbl{font-size:8px;font-style:italic;display:block;line-height:1.4}
-/* Scale boxes */
-.scale-box{display:flex;gap:12px;flex-wrap:wrap;padding:6px 10px;background:#f5f5f5;border:1px solid #ddd;border-radius:4px;margin-top:6px;font-size:9px;align-items:center}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px;flex-shrink:0}
-/* Individual lines */
-.tblock{margin-bottom:12px}
-.tlbl{font-family:'Oswald',sans-serif;font-size:0.82rem;letter-spacing:2px;font-weight:700;padding:3px 0;border-bottom:1px solid #ccc;margin-bottom:5px}
-.iline{display:flex;flex-wrap:wrap;gap:4px 10px;padding:4px 4px;border-bottom:1px dashed #e8e8e8;align-items:baseline;font-size:10px}
-.iname{font-family:'Oswald',sans-serif;font-weight:600;font-size:11px;min-width:140px}
-.ihit{color:#222;min-width:160px}.istats{color:#555}
-/* Linear weights */
-.barcell{border:none;text-align:left;padding:2px 6px}
-.bar{height:11px;border-radius:3px;min-width:2px}
-@media print{body{background:#fff}.page{padding:16px;max-width:100%}}
-</style>
-</head>
-<body>
-<div class="page">
-
-<div class="rpt-hdr">
-  <div class="rpt-title">NUMERITOS FINALES ⚾</div>
-  <div class="rpt-sub">${vn} vs ${ln}</div>
-  <div class="rpt-date">${today} · ${INNINGS} entradas jugadas</div>
-  <div class="matchup">
-    <span class="mn vis">${vn}</span>
-    <span class="ms">${totalV}</span>
-    <span class="msep">—</span>
-    <span class="ms">${totalL}</span>
-    <span class="mn loc">${ln}</span>
-  </div>
-</div>
-
-<div class="section">
-  <div class="sec-title">1 — BOX SCORE · LINE SCORE (R-H-E)</div>
-  <table>
-    <thead><tr><th style="text-align:left">EQUIPO</th>${innH}<th>R</th><th>H</th><th>E</th></tr></thead>
-    <tbody>${lsRows}</tbody>
-  </table>
-</div>
-
-<div class="section">
-  <div class="sec-title">2 — ESTADÍSTICAS DE BATEO</div>
-  <table>
-    <thead><tr>
-      <th style="text-align:left">JUGADOR</th>
-      <th>AB</th><th>H</th><th>R</th><th>RBI</th>
-      <th>2B</th><th>3B</th><th>HR</th>
-      <th>BB</th><th>HBP</th><th>K</th><th>SB</th>
-      <th>AVG</th><th>OBP</th><th>SLG</th><th>OPS</th>
-    </tr></thead>
-    <tbody>${batRows}</tbody>
-  </table>
-  <div class="scale-box">
-    <b>OPS:</b>
-    <span><span class="dot" style="background:#006600"></span>.900+ Excelente</span>
-    <span><span class="dot" style="background:#1a55cc"></span>.800–.899 Muy Bueno</span>
-    <span><span class="dot" style="background:#886600"></span>.700–.799 Promedio</span>
-    <span><span class="dot" style="background:#cc0000"></span>&lt;.600 Deficiente</span>
-    <span style="color:#888;margin-left:6px">AVG=H/AB · OBP=(H+BB+HBP)/(AB+BB+HBP+SF) · SLG=(1B+2B×2+3B×3+HR×4)/AB · OPS=OBP+SLG</span>
-  </div>
-</div>
-
-<div class="section">
-  <div class="sec-title">3 — ESTADÍSTICAS DE PITCHEO</div>
-  <table>
-    <thead><tr>
-      <th style="text-align:left">LANZADOR</th>
-      <th>IP</th><th>H</th><th>R</th><th>ER</th>
-      <th>BB</th><th>K</th><th>HR</th>
-      <th>ERA</th><th>WHIP</th><th>K/9</th><th>BB/9</th>
-    </tr></thead>
-    <tbody>${pitRows}</tbody>
-  </table>
-  <div class="scale-box">
-    <b>ERA:</b>
-    <span style="color:#006600">&lt;2.00 Élite</span>
-    <span style="color:#1a55cc">2–3 Excelente</span>
-    <span style="color:#886600">3–4 Bueno</span>
-    <span style="color:#cc6600">4–5 Promedio</span>
-    <span style="color:#cc0000">&gt;5 Deficiente</span>
-    &nbsp;&nbsp;<b>WHIP:</b>
-    <span style="color:#006600">&lt;1.00 Élite</span>
-    <span style="color:#1a55cc">1.00–1.15 Excelente</span>
-    <span style="color:#886600">1.15–1.30 Bueno</span>
-    <span style="color:#cc0000">&gt;1.50 Deficiente</span>
-  </div>
-</div>
-
-<div class="section">
-  <div class="sec-title">4 — LÍNEA INDIVIDUAL POR BATEADOR</div>
-  ${indivHTML}
-</div>
-
-<div class="section">
-  <div class="sec-title">5 — VALORES LINEALES (Linear Weights) — ordenados de mayor a menor</div>
-  <table>
-    <thead><tr>
-      <th style="text-align:left">JUGADOR</th>
-      <th style="min-width:90px">VALOR (runs)</th>
-      <th style="text-align:left;padding-left:6px">BARRA</th>
-    </tr></thead>
-    <tbody>${lwRows}</tbody>
-  </table>
-  <div class="scale-box">
-    BB/HBP = +0.55 &nbsp;·&nbsp; 1B = +0.70 &nbsp;·&nbsp; 2B = +1.10 &nbsp;·&nbsp; 3B = +1.35 &nbsp;·&nbsp; HR = +1.65 &nbsp;·&nbsp; Out = −0.25
-  </div>
-</div>
-
-</div>
-<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),500));<\/script>
-</body>
-</html>`;
-}
+// (función de reporte antiguo eliminada)
 
 // ─── CONTADOR DE LANZAMIENTOS ──────────────────────────────
 function addPitch(team,type){
