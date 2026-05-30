@@ -212,6 +212,8 @@
   .jug-inn-num { font-size:0.48rem; color:#8fa3b7; letter-spacing:1px; font-family:'Oswald',sans-serif; }
   .jug-inn-sym { font-size:0.7rem; font-weight:700; font-family:'Bebas Neue',sans-serif; }
   .jug-lw-box { background:rgba(0,191,255,.07); border:1px solid rgba(0,191,255,.2); border-radius:12px; padding:10px 16px; margin-top:10px; display:flex; align-items:center; justify-content:space-between; }
+  .mode-btn-pro { background:rgba(0,229,153,.15) !important; color:var(--green) !important; border-color:var(--green) !important; }
+  .narrative-panel { background:rgba(0,191,255,.07); border:1px solid rgba(0,191,255,.22); border-radius:12px; padding:14px 16px; margin:6px 0 0; font-size:0.84rem; color:#c8dff0; line-height:1.7; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -307,6 +309,7 @@
     <button id="jugador-btn" onclick="openJugadorModal()" style="display:none;background:var(--cyan);color:#071018;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(0,191,255,0.3)">👤 JUGADOR</button>
     <div id="lang-toggle" style="display:none" onclick="toggleLang()">🎤 ES</div>
     <button id="save-cloud-btn" onclick="window.fbSaveGame && window.fbSaveGame()" style="display:none;background:rgba(0,229,153,.12);color:#00e599;border:1px solid #00e599;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer">☁️ GUARDAR</button>
+    <button id="mode-btn" onclick="toggleMode()" style="background:rgba(255,255,255,.06);color:#8fa3b7;border:1px solid rgba(255,255,255,.18);border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer">BÁSICO</button>
     <button id="auth-btn" onclick="window.fbSignIn && window.fbSignIn()" style="background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer">🔑 ENTRAR</button>
   </div>
 </header>
@@ -438,6 +441,9 @@
 </div>
 
 <script>
+// ─── MODO BÁSICO / PRO ────────────────────────────────────
+let appMode = localStorage.getItem('svMode') || 'basico';
+
 // ─── ESTADO ────────────────────────────────────────────────
 let INNINGS = 9;
 let gs = {
@@ -1020,16 +1026,25 @@ const D = { home:[27,46], first:[46,27], second:[27,8], third:[8,27] };
 
 function drawDiamond(play){
   const p=play;
-  const gc='#1e3048'; // gris base
-  const hc='var(--green)'; // verde activo
+  const gc='#1e3048';
 
-  // líneas base
+  // PRO: color según sistema latinoamericano
+  function proLineColor(p){
+    if(!p) return 'var(--green)';
+    if(p.type==='hit') return 'var(--red)';
+    if(p.type==='walk') return 'var(--cyan)';
+    if(p.type==='error') return 'var(--amber)';
+    if(p.sym==='SB') return 'var(--red)';
+    if(p.type==='advance') return 'rgba(200,215,230,0.65)';
+    return 'var(--green)';
+  }
+  const hc = appMode==='pro' ? proLineColor(p) : 'var(--green)';
+
   const base=(a,b,c,w=1.5)=>`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`;
   const dot=(pt,c,r=3.5)=>`<circle cx="${pt[0]}" cy="${pt[1]}" r="${r}" fill="${c}"/>`;
 
   let s=`<svg viewBox="0 0 54 54" xmlns="http://www.w3.org/2000/svg">`;
 
-  // Fondo líneas
   s+=base(D.home,D.first,gc);
   s+=base(D.first,D.second,gc);
   s+=base(D.second,D.third,gc);
@@ -1053,7 +1068,6 @@ function drawDiamond(play){
     }
   }
 
-  // Dots en bases
   if(p && p.runnerOut){
     const ob=p.runnerOutBase||0; const ac='var(--amber)';
     s+=dot(D.first, ob>1?ac:ob===1?'var(--red)':gc);
@@ -1067,24 +1081,32 @@ function drawDiamond(play){
     s+=dot(D.home,  p&&(p.scored||p.bases>=4)?hc:'#2a3a50',4);
   }
 
-  // OUT: círculo alrededor del centro
+  // Círculo de out: PRO → rojo solo en KS/DP/TP, gris en el resto
   if(p && p.type==='out'){
-    s+=`<circle cx="27" cy="27" r="11" fill="none" stroke="var(--red)" stroke-width="1.8" opacity="0.85"/>`;
+    const redSym=['KS','6-4-3','5-4-3','TP'];
+    const oc = (appMode==='pro' && !redSym.includes(p.sym)) ? 'rgba(180,195,210,0.7)' : 'var(--red)';
+    s+=`<circle cx="27" cy="27" r="11" fill="none" stroke="${oc}" stroke-width="1.8" opacity="0.85"/>`;
   }
 
-  // Corredor out en bases: círculo ámbar punteado
   if(p && p.runnerOut){
     s+=`<circle cx="27" cy="27" r="9" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="3 2" opacity="0.7"/>`;
   }
 
-  // Carrera anotada: círculo verde punteado
+  // Carrera anotada: PRO → mitad rellena=limpia / completo rellena=sucia
   if(p && p.scored && p.type!=='out' && !p.runnerOut){
-    s+=`<circle cx="27" cy="27" r="9" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="3 2" opacity="0.7"/>`;
+    if(appMode==='pro'){
+      if(p.earned===false){
+        s+=`<circle cx="27" cy="27" r="9" fill="var(--green)" opacity="0.5"/>`;
+      } else {
+        s+=`<path d="M 18 27 A 9 9 0 0 1 36 27 Z" fill="var(--green)" opacity="0.6"/>`;
+      }
+    } else {
+      s+=`<circle cx="27" cy="27" r="9" fill="none" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="3 2" opacity="0.7"/>`;
+    }
   }
 
   s+=`</svg>`;
 
-  // Etiqueta
   if(p && p.sym && p.type!=='clear'){
     const cls = p.type==='out'?'out-lbl':p.type==='hit'?'hit-lbl':p.type==='walk'?'walk-lbl':'other-lbl';
     s+=`<div class="play-lbl ${cls}">${p.sym}</div>`;
@@ -1098,6 +1120,9 @@ function selectCell(team,pidx,inn,td){
   const pl=gs.plays[team][pidx][inn];
   if(pl && pl.type!=='out' && pl.type!=='clear' && !pl.scored && !pl.runnerOut){
     showRunnerModal(team,pidx,inn); return;
+  }
+  if(appMode==='pro' && pl && pl.type!=='clear'){
+    showNarrativeModal(team,pidx,inn); return;
   }
   document.querySelectorAll('.dc.active').forEach(c=>c.classList.remove('active'));
   td.classList.add('active');
@@ -1164,10 +1189,14 @@ function showRunnerModal(team,pidx,inn){
   const grid=document.createElement('div');
   grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px';
 
+  const scoreMoves = appMode==='pro'
+    ? [{a:'score-earned',   lbl:'🏠 Limpia',  show:true, cls:'run-btn-score', full:false},
+       {a:'score-unearned', lbl:'🏠 Sucia',   show:true, cls:'run-btn-score', full:false}]
+    : [{a:'score',          lbl:'🏠 Anotó',   show:true, cls:'run-btn-score', full:true}];
   const moves=[
     {a:'to2',  lbl:'▶ Avanzó a 2ª',  show:pl.bases<2, cls:'run-btn-adv',  full:false},
     {a:'to3',  lbl:'▶▶ Avanzó a 3ª', show:pl.bases<3, cls:'run-btn-adv',  full:false},
-    {a:'score',lbl:'🏠 Anotó',        show:true,       cls:'run-btn-score', full:true},
+    ...scoreMoves,
     {a:'out2', lbl:'✕ Out en 2ª',     show:pl.bases<2, cls:'run-btn-out',  full:false},
     {a:'out3', lbl:'✕ Out en 3ª',     show:pl.bases<3, cls:'run-btn-out',  full:false},
     {a:'outH', lbl:'✕ Out en Home',   show:true,       cls:'run-btn-out',  full:false},
@@ -1203,7 +1232,9 @@ function applyRunnerMove(team,pidx,inn,action){
   switch(action){
     case 'to2':  pl.bases=Math.max(pl.bases,2); showToast('Corredor avanzó a 2ª'); break;
     case 'to3':  pl.bases=Math.max(pl.bases,3); showToast('Corredor avanzó a 3ª'); break;
-    case 'score': pl.bases=Math.max(pl.bases,3); pl.scored=true; showToast('✓ Corredor anotó'); break;
+    case 'score':         pl.bases=Math.max(pl.bases,3); pl.scored=true; showToast('✓ Corredor anotó'); break;
+    case 'score-earned':  pl.bases=Math.max(pl.bases,3); pl.scored=true; pl.earned=true;  showToast('✓ Carrera limpia'); break;
+    case 'score-unearned':pl.bases=Math.max(pl.bases,3); pl.scored=true; pl.earned=false; showToast('✓ Carrera sucia');  break;
     case 'out2': pl.runnerOut=true; pl.runnerOutBase=2; showToast('Out en 2ª'); break;
     case 'out3': pl.runnerOut=true; pl.runnerOutBase=3; showToast('Out en 3ª'); break;
     case 'outH': pl.runnerOut=true; pl.runnerOutBase=4; showToast('Out en Home'); break;
@@ -1233,7 +1264,9 @@ function stopRunnerMic(){
   const b=document.getElementById('runner-mic-btn'); if(b) b.style.borderColor='';
 }
 function parseRunnerVoice(t){
-  if(/anotó|anoto|carrera|score/.test(t)) return 'score';
+  if(/limpia/.test(t)) return 'score-earned';
+  if(/sucia/.test(t)) return 'score-unearned';
+  if(/anotó|anoto|carrera|score/.test(t)) return appMode==='pro' ? 'score-earned' : 'score';
   if(/regres|volvió|volvio/.test(t)) return 'back';
   if(/out.*home|home.*out|cuatro.*cinco|al home/.test(t)) return 'outH';
   if(/out.*terc|terc.*out|tres.*out|cuatro.*cinco/.test(t)) return 'out3';
@@ -2407,6 +2440,72 @@ function downloadPlayerFichaPDF(team,pidx){
   doc.save(`ficha_${safeName}.pdf`);
   showToast(`📄 PDF de ${curName} descargado`);
 }
+
+// ─── MODO BÁSICO / PRO ────────────────────────────────────
+function toggleMode(){
+  appMode = appMode==='pro' ? 'basico' : 'pro';
+  localStorage.setItem('svMode', appMode);
+  const btn=document.getElementById('mode-btn');
+  if(appMode==='pro'){ btn.textContent='⚡ PRO'; btn.classList.add('mode-btn-pro'); }
+  else               { btn.textContent='BÁSICO'; btn.classList.remove('mode-btn-pro'); }
+  refreshAllCells();
+}
+
+function refreshAllCells(){
+  ['v','l'].forEach(team=>{
+    Object.keys(gs.plays[team]||{}).forEach(pidx=>{
+      Object.keys(gs.plays[team][pidx]||{}).forEach(inn=>{
+        refreshCell(team,+pidx,+inn);
+      });
+    });
+  });
+}
+
+function narratePlay(team,pidx,inn){
+  const p=gs.plays[team]?.[pidx]?.[inn];
+  if(!p||p.type==='clear') return 'Sin jugada registrada.';
+  const sym=p.sym||'';
+  const hitNarr={'1B':'Bateó sencillo, llegó a primera.','2B':'Bateó doble, llegó a segunda.','3B':'Bateó triple, llegó a tercera.','HR':'Jonrón, recorrió las cuatro bases.','IHR':'Jonrón dentro del parque.','LS':'Hit sencillo por el lado izquierdo.','RS':'Hit sencillo por el lado derecho.','MI':'Hit sencillo por el medio cuadro.','LC':'Doble al left-center.','RC':'Doble al right-center.','LL':'Hit por la línea izquierda.','RL':'Hit por la línea derecha.','B':'Bunt hit, llegó a primera.'};
+  const outNarr={'KS':'Ponche swing.','KL':'Ponche cantado, sin tirarle.','F7':'Fly out al left field.','F8':'Fly out al center field.','F9':'Fly out al right field.','P':'Pop fly, out.','L':'Línea atrapada, out.','FF':'Foul fly, out.','6-3':'Rodado al short, out en primera.','4-3':'Rodado al segunda, out en primera.','5-3':'Rodado al tercera, out en primera.','1-3':'Rodado al pitcher, out en primera.','3':'Rodado a primera sin asistencia, out.','6-4-3':'Doble play 6-4-3.','5-4-3':'Doble play 5-4-3.','SH':'Sacrificio toque, avanzó el corredor.','SF':'Sacrificio fly, avanzó el corredor.','IF':'Infield fly, out automático.','OR':'Out por regla.','GDP':'Bateado en doble play.','CS':'Cogido robando, out.','RD':'Tira y tira (rundown), out.','TP':'Triple play.'};
+  const walkNarr={'BB':'Base por bolas, pasó a primera.','BBI':'Base intencional, fue a primera.','BG':'Golpeado por pitcheo (HBP), se embasó.','INT':'Interferencia, se embasó.','OB':'Obstrucción, se embasó.'};
+  const advNarr={'SB':'Base robada.','WP':'Avanzó por wild pitch.','PB':'Avanzó por passed ball.','BK':'Avanzó por balk.','T':'Avanzó por tiro.','FC':"Llegó a primera por fielder's choice.",'PC':'Pisa y corre.'};
+  let parts=[];
+  if(hitNarr[sym])       parts.push(hitNarr[sym]);
+  else if(outNarr[sym])  parts.push(outNarr[sym]);
+  else if(walkNarr[sym]) parts.push(walkNarr[sym]);
+  else if(advNarr[sym])  parts.push(advNarr[sym]);
+  else if(sym.startsWith('E')) parts.push(`Error del defensor (${sym}), se embasó.`);
+  else if(sym) parts.push(`Jugada: ${sym}.`);
+  if(p.type!=='out'){
+    const origBases={'1B':1,'LS':1,'RS':1,'MI':1,'B':1,'2B':2,'LC':2,'RC':2,'LL':2,'RL':2,'3B':3,'HR':4,'IHR':4}[sym]??1;
+    if(p.bases>origBases&&!p.scored&&!p.runnerOut){
+      const bn={2:'segunda',3:'tercera'};
+      parts.push(`Avanzó a ${bn[p.bases]||p.bases+'ª base'}.`);
+    }
+    if(p.scored){
+      parts.push(p.earned===false ? 'Anotó carrera sucia.' : 'Anotó carrera limpia.');
+    } else if(p.runnerOut){
+      const bn={2:'segunda',3:'tercera',4:'home'};
+      parts.push(`Fue puesto out en ${bn[p.runnerOutBase]||'bases'}.`);
+    }
+  }
+  return parts.join(' ')||'Sin descripción disponible.';
+}
+
+function showNarrativeModal(team,pidx,inn){
+  const p=gs.teams[team].players[pidx];
+  document.getElementById('mtitle').textContent=`${p.name} · ENTRADA ${inn}`;
+  const body=document.getElementById('mbody');
+  body.innerHTML=`<div class="narrative-panel">${narratePlay(team,pidx,inn)}</div>
+  <div style="margin-top:10px;display:flex;gap:6px">
+    <button class="modal-close" style="flex:1" onclick="closeModal();selectCell('${team}',${pidx},${inn},document.getElementById('c-${team}-${pidx}-${inn}'))">✏️ EDITAR</button>
+    <button class="modal-close" style="flex:1" onclick="closeModal()">CERRAR</button>
+  </div>`;
+  document.getElementById('modal').classList.add('show');
+}
+
+// Init estado del botón al cargar
+(function(){ const btn=document.getElementById('mode-btn'); if(!btn) return; if(appMode==='pro'){btn.textContent='⚡ PRO';btn.classList.add('mode-btn-pro');} })();
 
 // ─── TOAST ────────────────────────────────────────────────
 function showToast(msg,err=false){
