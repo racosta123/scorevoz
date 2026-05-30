@@ -9,11 +9,11 @@
 <style>
   /* ── VARIABLES ──────────────────────────────────────────── */
   :root {
-    --bg-main:#071018; --card-primary:#101b25; --card-secondary:#0c151d;
+    --bg-main:#060d1e; --card-primary:#0c1928; --card-secondary:#081220;
     --green:#00e599; --cyan:#00bfff; --amber:#ffb648; --red:#ff4d67;
-    --text:#ffffff; --text-dim:#8fa3b7; --border:rgba(255,255,255,0.08);
+    --text:#ffffff; --text-dim:#8fa3b7; --border:rgba(255,255,255,0.10);
     /* Alias compatibilidad JS/SVG */
-    --bg:#071018; --bg2:#101b25; --bg3:#0c151d; --card:#101b25;
+    --bg:#060d1e; --bg2:#0c1928; --bg3:#081220; --card:#0c1928;
     --blue:#00bfff; --gold:#ffb648; --gold-dim:#cc9238;
     --green-dim:#00cc7a; --green-dark:#003322;
     --red-dim:#cc3d52; --red-dark:rgba(255,77,103,0.12);
@@ -23,9 +23,9 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   button { border-radius:12px; cursor:pointer; transition:all .15s; }
   /* ── BASE ───────────────────────────────────────────────── */
-  body { background:#071018; color:#fff; font-family:'Inter',sans-serif; min-height:100vh; }
+  body { background:#060d1e; background-image:radial-gradient(ellipse at 50% -10%,rgba(10,100,240,.22) 0%,transparent 58%),radial-gradient(ellipse at 50% 105%,rgba(0,229,153,.05) 0%,transparent 50%); color:#fff; font-family:'Inter',sans-serif; min-height:100vh; }
   /* ── HEADER ─────────────────────────────────────────────── */
-  header { background:#0c151d; border-bottom:1px solid rgba(255,255,255,.08); padding:16px 24px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:100; box-shadow:0 2px 24px rgba(0,0,0,.6); min-height:56px; }
+  header { background:#081220; border-bottom:1px solid rgba(0,191,255,.12); padding:16px 24px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:100; box-shadow:0 2px 24px rgba(0,0,0,.6); min-height:56px; }
   .logo { font-family:'Bebas Neue',sans-serif; font-size:2rem; color:#fff; letter-spacing:5px; }
   .logo span { color:#00e599; }
   .inning-display { background:#00e599; border:none; border-radius:10px; padding:4px 14px; font-family:'Bebas Neue',sans-serif; font-size:1.3rem; color:#071018; letter-spacing:2px; font-weight:900; }
@@ -33,16 +33,17 @@
   #setup-screen { max-width:720px; margin:48px auto; padding:0 20px; }
   .setup-title { font-family:'Oswald',sans-serif; font-size:1.6rem; color:#fff; margin-bottom:6px; letter-spacing:3px; }
   .setup-sub { color:#8fa3b7; font-size:0.75rem; margin-bottom:32px; }
-  .team-setup { background:linear-gradient(180deg,#101b25,#0c151d); border:1px solid rgba(255,255,255,.08); border-radius:34px; box-shadow:0 20px 60px rgba(0,0,0,.45); padding:28px; margin-bottom:20px; }
+  .team-setup { background:linear-gradient(180deg,#0c1928,#081220); border:1px solid rgba(255,255,255,.10); border-radius:34px; box-shadow:0 20px 60px rgba(0,0,0,.6); padding:28px; margin-bottom:20px; }
   .team-setup h3 { font-family:'Oswald',sans-serif; font-size:0.85rem; letter-spacing:3px; margin-bottom:16px; color:#8fa3b7; }
   .team-name-input,.player-input,.pos-input { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); border-radius:12px; color:#fff; font-family:'Inter',sans-serif; outline:none; transition:border-color .2s; }
-  .team-name-input { width:100%; font-family:'Oswald',sans-serif; font-size:1.1rem; padding:10px 14px; margin-bottom:16px; letter-spacing:2px; }
+  .team-name-input { width:100%; font-family:'Oswald',sans-serif; font-size:1.1rem; padding:10px 14px; letter-spacing:2px; }
+  .team-name-row { display:flex; gap:8px; align-items:center; margin-bottom:16px; }
   .team-name-input:focus { border-color:#00bfff; }
   .player-input { font-size:0.8rem; padding:7px 10px; width:100%; }
   .player-input:focus { border-color:#00e599; }
   .pos-input { font-size:0.78rem; padding:7px 6px; width:100%; color:#ffb648; text-align:center; text-transform:uppercase; }
   .pos-input:focus { border-color:#ffb648; }
-  .players-grid { display:grid; grid-template-columns:26px 1fr 50px 24px 28px; gap:5px; align-items:center; margin-bottom:5px; }
+  .players-grid { display:grid; grid-template-columns:26px 1fr 50px 24px 28px 28px; gap:5px; align-items:center; margin-bottom:5px; }
   .dh-pill { font-size:0.52rem; font-family:'Inter',sans-serif; background:transparent; border:1px solid rgba(255,255,255,.08); border-radius:8px; color:#8fa3b7; cursor:pointer; letter-spacing:1px; padding:0; width:24px; height:24px; transition:all .15s; flex-shrink:0; }
   .dh-pill:hover { border-color:#ffb648; color:#ffb648; }
   .dh-pill.active { background:#ffb648; color:#071018; border-color:#ffb648; font-weight:700; }
@@ -56,21 +57,21 @@
   #game-screen { display:none; padding:0; }
   .game-content { padding-bottom:100px; }
   /* ── LINE SCORE ─────────────────────────────────────────── */
-  .line-score-bar { background:#0c151d; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.08); overflow-x:auto; }
+  .line-score-bar { background:#081220; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.10); overflow-x:auto; }
   .ls-table { border-collapse:collapse; font-size:0.72rem; width:100%; }
   .ls-table td,.ls-table th { padding:5px 8px; text-align:center; border:1px solid rgba(255,255,255,.08); white-space:nowrap; }
-  .ls-table th { background:#071018; color:#8fa3b7; font-family:'Oswald',sans-serif; letter-spacing:2px; font-size:0.68rem; }
+  .ls-table th { background:#060d1e; color:#8fa3b7; font-family:'Oswald',sans-serif; letter-spacing:2px; font-size:0.68rem; }
   .ls-table td:first-child { text-align:left; font-family:'Oswald',sans-serif; font-size:0.9rem; letter-spacing:2px; font-weight:700; padding-left:12px; min-width:120px; color:#fff; }
   .ls-runs { color:#071018 !important; font-weight:900 !important; font-size:1rem !important; background:#00e599 !important; border-color:#00e599 !important; }
   .ls-current { background:rgba(0,229,153,.10) !important; border-color:rgba(0,229,153,.3) !important; }
   /* ── INNING NAV ─────────────────────────────────────────── */
-  .inning-nav { display:flex; gap:4px; padding:8px 16px; background:#0c151d; border-bottom:1px solid rgba(255,255,255,.08); overflow-x:auto; }
+  .inning-nav { display:flex; gap:4px; padding:8px 16px; background:#081220; border-bottom:1px solid rgba(255,255,255,.10); overflow-x:auto; }
   .inn-btn { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:10px; color:#8fa3b7; font-family:'Oswald',sans-serif; font-size:0.8rem; padding:5px 14px; cursor:pointer; letter-spacing:1px; transition:all .15s; white-space:nowrap; }
   .inn-btn:hover { border-color:#00e599; color:#00e599; }
   .inn-btn.current { background:#00e599; border-color:#00e599; color:#071018; font-weight:700; }
   /* ── GAME LAYOUT ────────────────────────────────────────── */
   .game-layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:1400px; margin:16px auto 0; padding:0 16px; }
-  .team-panel { background:linear-gradient(180deg,#101b25,#0c151d); border:1px solid rgba(255,255,255,.08); border-radius:34px; box-shadow:0 20px 60px rgba(0,0,0,.45); overflow:hidden; }
+  .team-panel { background:linear-gradient(180deg,#0c1928,#081220); border:1px solid rgba(255,255,255,.10); border-radius:34px; box-shadow:0 20px 60px rgba(0,0,0,.6); overflow:hidden; }
   .team-panel:has(.team-header.v) { background:rgba(0,191,255,.08); border:1px solid rgba(0,191,255,.15); }
   .team-panel:has(.team-header.l) { background:rgba(0,229,153,.08); border:1px solid rgba(0,229,153,.15); }
   .team-header { padding:14px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,.08); }
@@ -81,9 +82,9 @@
   /* ── SCORESHEET ─────────────────────────────────────────── */
   .scoresheet-wrap { overflow-x:auto; }
   table.scoresheet { width:100%; border-collapse:collapse; font-size:0.68rem; }
-  table.scoresheet th { background:rgba(255,255,255,.03); color:#8fa3b7; font-family:'Oswald',sans-serif; letter-spacing:1px; font-size:0.62rem; padding:6px 3px; text-align:center; border:1px solid rgba(255,255,255,.08); white-space:nowrap; }
+  table.scoresheet th { background:rgba(0,150,255,.06); color:#a0bcd0; font-family:'Oswald',sans-serif; letter-spacing:1px; font-size:0.62rem; padding:6px 3px; text-align:center; border:1px solid rgba(255,255,255,.13); white-space:nowrap; }
   table.scoresheet th.ph { text-align:left; padding-left:7px; min-width:110px; }
-  table.scoresheet td { border:1px solid rgba(255,255,255,.08); text-align:center; vertical-align:middle; padding:1px; }
+  table.scoresheet td { border:1px solid rgba(255,255,255,.12); text-align:center; vertical-align:middle; padding:1px; }
   .player-cell { text-align:left; padding:4px 8px; }
   .pname { font-size:0.72rem; color:#fff; display:block; font-weight:600; }
   .ppos { font-size:0.58rem; color:#ffb648; }
@@ -100,7 +101,7 @@
   .play-lbl.walk-lbl { color:#00bfff; }
   .play-lbl.other-lbl{ color:#ffb648; }
   /* ── VOICE PANEL ────────────────────────────────────────── */
-  .voice-panel { position:fixed; bottom:0; left:0; right:0; background:#0c151d; border-top:1px solid rgba(255,255,255,.08); padding:10px 20px; display:flex; align-items:center; gap:14px; z-index:200; box-shadow:0 -8px 40px rgba(0,0,0,.7); }
+  .voice-panel { position:fixed; bottom:0; left:0; right:0; background:#081220; border-top:1px solid rgba(0,191,255,.15); padding:10px 20px; display:flex; align-items:center; gap:14px; z-index:200; box-shadow:0 -8px 40px rgba(0,0,0,.7); }
   .voice-btn { width:52px; height:52px; border-radius:50%; border:2px solid #00e599; background:rgba(0,229,153,.1); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .2s; flex-shrink:0; }
   .voice-btn:hover { background:rgba(0,229,153,.2); }
   .voice-btn.listening { animation:pulse 1s infinite; }
@@ -120,6 +121,17 @@
   .setup-mic-row { background:rgba(255,77,103,.1); border:1px solid #ff4d67; border-radius:50%; width:26px; height:26px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.72rem; flex-shrink:0; transition:all .2s; padding:0; }
   .setup-mic-row:hover { background:rgba(255,77,103,.2); }
   .setup-mic-row.recording { background:rgba(255,77,103,.2); border-color:#ff4d67; animation:pulse-red .7s infinite; }
+  .setup-pos-mic { background:rgba(255,182,72,.1); border:1px solid var(--amber); border-radius:50%; width:26px; height:26px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.58rem; font-weight:700; color:var(--amber); flex-shrink:0; transition:all .2s; padding:0; }
+  .setup-pos-mic:hover { background:rgba(255,182,72,.22); }
+  .setup-pos-mic.recording { background:rgba(255,182,72,.22); animation:pulse-amber .7s infinite; }
+  @keyframes pulse-amber { 0%,100%{box-shadow:0 0 0 0 rgba(255,182,72,.6)} 50%{box-shadow:0 0 0 8px rgba(255,182,72,0)} }
+  .setup-team-mic { background:rgba(0,191,255,.1); border:1px solid var(--cyan); border-radius:50%; width:30px; height:30px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.82rem; flex-shrink:0; transition:all .2s; padding:0; }
+  .setup-team-mic:hover { background:rgba(0,191,255,.2); }
+  .setup-team-mic.recording { background:rgba(0,191,255,.2); animation:pulse-cyan .7s infinite; }
+  @keyframes pulse-cyan { 0%,100%{box-shadow:0 0 0 0 rgba(0,191,255,.6)} 50%{box-shadow:0 0 0 10px rgba(0,191,255,0)} }
+  .btn-pc:disabled { opacity:0.28; cursor:not-allowed; filter:grayscale(.8); }
+  .btn-pc-undo { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); color:#8fa3b7; }
+  .btn-pc-undo:hover:not(:disabled) { border-color:var(--amber); color:var(--amber); }
   /* ── CAMBIO DE JUGADOR ──────────────────────────────────── */
   .cambio-btn { background:transparent; border:1px solid rgba(255,255,255,.08); border-radius:8px; color:#8fa3b7; font-size:0.6rem; padding:2px 5px; cursor:pointer; transition:all .15s; flex-shrink:0; line-height:1.2; }
   .cambio-btn:hover { border-color:#ffb648; color:#ffb648; }
@@ -132,7 +144,7 @@
   /* ── MODAL ──────────────────────────────────────────────── */
   .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:300; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; }
   .modal-overlay.show { opacity:1; pointer-events:all; }
-  .modal { background:#101b25; border:1px solid rgba(255,255,255,.1); border-radius:24px; padding:24px; max-width:440px; width:92%; box-shadow:0 24px 80px rgba(0,0,0,.9); max-height:90vh; overflow-y:auto; }
+  .modal { background:#0c1928; border:1px solid rgba(255,255,255,.12); border-radius:24px; padding:24px; max-width:440px; width:92%; box-shadow:0 24px 80px rgba(0,0,0,.9); max-height:90vh; overflow-y:auto; }
   .modal h3 { font-family:'Oswald',sans-serif; font-size:1rem; letter-spacing:2px; color:#fff; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,.08); }
   .modal-section { font-size:0.62rem; color:#8fa3b7; letter-spacing:2px; margin:12px 0 6px; font-family:'Oswald',sans-serif; border-bottom:1px solid rgba(255,255,255,.08); padding-bottom:3px; }
   .play-buttons { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; }
@@ -144,7 +156,7 @@
   .modal-close { width:100%; margin-top:10px; background:transparent; border:1px solid rgba(255,255,255,.08); border-radius:10px; color:#8fa3b7; font-family:'Inter',sans-serif; font-size:0.78rem; padding:9px; cursor:pointer; transition:all .15s; }
   .modal-close:hover { border-color:#ff4d67; color:#ff4d67; }
   /* ── TOAST ──────────────────────────────────────────────── */
-  .toast { position:fixed; top:72px; right:16px; background:#101b25; border:1px solid #00e599; border-radius:12px; padding:10px 16px; font-size:0.78rem; color:#fff; z-index:500; transform:translateX(120%); transition:transform .3s; max-width:260px; box-shadow:0 4px 20px rgba(0,0,0,.7); }
+  .toast { position:fixed; top:72px; right:16px; background:#0c1928; border:1px solid #00e599; border-radius:12px; padding:10px 16px; font-size:0.78rem; color:#fff; z-index:500; transform:translateX(120%); transition:transform .3s; max-width:260px; box-shadow:0 4px 20px rgba(0,0,0,.7); }
   .toast.show  { transform:translateX(0); }
   .toast.error { border-color:#ff4d67; color:#ff4d67; }
   /* ── PUSH TO TALK ───────────────────────────────────────── */
@@ -170,7 +182,7 @@
   .confirm-no  { background:#ff4d67; color:#fff; }
   @media(max-width:768px){ .game-layout{grid-template-columns:1fr;} }
   /* ── PITCH COUNTER BAR ──────────────────────────────────── */
-  .pitch-bar { background:#0c151d; padding:8px 16px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .pitch-bar { background:#081220; padding:8px 16px; border-bottom:1px solid rgba(255,255,255,.10); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .pitch-box { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:8px 14px; display:flex; align-items:center; gap:8px; flex:1; min-width:240px; }
   .pitch-pitcher-name { font-family:'Oswald',sans-serif; font-size:0.82rem; color:#00bfff; letter-spacing:1px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px; }
   .pitch-total { font-family:'Bebas Neue',sans-serif; font-size:2.6rem; color:#fff; line-height:1; min-width:44px; text-align:center; font-weight:900; }
@@ -320,9 +332,12 @@
   <div class="setup-sub">INGRESA EQUIPOS Y ALINEACIONES</div>
   <div class="team-setup">
     <h3><span style="color:var(--blue)">▶ VISITANTE</span></h3>
-    <input class="team-name-input" id="tn-v" placeholder="NOMBRE DEL EQUIPO VISITANTE" maxlength="30">
+    <div class="team-name-row">
+      <input class="team-name-input" id="tn-v" placeholder="NOMBRE DEL EQUIPO VISITANTE" maxlength="30" style="flex:1">
+      <button class="setup-team-mic" id="tnmb-v" onmousedown="teamNamePttStart('v',event)" onmouseup="teamNamePttEnd(event)" ontouchstart="teamNamePttStart('v',event)" ontouchend="teamNamePttEnd(event)" ontouchcancel="teamNamePttEnd(event)" title="Mantén: di el nombre del equipo">🎤</button>
+    </div>
     <div class="players-grid">
-      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div>
+      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div><div class="col-header"></div>
     </div>
     <div id="pl-v"></div>
     <div class="pitcher-section">
@@ -339,9 +354,12 @@
   </div>
   <div class="team-setup">
     <h3><span style="color:var(--amber)">▶ LOCAL</span></h3>
-    <input class="team-name-input" id="tn-l" placeholder="NOMBRE DEL EQUIPO LOCAL" maxlength="30">
+    <div class="team-name-row">
+      <input class="team-name-input" id="tn-l" placeholder="NOMBRE DEL EQUIPO LOCAL" maxlength="30" style="flex:1">
+      <button class="setup-team-mic" id="tnmb-l" onmousedown="teamNamePttStart('l',event)" onmouseup="teamNamePttEnd(event)" ontouchstart="teamNamePttStart('l',event)" ontouchend="teamNamePttEnd(event)" ontouchcancel="teamNamePttEnd(event)" title="Mantén: di el nombre del equipo">🎤</button>
+    </div>
     <div class="players-grid">
-      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div>
+      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div><div class="col-header"></div>
     </div>
     <div id="pl-l"></div>
     <div class="pitcher-section">
@@ -377,17 +395,19 @@
         <div style="min-width:0"><div style="font-size:0.58rem;color:var(--text-dim);letter-spacing:1px;font-family:'Oswald'">VISITANTE</div><div class="pitch-pitcher-name" id="pc-name-v">—</div></div>
         <div class="pitch-total" id="pc-total-v">0</div>
         <div class="pitch-sbf" id="pc-sbf-v">S: 0<br>B: 0<br>F: 0</div>
-        <button class="btn-pc btn-pc-s" onclick="addPitch('v','strikes')">S</button>
-        <button class="btn-pc btn-pc-b" onclick="addPitch('v','balls')">B</button>
-        <button class="btn-pc btn-pc-f" onclick="addPitch('v','fouls')">F</button>
+        <button class="btn-pc btn-pc-s" id="pc-btn-s-v" onclick="addPitch('v','strikes')">S</button>
+        <button class="btn-pc btn-pc-b" id="pc-btn-b-v" onclick="addPitch('v','balls')">B</button>
+        <button class="btn-pc btn-pc-f" id="pc-btn-f-v" onclick="addPitch('v','fouls')">F</button>
+        <button class="btn-pc btn-pc-undo" id="pc-btn-undo-v" onclick="undoPitch('v')" title="Deshacer último pitch">←</button>
       </div>
       <div class="pitch-box">
         <div style="min-width:0"><div style="font-size:0.58rem;color:var(--text-dim);letter-spacing:1px;font-family:'Oswald'">LOCAL</div><div class="pitch-pitcher-name" id="pc-name-l">—</div></div>
         <div class="pitch-total" id="pc-total-l">0</div>
         <div class="pitch-sbf" id="pc-sbf-l">S: 0<br>B: 0<br>F: 0</div>
-        <button class="btn-pc btn-pc-s" onclick="addPitch('l','strikes')">S</button>
-        <button class="btn-pc btn-pc-b" onclick="addPitch('l','balls')">B</button>
-        <button class="btn-pc btn-pc-f" onclick="addPitch('l','fouls')">F</button>
+        <button class="btn-pc btn-pc-s" id="pc-btn-s-l" onclick="addPitch('l','strikes')">S</button>
+        <button class="btn-pc btn-pc-b" id="pc-btn-b-l" onclick="addPitch('l','balls')">B</button>
+        <button class="btn-pc btn-pc-f" id="pc-btn-f-l" onclick="addPitch('l','fouls')">F</button>
+        <button class="btn-pc btn-pc-undo" id="pc-btn-undo-l" onclick="undoPitch('l')" title="Deshacer último pitch">←</button>
       </div>
     </div>
     <div class="game-layout">
@@ -454,6 +474,7 @@ let gs = {
   pitcher:{ v:{name:'',batea:false}, l:{name:'',batea:false} },
   pitcherChanges:{ v:[], l:[] },
   pitchCount:{ v:{total:0,strikes:0,balls:0,fouls:0}, l:{total:0,strikes:0,balls:0,fouls:0} },
+  pitchAB:{ v:{s:0,b:0,f:0,history:[]}, l:{s:0,b:0,f:0,history:[]} },
   selected:null,
   lang:'es-MX'
 };
@@ -539,6 +560,7 @@ const PLAY_CATALOG = {
   // ── AVANCES / EVENTOS EN BASE ──
   advances:[
     { id:'SB',  label:'SB Base Robada',           sym:'SB',  bases:null, type:'advance', ab:false, color:'amber', voice:['robo','robó','base robada','stolen base','sb','se robó','se robo','robo exitoso'] },
+    { id:'SBH', label:'SBH Robo de Home',         sym:'SBH', bases:null, type:'advance', ab:false, color:'red',   voice:['robo de home','robó el home','robo home','anotó robando home','anoto robando home','se robó el home','se robo el home','robó el plato','robo del plato'] },
     { id:'WP',  label:'WP Wild Pitch',            sym:'WP',  bases:null, type:'advance', ab:false, color:'amber', voice:['wild pitch','lanzamiento wild','tiro salvaje','wp','lanzamiento loco','lanzamiento descontrolado','tiro descontrolado'] },
     { id:'PB',  label:'PB Passed Ball',           sym:'PB',  bases:null, type:'advance', ab:false, color:'amber', voice:['passed ball','pasbol','pelota pasada','pb'] },
     { id:'BK',  label:'BK Balk / Falta',          sym:'BK',  bases:null, type:'advance', ab:false, color:'amber', voice:['balk','falta lanzador','falta del pitcher','bk','engaño','infracción del lanzador','infraccion del lanzador'] },
@@ -875,7 +897,11 @@ function buildSetup(t) {
       <button class="setup-mic-row" id="smb-${t}-${i}"
         onmousedown="setupRowPttStart('${t}',${i},event)" onmouseup="setupRowPttEnd(event)"
         ontouchstart="setupRowPttStart('${t}',${i},event)" ontouchend="setupRowPttEnd(event)"
-        ontouchcancel="setupRowPttEnd(event)" title="Mantén: di nombre al número">🎤</button>`;
+        ontouchcancel="setupRowPttEnd(event)" title="Mantén: di nombre al número">🎤</button>
+      <button class="setup-pos-mic" id="posmb-${t}-${i}"
+        onmousedown="posPttStart('${t}',${i},event)" onmouseup="posPttEnd(event)"
+        ontouchstart="posPttStart('${t}',${i},event)" ontouchend="posPttEnd(event)"
+        ontouchcancel="posPttEnd(event)" title="Mantén: di la posición">P</button>`;
     c.appendChild(d);
   }
 }
@@ -1289,6 +1315,8 @@ function applyPlay(team,pidx,inn,play){
   if(play.type==='score'){
     if(!gs.plays[team][pidx][inn]) gs.plays[team][pidx][inn]={sym:'R',bases:0,type:'advance'};
     gs.plays[team][pidx][inn].scored=true;
+  } else if(play.id==='SBH'){
+    gs.plays[team][pidx][inn]={ sym:'SBH', bases:3, scored:true, earned:true, type:'advance', ab:false, h:false };
   } else {
     const bases = play.bases===4?3:(play.bases||0);
     const scored = play.bases===4;
@@ -1297,6 +1325,8 @@ function applyPlay(team,pidx,inn,play){
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
   updateScores();
+  // Desbloquear contador del pitcher contrario
+  resetPitchAB(team==='v'?'l':'v');
   showToast(`✓ ${play.label}`);
 }
 
@@ -1967,10 +1997,46 @@ function openNumeritos(){
 function addPitch(team,type){
   gs.pitchCount[team].total++;
   if(type) gs.pitchCount[team][type]++;
+  // Per-AB counter
+  const ab=gs.pitchAB[team];
+  const tKey={strikes:'s',balls:'b',fouls:'f'}[type];
+  if(tKey){ ab[tKey]++; ab.history.push(type); }
+  // UI
   const el=document.getElementById(`pc-total-${team}`);
   if(el) el.textContent=gs.pitchCount[team].total;
   const sb=document.getElementById(`pc-sbf-${team}`);
   if(sb) sb.innerHTML=`S: ${gs.pitchCount[team].strikes}<br>B: ${gs.pitchCount[team].balls}<br>F: ${gs.pitchCount[team].fouls}`;
+  // Auto-lock
+  if(ab.s>=3){ lockPitchButtons(team); showToast('⛔ 3 strikes — registra la jugada'); }
+  else if(ab.b>=4){ lockPitchButtons(team); showToast('⛔ 4 bolas — registra BB/BBI'); }
+}
+
+function undoPitch(team){
+  const ab=gs.pitchAB[team];
+  if(!ab.history.length){ showToast('No hay pitch para deshacer',true); return; }
+  const last=ab.history.pop();
+  const tKey={strikes:'s',balls:'b',fouls:'f'}[last];
+  if(tKey) ab[tKey]=Math.max(0,ab[tKey]-1);
+  gs.pitchCount[team].total=Math.max(0,gs.pitchCount[team].total-1);
+  if(last) gs.pitchCount[team][last]=Math.max(0,gs.pitchCount[team][last]-1);
+  const el=document.getElementById(`pc-total-${team}`);
+  if(el) el.textContent=gs.pitchCount[team].total;
+  const sb=document.getElementById(`pc-sbf-${team}`);
+  if(sb) sb.innerHTML=`S: ${gs.pitchCount[team].strikes}<br>B: ${gs.pitchCount[team].balls}<br>F: ${gs.pitchCount[team].fouls}`;
+  if(ab.s<3&&ab.b<4) unlockPitchButtons(team);
+}
+
+function lockPitchButtons(team){
+  ['s','b','f'].forEach(t=>{ const b=document.getElementById(`pc-btn-${t}-${team}`); if(b) b.disabled=true; });
+}
+
+function unlockPitchButtons(team){
+  ['s','b','f'].forEach(t=>{ const b=document.getElementById(`pc-btn-${t}-${team}`); if(b) b.disabled=false; });
+}
+
+function resetPitchAB(pitcherTeam){
+  gs.pitchAB[pitcherTeam]={s:0,b:0,f:0,history:[]};
+  unlockPitchButtons(pitcherTeam);
 }
 
 function getCurrentPitcherName(team){
@@ -2440,6 +2506,65 @@ function downloadPlayerFichaPDF(team,pidx){
   doc.save(`ficha_${safeName}.pdf`);
   showToast(`📄 PDF de ${curName} descargado`);
 }
+
+// ─── VOZ NOMBRE DE EQUIPO (SETUP) ─────────────────────────
+let teamNameRec=null, teamNameListeningTeam=null;
+function teamNamePttStart(team,e){
+  e.preventDefault();
+  if(teamNameListeningTeam&&teamNameListeningTeam!==team) teamNamePttForceStop();
+  if(teamNameListeningTeam) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ showToast('⚠️ Sin soporte de voz',true); return; }
+  let tr='';
+  teamNameRec=new SR(); teamNameRec.continuous=true; teamNameRec.interimResults=true; teamNameRec.lang=gs.lang;
+  teamNameRec.onresult=ev=>{ tr=Array.from(ev.results).map(r=>r[0].transcript).join(''); };
+  teamNameRec.onend=()=>{
+    const txt=tr.trim(); tr=''; teamNameStopUI(team);
+    if(txt){ document.getElementById(`tn-${team}`).value=txt.toUpperCase();
+      const btn=document.getElementById(`tnmb-${team}`); if(btn){ btn.textContent='✓'; setTimeout(()=>{ btn.textContent='🎤'; },1500); } }
+  };
+  teamNameRec.onerror=ev=>{ tr=''; teamNameStopUI(team); if(ev.error!=='aborted') showToast(`⚠️ ${ev.error}`,true); };
+  teamNameRec.start(); teamNameListeningTeam=team;
+  const btn=document.getElementById(`tnmb-${team}`); if(btn){ btn.classList.add('recording'); btn.textContent='🔴'; }
+}
+function teamNamePttEnd(e){ e.preventDefault(); if(!teamNameListeningTeam) return; try{ if(teamNameRec) teamNameRec.stop(); }catch(ex){} }
+function teamNamePttForceStop(){ if(teamNameListeningTeam) teamNameStopUI(teamNameListeningTeam); try{ if(teamNameRec) teamNameRec.abort(); }catch(ex){} }
+function teamNameStopUI(team){ const btn=document.getElementById(`tnmb-${team}`); if(btn){ btn.classList.remove('recording'); btn.textContent='🎤'; } teamNameListeningTeam=null; }
+
+// ─── VOZ POSICIÓN (SETUP) ──────────────────────────────────
+let posRec=null, posListeningInfo=null;
+function posPttStart(team,row,e){
+  e.preventDefault();
+  if(posListeningInfo&&!(posListeningInfo.team===team&&posListeningInfo.row===row)) posPttForceStop();
+  if(posListeningInfo) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ showToast('⚠️ Sin soporte de voz',true); return; }
+  let tr='';
+  posRec=new SR(); posRec.continuous=true; posRec.interimResults=true; posRec.lang=gs.lang;
+  posRec.onresult=ev=>{ tr=Array.from(ev.results).map(r=>r[0].transcript).join(''); };
+  posRec.onend=()=>{
+    const txt=tr.toLowerCase().trim(); tr=''; posStopUI(team,row);
+    if(!txt) return;
+    let posLabel='';
+    const posKeys=Object.keys(POS_WORD_MAP).sort((a,b)=>b.length-a.length);
+    if(/^(designado|dh)/.test(txt)){ posLabel='DH'; }
+    else { for(const pw of posKeys){ if(txt===pw||txt.startsWith(pw+' ')||txt.startsWith(pw)){ posLabel=POS_ABBR[POS_WORD_MAP[pw]-1]; break; } }
+      if(!posLabel){ const n=parseInt(txt,10); if(n>=1&&n<=9) posLabel=POS_ABBR[n-1]; } }
+    const btn=document.getElementById(`posmb-${team}-${row}`);
+    if(posLabel){
+      if(posLabel==='DH'){ if(hasDH(team,row)){ showToast('⚠️ Ya hay un DH en este equipo',true); }
+        else { const dh=document.getElementById(`dh-${team}-${row}`); if(dh&&!dh.classList.contains('active')) dh.classList.add('active'); document.getElementById(`o-${team}-${row}`).style.color='var(--amber)'; } }
+      document.getElementById(`o-${team}-${row}`).value=posLabel;
+      if(btn){ btn.textContent='✓'; setTimeout(()=>{ btn.textContent='P'; },1500); }
+    } else { if(btn){ btn.textContent='⚠'; setTimeout(()=>{ btn.textContent='P'; },1500); } showToast('⚠️ Di: pitcher, catcher, primera, segunda, short, left, center, right',true); }
+  };
+  posRec.onerror=ev=>{ tr=''; posStopUI(team,row); if(ev.error!=='aborted') showToast(`⚠️ ${ev.error}`,true); };
+  posRec.start(); posListeningInfo={team,row};
+  const btn=document.getElementById(`posmb-${team}-${row}`); if(btn){ btn.classList.add('recording'); btn.textContent='🔴'; }
+}
+function posPttEnd(e){ e.preventDefault(); if(!posListeningInfo) return; try{ if(posRec) posRec.stop(); }catch(ex){} }
+function posPttForceStop(){ if(posListeningInfo) posStopUI(posListeningInfo.team,posListeningInfo.row); try{ if(posRec) posRec.abort(); }catch(ex){} }
+function posStopUI(team,row){ const btn=document.getElementById(`posmb-${team}-${row}`); if(btn){ btn.classList.remove('recording'); btn.textContent='P'; } posListeningInfo=null; }
 
 // ─── MODO BÁSICO / PRO ────────────────────────────────────
 function toggleMode(){
