@@ -1362,6 +1362,59 @@ function parseRunnerVoice(t){
   return null;
 }
 
+// ─── ESTADO DE BASES (corredores vivos) ──────────────────
+function computeBaseState(team,inn,excludePidx){
+  const st={first:null,second:null,third:null};
+  gs.teams[team].players.forEach((_,i)=>{
+    if(i===excludePidx) return;
+    const pl=(gs.plays[team][i]||{})[inn];
+    if(!pl||pl.type==='out'||pl.type==='clear'||pl.scored||pl.runnerOut) return;
+    if(pl.bases===1) st.first ={pidx:i,play:pl};
+    if(pl.bases===2) st.second={pidx:i,play:pl};
+    if(pl.bases===3) st.third ={pidx:i,play:pl};
+  });
+  return st;
+}
+
+// ─── AVANCE AUTOMÁTICO DE CORREDORES EN HITS ─────────────
+function advanceRunners(team,pidx,inn,play){
+  if(play.type!=='hit') return '';
+  const b=play.bases===4?4:(play.bases||0);
+  if(!b) return '';
+  const st=computeBaseState(team,inn,pidx);
+  const moved=[];
+  const nm=i=>gs.teams[team].players[i].name;
+  const bNames=['','1ª','2ª','3ª'];
+
+  function score(r){
+    r.play.bases=Math.max(r.play.bases,3);
+    r.play.scored=true;
+    refreshCell(team,r.pidx,inn);
+    moved.push(nm(r.pidx)+' anotó');
+  }
+  function adv(r,to){
+    r.play.bases=to;
+    refreshCell(team,r.pidx,inn);
+    moved.push(nm(r.pidx)+' →'+bNames[to]);
+  }
+
+  if(b===1){
+    if(st.third)  score(st.third);
+    if(st.second) adv(st.second,3);
+    if(st.first)  adv(st.first,2);
+  } else if(b===2){
+    if(st.third)  score(st.third);
+    if(st.second) score(st.second);
+    if(st.first)  adv(st.first,3);
+  } else {  // 3B y HR: todos anotan
+    if(st.third)  score(st.third);
+    if(st.second) score(st.second);
+    if(st.first)  score(st.first);
+  }
+
+  return moved.join(' · ');
+}
+
 // ─── APLICAR JUGADA ───────────────────────────────────────
 function applyPlay(team,pidx,inn,play){
   if(play.type==='clear'){
@@ -1382,11 +1435,12 @@ function applyPlay(team,pidx,inn,play){
     const scored = play.bases===4;
     gs.plays[team][pidx][inn]={ sym:play.sym, bases, scored, type:play.type, ab:play.ab, h:play.h||false };
   }
+  const runSummary=advanceRunners(team,pidx,inn,play);
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
   updateScores();
   resetPitchAB();
-  showToast(`✓ ${play.label}`);
+  showToast(runSummary?`✓ ${play.label} · ${runSummary}`:`✓ ${play.label}`);
   // Auto-avanzar solo cuando es turno al bate real (no movimiento de corredor)
   if(play.type!=='score') autoAdvance(team,pidx,inn);
 }
