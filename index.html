@@ -1254,15 +1254,15 @@ function selectCell(team,pidx,inn,td){
   const p=gs.teams[team].players[pidx];
   document.getElementById('selinfo').innerHTML=`<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
   document.getElementById('reg-btn').disabled=false;
-  // Cambio 18: resetear contador S/B/F del pitcher que enfrenta al bateador
+  // Cambio 18: resetear S/B/F — actualizar sbfTeam ANTES de resetPitchAB
+  // para que resetPitchAB → sbfRefresh() opere sobre el equipo correcto
   const pitchTeam=team==='v'?'l':'v';
-  resetPitchAB(pitchTeam);
   if(typeof sbfTeam!=='undefined'){
     sbfTeam=pitchTeam;
     const sbfBtn=document.getElementById('sbf-team-btn');
     if(sbfBtn){ sbfBtn.textContent=pitchTeam.toUpperCase(); sbfBtn.className='sbf-team-btn'+(pitchTeam==='l'?' l':''); }
-    sbfRefresh();
   }
+  resetPitchAB(pitchTeam); // ahora sbfTeam===pitchTeam → sbfRefresh() se ejecuta siempre
 }
 
 function openModalForSelected(){
@@ -2293,7 +2293,17 @@ function unlockPitchButtons(team){
 function resetPitchAB(pitcherTeam){
   gs.pitchAB[pitcherTeam]={s:0,b:0,f:0,history:[]};
   unlockPitchButtons(pitcherTeam);
-  if(typeof sbfTeam!=='undefined'&&sbfTeam===pitcherTeam) sbfRefresh();
+  if(typeof sbfTeam==='undefined') return;
+  if(sbfTeam===pitcherTeam){
+    sbfRefresh(); // actualiza display y desbloquea botones del flotante
+  } else {
+    // Equipo distinto: desbloquear botones del flotante directamente
+    // (el display se actualizará cuando sbfTeam sea reasignado)
+    ['s','b','f'].forEach(t=>{
+      const b=document.getElementById(`sbf-btn-${t}`);
+      if(b) b.disabled=false;
+    });
+  }
 }
 
 function getCurrentPitcherName(team){
