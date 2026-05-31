@@ -183,7 +183,6 @@
   @media(max-width:768px){ .game-layout{grid-template-columns:1fr;} }
   @media(max-width:524px){
     .game-content { padding-bottom:300px; }
-    #sbf-float { bottom:288px; }
   }
   /* ── PITCH COUNTER BAR ──────────────────────────────────── */
   .pitch-bar { position:fixed; left:0; right:0; bottom:100px; z-index:150; background:#081220; padding:8px 16px; border-top:2px solid rgba(0,229,153,.20); box-shadow:0 -4px 24px rgba(0,0,0,.65); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
@@ -257,36 +256,6 @@
   .chat-mic-btn.recording { border-color:var(--red); background:rgba(255,77,103,.28); animation:pulse-red .7s infinite; }
   .chat-send-btn { width:38px; height:38px; border-radius:50%; border:none; background:var(--amber); color:#071018; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; transition:opacity .15s; padding:0; }
   .chat-send-btn:hover { opacity:.82; }
-  /* ── FLOATING SBF COUNTER ───────────────────────────────── */
-  #sbf-float { position:fixed; bottom:184px; right:16px; z-index:9999; background:#0c1928; border:1.5px solid rgba(0,191,255,.35); border-radius:20px; padding:10px 12px; display:none; flex-direction:column; gap:7px; box-shadow:0 8px 32px rgba(0,0,0,.8); min-width:128px; user-select:none; touch-action:none; }
-  #sbf-float.visible { display:flex; }
-  .sbf-handle { display:flex; align-items:center; justify-content:space-between; cursor:grab; padding:2px 0; }
-  .sbf-handle:active { cursor:grabbing; }
-  .sbf-team-btn { font-size:0.58rem; font-family:'Oswald',sans-serif; letter-spacing:2px; color:#00bfff; background:rgba(0,191,255,.12); border:1px solid rgba(0,191,255,.35); border-radius:7px; padding:2px 8px; cursor:pointer; transition:all .15s; }
-  .sbf-team-btn.l { color:#00e599; background:rgba(0,229,153,.12); border-color:rgba(0,229,153,.35); }
-  .sbf-grip { color:rgba(255,255,255,.25); font-size:0.7rem; letter-spacing:1px; pointer-events:none; }
-  .sbf-digits { display:flex; gap:5px; }
-  .sbf-digit { flex:1; text-align:center; border-radius:10px; padding:6px 4px; }
-  .sbf-digit-s { background:rgba(255,77,103,.1); border:1px solid rgba(255,77,103,.3); }
-  .sbf-digit-b { background:rgba(0,191,255,.08); border:1px solid rgba(0,191,255,.25); }
-  .sbf-digit-f { background:rgba(255,182,72,.08); border:1px solid rgba(255,182,72,.25); }
-  .sbf-dlbl { font-size:0.45rem; letter-spacing:1.5px; font-family:'Oswald',sans-serif; }
-  .sbf-digit-s .sbf-dlbl { color:#ff4d67; }
-  .sbf-digit-b .sbf-dlbl { color:#00bfff; }
-  .sbf-digit-f .sbf-dlbl { color:#ffb648; }
-  .sbf-dnum { font-family:'Bebas Neue',sans-serif; font-size:2rem; line-height:1.05; }
-  .sbf-digit-s .sbf-dnum { color:#ff4d67; }
-  .sbf-digit-b .sbf-dnum { color:#00bfff; }
-  .sbf-digit-f .sbf-dnum { color:#ffb648; }
-  .sbf-btns { display:flex; gap:4px; }
-  .sbf-pbtn { flex:1; padding:5px 2px; border-radius:8px; font-family:'Bebas Neue',sans-serif; font-size:0.9rem; letter-spacing:1px; cursor:pointer; transition:filter .12s; }
-  .sbf-pbtn-s { background:rgba(255,77,103,.18); color:#ff4d67; border:1px solid rgba(255,77,103,.45); }
-  .sbf-pbtn-b { background:rgba(0,191,255,.14); color:#00bfff; border:1px solid rgba(0,191,255,.4); }
-  .sbf-pbtn-f { background:rgba(255,182,72,.14); color:#ffb648; border:1px solid rgba(255,182,72,.4); }
-  .sbf-pbtn:hover { filter:brightness(1.25); }
-  .sbf-pbtn:disabled { opacity:.3; cursor:default; filter:none; }
-  .sbf-undo { width:100%; padding:4px; border-radius:8px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); color:#8fa3b7; font-size:0.6rem; cursor:pointer; letter-spacing:1px; font-family:'Inter',sans-serif; transition:all .12s; }
-  .sbf-undo:hover { border-color:var(--amber); color:var(--amber); }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -490,24 +459,6 @@
   </div>
 </div>
 
-<!-- FLOATING SBF COUNTER -->
-<div id="sbf-float">
-  <div class="sbf-handle" id="sbf-handle">
-    <button class="sbf-team-btn" id="sbf-team-btn" onclick="sbfToggleTeam()">V</button>
-    <span class="sbf-grip">⠿⠿</span>
-  </div>
-  <div class="sbf-digits">
-    <div class="sbf-digit sbf-digit-s"><div class="sbf-dlbl">STR</div><div class="sbf-dnum" id="sbf-s">0</div></div>
-    <div class="sbf-digit sbf-digit-b"><div class="sbf-dlbl">BOL</div><div class="sbf-dnum" id="sbf-b">0</div></div>
-    <div class="sbf-digit sbf-digit-f"><div class="sbf-dlbl">FOU</div><div class="sbf-dnum" id="sbf-f">0</div></div>
-  </div>
-  <div class="sbf-btns">
-    <button class="sbf-pbtn sbf-pbtn-s" id="sbf-btn-s" onclick="sbfAdd('strikes')">+S</button>
-    <button class="sbf-pbtn sbf-pbtn-b" id="sbf-btn-b" onclick="sbfAdd('balls')">+B</button>
-    <button class="sbf-pbtn sbf-pbtn-f" id="sbf-btn-f" onclick="sbfAdd('fouls')">+F</button>
-  </div>
-  <button class="sbf-undo" onclick="sbfUndo()">← DESHACER</button>
-</div>
 
 <!-- CHAT ASISTENTE -->
 <div id="chat-panel">
@@ -1041,7 +992,6 @@ function startGame(){
   document.getElementById('cambio-pit-btn').style.display='block';
   document.getElementById('jugador-btn').style.display='block';
   document.getElementById('pitch-bar').style.display='flex';
-  document.getElementById('sbf-float').classList.add('visible');
   buildLineScore(); buildInningNav(); buildScoresheets(); updateScores();
   updatePitchCounterUI();
 }
@@ -1246,14 +1196,10 @@ let selCell=null;
 function selectCell(team,pidx,inn,td){
   // Reset S/B/F SIEMPRE, sin excepción, antes de cualquier return
   const pitchTeam=team==='v'?'l':'v';
-  sbfTeam=pitchTeam;
-  const _sbfBtn=document.getElementById('sbf-team-btn');
-  if(_sbfBtn){ _sbfBtn.textContent=pitchTeam.toUpperCase(); _sbfBtn.className='sbf-team-btn'+(pitchTeam==='l'?' l':''); }
   gs.pitchAB[pitchTeam]={s:0,b:0,f:0,history:[]};
   unlockPitchButtons('v');
   unlockPitchButtons('l');
-  ['s','b','f'].forEach(t=>{ const b=document.getElementById(`sbf-btn-${t}`); if(b) b.disabled=false; });
-  sbfRefresh();
+  updatePitchABDisplay(pitchTeam);
 
   const pl=gs.plays[team][pidx][inn];
   if(pl && pl.type!=='out' && pl.type!=='clear' && !pl.scored && !pl.runnerOut){
@@ -2264,12 +2210,10 @@ function addPitch(team,type){
   // UI
   const el=document.getElementById(`pc-total-${team}`);
   if(el) el.textContent=gs.pitchCount[team].total;
-  const sb=document.getElementById(`pc-sbf-${team}`);
-  if(sb) sb.innerHTML=`S: ${gs.pitchCount[team].strikes}<br>B: ${gs.pitchCount[team].balls}<br>F: ${gs.pitchCount[team].fouls}`;
   // Auto-lock
   if(ab.s>=3){ lockPitchButtons(team); showToast('⛔ 3 strikes — registra la jugada'); }
   else if(ab.b>=4){ lockPitchButtons(team); showToast('⛔ 4 bolas — registra BB/BBI'); }
-  if(typeof sbfTeam!=='undefined'&&sbfTeam===team) sbfRefresh();
+  updatePitchABDisplay(team);
 }
 
 function undoPitch(team){
@@ -2282,10 +2226,8 @@ function undoPitch(team){
   if(last) gs.pitchCount[team][last]=Math.max(0,gs.pitchCount[team][last]-1);
   const el=document.getElementById(`pc-total-${team}`);
   if(el) el.textContent=gs.pitchCount[team].total;
-  const sb=document.getElementById(`pc-sbf-${team}`);
-  if(sb) sb.innerHTML=`S: ${gs.pitchCount[team].strikes}<br>B: ${gs.pitchCount[team].balls}<br>F: ${gs.pitchCount[team].fouls}`;
   if(ab.s<3&&ab.b<4) unlockPitchButtons(team);
-  if(typeof sbfTeam!=='undefined'&&sbfTeam===team) sbfRefresh();
+  updatePitchABDisplay(team);
 }
 
 function lockPitchButtons(team){
@@ -2296,20 +2238,16 @@ function unlockPitchButtons(team){
   ['s','b','f'].forEach(t=>{ const b=document.getElementById(`pc-btn-${t}-${team}`); if(b) b.disabled=false; });
 }
 
+function updatePitchABDisplay(team){
+  const ab=gs.pitchAB[team];
+  const el=document.getElementById(`pc-sbf-${team}`);
+  if(el) el.innerHTML=`S: ${ab.s}<br>B: ${ab.b}<br>F: ${ab.f}`;
+}
+
 function resetPitchAB(pitcherTeam){
   gs.pitchAB[pitcherTeam]={s:0,b:0,f:0,history:[]};
   unlockPitchButtons(pitcherTeam);
-  if(typeof sbfTeam==='undefined') return;
-  if(sbfTeam===pitcherTeam){
-    sbfRefresh(); // actualiza display y desbloquea botones del flotante
-  } else {
-    // Equipo distinto: desbloquear botones del flotante directamente
-    // (el display se actualizará cuando sbfTeam sea reasignado)
-    ['s','b','f'].forEach(t=>{
-      const b=document.getElementById(`sbf-btn-${t}`);
-      if(b) b.disabled=false;
-    });
-  }
+  updatePitchABDisplay(pitcherTeam);
 }
 
 function getCurrentPitcherName(team){
@@ -2324,7 +2262,7 @@ function updatePitchCounterUI(){
     const el=document.getElementById(`pc-total-${t}`);
     if(el) el.textContent=pc.total;
     const sb=document.getElementById(`pc-sbf-${t}`);
-    if(sb) sb.innerHTML=`S: ${pc.strikes}<br>B: ${pc.balls}<br>F: ${pc.fouls}`;
+    if(sb) sb.innerHTML=`S: ${gs.pitchAB[t].s}<br>B: ${gs.pitchAB[t].b}<br>F: ${gs.pitchAB[t].f}`;
     const pn=document.getElementById(`pc-name-${t}`);
     if(pn) pn.textContent=getCurrentPitcherName(t);
   });
@@ -3355,82 +3293,6 @@ function searchKB(raw){
   return best.r;
 }
 
-// ─── FLOATING SBF COUNTER ──────────────────────────────────
-let sbfTeam='v';
-
-function sbfRefresh(){
-  const ab=gs.pitchAB[sbfTeam];
-  if(!ab) return;
-  document.getElementById('sbf-s').textContent=ab.s;
-  document.getElementById('sbf-b').textContent=ab.b;
-  document.getElementById('sbf-f').textContent=ab.f;
-  const locked=ab.s>=3||ab.b>=4;
-  ['s','b','f'].forEach(t=>{
-    const btn=document.getElementById(`sbf-btn-${t}`);
-    if(btn) btn.disabled=locked;
-  });
-}
-
-function sbfToggleTeam(){
-  sbfTeam=sbfTeam==='v'?'l':'v';
-  const btn=document.getElementById('sbf-team-btn');
-  btn.textContent=sbfTeam.toUpperCase();
-  btn.className='sbf-team-btn'+(sbfTeam==='l'?' l':'');
-  sbfRefresh();
-}
-
-function sbfAdd(type){ addPitch(sbfTeam,type); }
-function sbfUndo(){ undoPitch(sbfTeam); }
-
-// Drag lógica — mouse y touch, todo el handle, diferencia click vs drag
-(function(){
-  let dragging=false, el=null, ox=0,oy=0,sx=0,sy=0, moved=false;
-  function getXY(e){ return e.touches?e.touches[0]:e; }
-
-  function onDown(e){
-    e.preventDefault();
-    el=document.getElementById('sbf-float');
-    const r=el.getBoundingClientRect();
-    sx=r.left; sy=r.top;
-    el.style.right='auto'; el.style.bottom='auto';
-    el.style.left=sx+'px'; el.style.top=sy+'px';
-    const p=getXY(e);
-    ox=p.clientX; oy=p.clientY;
-    moved=false; dragging=true;
-    document.addEventListener('mousemove',onMove);
-    document.addEventListener('mouseup',onUp);
-    document.addEventListener('touchmove',onMove,{passive:false});
-    document.addEventListener('touchend',onUp);
-  }
-
-  function onMove(e){
-    if(!dragging||!el) return;
-    e.preventDefault();
-    const p=getXY(e);
-    const dx=p.clientX-ox, dy=p.clientY-oy;
-    if(Math.abs(dx)>4||Math.abs(dy)>4) moved=true;
-    if(!moved) return;
-    const nx=Math.max(0,Math.min(window.innerWidth-el.offsetWidth, sx+dx));
-    const ny=Math.max(0,Math.min(window.innerHeight-el.offsetHeight, sy+dy));
-    el.style.left=nx+'px'; el.style.top=ny+'px';
-  }
-
-  function onUp(e){
-    dragging=false; el=null;
-    document.removeEventListener('mousemove',onMove);
-    document.removeEventListener('mouseup',onUp);
-    document.removeEventListener('touchmove',onMove);
-    document.removeEventListener('touchend',onUp);
-  }
-
-  document.addEventListener('DOMContentLoaded',()=>{
-    const h=document.getElementById('sbf-handle');
-    if(h){
-      h.addEventListener('mousedown',onDown);
-      h.addEventListener('touchstart',onDown,{passive:false});
-    }
-  });
-})();
 
 let chatRec=null, chatRecording=false;
 
