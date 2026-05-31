@@ -548,15 +548,16 @@ const PLAY_CATALOG = {
     { id:'FF',  label:'FF Foul Fly',             sym:'FF',  bases:0, type:'out', ab:true,  color:'red',   voice:['foul fly','fly foul'] },
     // Ground outs
     { id:'R63', label:'R63 Rodado SS→1B',        sym:'6-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado short','rolata short','rola short','ground out short'] },
-    { id:'R43', label:'R43 Rodado 2B→1B',        sym:'4-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado segunda','rolata segunda','rola segunda'] },
-    { id:'R53', label:'R53 Rodado 3B→1B',        sym:'5-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado tercera','rolata tercera','rola tercera'] },
-    { id:'R13', label:'R13 Rodado P→1B',         sym:'1-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado pitcher','rola pitcher'] },
-    { id:'R33', label:'R33 Rodado 1B no asist',  sym:'3',   bases:0, type:'out', ab:true,  color:'red',   voice:['rodado primera sin asistencia','foul line primera'] },
+    { id:'R43', label:'R43 Rodado 2B→1B',        sym:'4-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado segunda','rolata segunda','rola segunda','rola por segunda'] },
+    { id:'R53', label:'R53 Rodado 3B→1B',        sym:'5-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado tercera','rolata tercera','rola tercera','rola por tercera'] },
+    { id:'R13', label:'R13 Rodado P→1B',         sym:'1-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado pitcher','rola pitcher','rola al pitcher'] },
+    { id:'R23', label:'R23 Rodado C→1B',         sym:'2-3', bases:0, type:'out', ab:true,  color:'red',   voice:['toque de bola','rodado catcher','rola al catcher','rola catcher'] },
+    { id:'R33', label:'R33 Rodado 1B no asist',  sym:'3',   bases:0, type:'out', ab:true,  color:'red',   voice:['rodado primera sin asistencia','foul line primera','rola primera','rola por primera','rodado primera'] },
     // Doble play
     { id:'DP643',label:'DP 6-4-3 Doble Play',   sym:'6-4-3',bases:0, type:'out', ab:true,  color:'red',   voice:['doble play','double play','643','doble matanza'] },
     { id:'DP543',label:'DP 5-4-3 Doble Play',   sym:'5-4-3',bases:0, type:'out', ab:true,  color:'red',   voice:['doble play tercera','543'] },
     // Sacrificios
-    { id:'SH',  label:'SH Sacrificio Hit Toque', sym:'SH',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio hit','toque de sacrificio','bunt sacrificio','sacrificio toque','plancha','toque de bola','bunt','toque corto','toque al cuadro','bunt de sacrificio','plancha de sacrificio'] },
+    { id:'SH',  label:'SH Sacrificio Hit Toque', sym:'SH',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio hit','toque de sacrificio','bunt sacrificio','sacrificio toque','plancha','bunt','toque corto','toque al cuadro','bunt de sacrificio','plancha de sacrificio'] },
     { id:'SF',  label:'SF Sacrificio Fly',       sym:'SF',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio fly','fly de sacrificio'] },
     { id:'SQ',  label:'SQ Squeeze Play',         sym:'SQ',  bases:0, type:'out', ab:false, color:'amber', voice:['squeeze play','squeeze suicida','squeeze bunt','jugada de apriete'] },
     // Infield fly, out regla
@@ -591,7 +592,7 @@ const PLAY_CATALOG = {
 
   // ── EMBASADO SIN BATAZO ──
   walks:[
-    { id:'BB',  label:'BB Base por Bolas',        sym:'BB',  bases:1, type:'walk', ab:false, color:'blue',  voice:['base por bolas','walk','cuatro bolas','boleto','bb','libre tránsito','libre transito','pasaporte'] },
+    { id:'BB',  label:'BB Base por Bolas',        sym:'BB',  bases:1, type:'walk', ab:false, color:'blue',  voice:['base por bolas','base por bola','walk','cuatro bolas','boleto','bb','libre tránsito','libre transito','pasaporte'] },
     { id:'BBI', label:'BBI Base Intencional',     sym:'BBI', bases:1, type:'walk', ab:false, color:'blue',  voice:['base intencional','intencional','base por bolas intencional','bbi'] },
     { id:'BG',  label:'BG Base por Golpe/HBP',   sym:'BG',  bases:1, type:'walk', ab:false, color:'blue',  voice:['golpe','golpeado','pelotazo','hit by pitch','hbp','base por golpe'] },
     { id:'INT', label:'INT Interferencia',        sym:'INT', bases:1, type:'walk', ab:false, color:'blue',  voice:['interferencia'] },
@@ -1629,19 +1630,27 @@ function interpretVoice(text){
   const {team,pidx,inn}=gs.selected;
   let matched=null;
 
-  // Detección de fly outs con jardinero específico (fly al 7/8/9, sacrificio fly al 7/8/9)
-  if(/\bfly\b|elevado/.test(text)){
-    const jar=/\b7\b/.test(text)||/izquierda|left\b/.test(text)?'7'
-             :/\b8\b/.test(text)||/centr|center\b/.test(text)?'8'
-             :/\b9\b/.test(text)||/derecha|right\b/.test(text)?'9':null;
+  // Foul fly con fildeador específico — ANTES del fly regular para evitar falso match
+  if(/foul/.test(text)&&/\bfly\b|elevado/.test(text)){
+    const m=/\b([2-9])\b/.exec(text);
+    const ffPlay=PLAY_CATALOG.outs.find(p=>p.id==='FF');
+    if(ffPlay) matched=m?{...ffPlay,sym:`FF${m[1]}`,label:`FF${m[1]} Foul Fly al ${m[1]}`}:ffPlay;
+  }
+  // Fly outs con fildeador específico (posiciones 1-9, sacrificio fly)
+  if(!matched&&/\bfly\b|elevado/.test(text)){
+    const jar=/\b7\b|izquierda|left\b/.test(text)?'7'
+             :/\b8\b|centr|center\b/.test(text)?'8'
+             :/\b9\b|derecha|right\b/.test(text)?'9'
+             :(/\b([1-6])\b/.exec(text)||[])[1]||null;
     if(jar){
       const isSacri=/sacrificio|sacri\b/.test(text);
       if(isSacri){
         const sfPlay=PLAY_CATALOG.outs.find(p=>p.id==='SF');
         if(sfPlay) matched={...sfPlay,sym:`SF${jar}`,label:`SF${jar} Sacrificio Fly`};
       } else {
-        const fPlay=PLAY_CATALOG.outs.find(p=>p.id===('F'+jar));
-        if(fPlay) matched=fPlay;
+        let fPlay=PLAY_CATALOG.outs.find(p=>p.id===('F'+jar));
+        if(!fPlay) fPlay=PLAY_CATALOG.outs.find(p=>p.id==='P'); // infield 1-6 → P
+        if(fPlay) matched=Number(jar)>=7?fPlay:{...fPlay,sym:`F${jar}`,label:`F${jar} Fly al ${jar}`};
       }
     }
   }
@@ -1681,6 +1690,8 @@ function interpretVoice(text){
     else if(text.includes('segunda')||text.includes('second')) sym='4-3';
     else if(text.includes('tercera')||text.includes('third')) sym='5-3';
     else if(text.includes('pitcher')) sym='1-3';
+    else if(text.includes('catcher')) sym='2-3';
+    else if(text.includes('primera')||text.includes('first')) sym='3';
     matched={...PLAY_CATALOG.outs[0],sym,label:`Rodado ${sym}`,bases:0,type:'out',ab:true};
   }
 
