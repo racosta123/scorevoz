@@ -253,12 +253,6 @@
   .chat-mic-btn.recording { border-color:var(--red); background:rgba(255,77,103,.28); animation:pulse-red .7s infinite; }
   .chat-send-btn { width:38px; height:38px; border-radius:50%; border:none; background:var(--amber); color:#071018; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; transition:opacity .15s; padding:0; }
   .chat-send-btn:hover { opacity:.82; }
-  .chat-key-wrap { background:rgba(255,182,72,.07); border:1px solid rgba(255,182,72,.2); border-radius:14px; margin:6px 0; padding:14px; }
-  .chat-key-wrap p { font-size:0.76rem; color:var(--text-dim); margin-bottom:10px; line-height:1.5; }
-  .chat-key-input { width:100%; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:10px; color:#fff; font-family:'Roboto Mono',monospace; font-size:0.73rem; padding:8px 10px; outline:none; margin-bottom:8px; }
-  .chat-key-input:focus { border-color:var(--amber); }
-  .chat-key-save { width:100%; background:var(--amber); color:#071018; border:none; border-radius:10px; font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:2px; padding:9px; cursor:pointer; transition:opacity .15s; }
-  .chat-key-save:hover { opacity:.88; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -469,7 +463,6 @@
       <div class="chat-hdr-title">❓ ASISTENTE SCOREVOZ</div>
       <div class="chat-hdr-sub">Describe cualquier jugada y te digo cómo anotarla</div>
     </div>
-    <button class="chat-key-btn" onclick="showKeyInput()" title="Configurar API Key de Claude">🔑 API KEY</button>
     <button class="chat-close" onclick="closeHelpChat()">✕</button>
   </div>
   <div class="chat-msgs" id="chat-msgs"></div>
@@ -2752,88 +2745,456 @@ function showToast(msg,err=false){
   setTimeout(()=>{ t.className='toast'; },3000);
 }
 
-// ─── ASISTENTE CHAT ───────────────────────────────────────
-const CHAT_SYSTEM=`Eres el asistente de ScoreVoz, app de anotación de béisbol latinoamericano.
-Tu función: decirle al anotador cómo registrar en ScoreVoz la jugada que describe.
-Responde SIEMPRE en español. Sé conciso: 2-4 líneas máximo.
-Usa backticks para los símbolos: \`KS\`, \`4-3\`, \`SF9\`, \`DP 6-4-3\`, etc.
-Formato preferido: símbolo → comando de voz exacto → nota breve si aplica.
+// ─── ASISTENTE CHAT — BASE DE CONOCIMIENTO ESTÁTICA ──────
+const KB=[
+  // ── PONCHES ──
+  {keys:['ponche swing','ks','abanico','chocolate','whiff','morder el polvo','strike out swing','se lo comio','strikeout swing'],
+   r:`🔴 Ponche Swing → \`KS\`
+🎤 Di: "ponche", "abanicó", "chocolate", "whiff", "morder el polvo"
+📋 Toca la casilla del bateador → mantén 🎤 → di el comando → confirma ✅
+AB=Sí. El bateador intentó pero falló el 3er strike.`},
+  {keys:['ponche cantado','ponche mirando','kl','watching','caught looking','sin tirarle','parado','strike three','sin batear','ponche viendo'],
+   r:`🔴 Ponche Cantado → \`KL\`
+🎤 Di: "ponche cantado", "parado", "watching", "caught looking", "sin batear"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=Sí. El árbitro cantó el 3er strike sin que el bateador intentara.`},
+  // ── FLY OUTS ──
+  {keys:['fly izquierda','fly al 7','f7','fly left','elevado izquierda'],
+   r:`🔴 Fly Izquierda → \`F7\`
+🎤 Di: "fly izquierda" o "fly al 7"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+Jardinero izquierdo (pos. 7) atrapó el elevado. AB=Sí.`},
+  {keys:['fly centro','fly center','fly al 8','f8','fly central','elevado centro'],
+   r:`🔴 Fly Centro → \`F8\`
+🎤 Di: "fly center" o "fly al 8"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+Jardinero central (pos. 8) atrapó el elevado. AB=Sí.`},
+  {keys:['fly derecha','fly al 9','f9','fly right','elevado derecha'],
+   r:`🔴 Fly Derecha → \`F9\`
+🎤 Di: "fly derecha" o "fly al 9"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+Jardinero derecho (pos. 9) atrapó el elevado. AB=Sí.`},
+  {keys:['sacrificio fly','sf','fly de sacrificio','fly sacri'],
+   r:`🟡 Sacrificio Fly → \`SF7\`, \`SF8\` o \`SF9\` (según jardinero)
+🎤 Di: "sacrificio fly al 7", "sacrificio fly al 8" o "sacrificio fly al 9"
+📋 Toca casilla → mantén 🎤 → di el comando → confirma ✅
+AB=No. Para anotar al corredor: toca su casilla → menú corredor → Anotó.`},
+  {keys:['pop fly','pop','palomita','globito','pop up'],
+   r:`🔴 Pop Fly → \`P\`
+🎤 Di: "pop fly" o "palomita"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+Elevado corto atrapado en el cuadro interno. AB=Sí.`},
+  {keys:['linea atrapada','line drive out','linea out','linea atrapa'],
+   r:`🔴 Línea Atrapada → \`L\`
+🎤 Di: "línea atrapada" o "line drive out"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+Batazo de línea atrapado directamente. AB=Sí.`},
+  {keys:['foul fly','fly foul','ff foul'],
+   r:`🔴 Foul Fly → \`FF\`
+🎤 Di: "foul fly" o "fly foul"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+Elevado atrapado en zona de foul. AB=Sí.`},
+  // ── RODADOS ──
+  {keys:['rodado short','6-3','rola short','rolata short','6 al 3','out short'],
+   r:`🔴 Rodado Short → \`6-3\`
+🎤 Di: "rodado short" o "6 al 3"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+Shortstop (6) fieldeó y tiró a primera (3). AB=Sí.`},
+  {keys:['rodado segunda','4-3','rola segunda','4 al 3','rodado 2b'],
+   r:`🔴 Rodado Segunda → \`4-3\`
+🎤 Di: "rodado segunda" o "4 al 3"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+Segunda base (4) fieldeó y tiró a primera (3). AB=Sí.`},
+  {keys:['rodado tercera','5-3','rola tercera','5 al 3','rodado 3b'],
+   r:`🔴 Rodado Tercera → \`5-3\`
+🎤 Di: "rodado tercera" o "5 al 3"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+Tercera base (5) fieldeó y tiró a primera (3). AB=Sí.`},
+  {keys:['rodado pitcher','1-3','rola pitcher','rodado al pitcher','1 al 3'],
+   r:`🔴 Rodado Pitcher → \`1-3\`
+🎤 Di: "rodado pitcher" o "1 al 3"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+El pitcher (1) fieldeó y tiró a primera (3). AB=Sí.`},
+  {keys:['rodado','rola','rolata','rodado cuadro','ground out'],
+   r:`🔴 Rodado — especifica la posición para el símbolo exacto:
+🎤 Di: "rodado short" (6-3), "rodado segunda" (4-3), "rodado tercera" (5-3), "rodado pitcher" (1-3)
+O usa números: "6 al 3", "4 al 3", "5 al 3"
+📋 Toca casilla → mantén 🎤 → di el comando → confirma ✅`},
+  // ── DOBLE PLAY ──
+  {keys:['doble play','double play','643','6-4-3','dp beisbol','cancan','cancán','doble matanza','dp'],
+   r:`🔴 Doble Play → \`DP 6-4-3\` (o la cadena que corresponda)
+🎤 Di: "doble play del 6 al 4 al 3" especificando las posiciones
+📋 Toca casilla → mantén 🎤 → di el comando → confirma ✅
+Dos outs en una jugada. ⚠️ "Cancán" es el nombre coloquial del doble play en R.Dominicana.`},
+  // ── SACRIFICIOS TOQUE ──
+  {keys:['sacrificio hit','sacrificio toque','sh','bunt sacrificio','plancha','toque de bola','bunt de sacrificio'],
+   r:`🟡 Sacrificio Toque → \`SH\` (o \`SH 5-3\` con posiciones)
+🎤 Di: "sacrificio hit" o "bunt" + posiciones opcionales: "sacrificio hit del 5 al 3"
+📋 Toca casilla → mantén 🎤 → di el comando → confirma ✅
+AB=No. El corredor avanza: toca su casilla → menú corredor → avanzó a Xª.`},
+  // ── SQUEEZE PLAY ──
+  {keys:['squeeze play','squeeze','squeeze suicida','squeeze bunt','jugada de apriete','sq'],
+   r:`🟡 Squeeze Play → \`SQ\`
+🎤 Di: "squeeze play" o "squeeze suicida"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=No. Suicide squeeze: corredor de 3ª corre al lanzar; bateador debe tocar.
+Safety squeeze: bateador toca y corredor decide según la jugada.
+Para anotar al corredor: toca su casilla → menú → Anotó.`},
+  // ── COGIDO ROBANDO ──
+  {keys:['cogido robando','cs','caught stealing','atrapado robando','out robando','se la jalaron'],
+   r:`🔴 Cogido Robando → \`CS\` (o con cadena ej: \`2-6\`)
+🎤 Di: "cogido robando" + posiciones opcionales ("del 2 al 6")
+📋 Toca la casilla del corredor → mantén 🎤 → di el comando → confirma ✅
+AB=No. La cadena indica los tiros: 2=catcher, 6=short, 4=segunda, 5=tercera.`},
+  // ── RUNDOWN ──
+  {keys:['tira y tira','rundown','pickle','rd','atrapado entre bases','tierra de nadie'],
+   r:`🔴 Tira y Tira / Rundown → \`RD\` (o \`RD 5-2-5\` con cadena)
+🎤 Di: "tira y tira del 5 al 2" especificando los tiros
+📋 Toca la casilla del corredor → mantén 🎤 → di el comando → confirma ✅
+AB=No. El corredor quedó atrapado entre bases. Anota la cadena completa.`},
+  // ── TRIPLE PLAY ──
+  {keys:['triple play','triple matanza','tp'],
+   r:`🔴 Triple Play → \`TP\`
+🎤 Di: "triple play" o "triple matanza"
+📋 Registra el out del bateador con \`TP\`. Para los corredores: toca su casilla → menú → Out.
+AB=No. Tres outs en una sola jugada. Extremadamente raro.`},
+  // ── INFIELD FLY / IFF ──
+  {keys:['infield fly','iff','if regla','regla infield','infield fly rule'],
+   r:`🔴 Infield Fly (IFF) → \`IF\`
+🎤 Di: "infield fly"
+📋 Toca casilla → mantén 🎤 → di "infield fly" → confirma ✅
+Regla especial: con corredores en 1ª y 2ª (o llenas) y menos de 2 outs, elevado fácil en el cuadro = out automático aunque caiga. Protege a los corredores de doble plays fáciles. AB=Sí.`},
+  // ── GDP ──
+  {keys:['bateado doble play','gdp','grounded into double play','bateado en dp'],
+   r:`🔴 Bateado en Doble Play → \`GDP\`
+🎤 Di: "bateado doble play"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+El bateador inició el DP con su batazo. AB=Sí. Diferente al DP puro.`},
+  // ── DROPPED 3RD STRIKE ──
+  {keys:['tercer strike caido','dropped third strike','dropped strike','catcher no atrapo','tercer strike cayendo','passed strike'],
+   r:`⚠️ Tercer Strike Caído (Dropped 3rd Strike)
+No tiene símbolo propio — el resultado determina el símbolo:
+• Si el bateador es puesto out igualmente → registra \`KS\` (ponche)
+• Si llega a 1ª de forma segura → registra \`1B\` o \`E2\` (error del catcher)
+Regla: con 1ª base vacía O con 2 outs, el bateador puede correr al 1er strike caído.`},
+  // ── APPEAL PLAY ──
+  {keys:['jugada de apelacion','appeal play','apelacion','appeal','jugada apelacion'],
+   r:`⚠️ Jugada de Apelación (Appeal Play)
+Usa \`OR\` (Out por Regla) si el corredor es declarado out.
+📋 Situaciones típicas: corredor no pisó una base, bateó fuera de turno, abandonó base en fly out.
+Toca la casilla afectada → "REGISTRAR JUGADA" → sección OUTS → selecciona OR.`},
+  // ── BALK ──
+  {keys:['balk','bk','falta lanzador','boc','engano','infraccion del lanzador'],
+   r:`🟡 Balk → \`BK\`
+🎤 Di: "balk", "boc" o "falta lanzador"
+📋 Toca la casilla del corredor que avanza → mantén 🎤 → di "balk" → confirma ✅
+AB=No. Todos los corredores avanzan 1 base. ⚠️ "Boc" = término coloquial latinoamericano para balk.`},
+  // ── HITS ──
+  {keys:['sencillo','single','1b','hit sencillo','una base','imparable','hit uno'],
+   r:`🟢 Sencillo → \`1B\`
+🎤 Di: "sencillo", "single", "imparable", "una base"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=Sí, H=Sí. Para avanzar más: toca su casilla → menú corredor.`},
+  {keys:['doble hit','2b','tubey','tubei','dos bases','hit doble','doble beisbol'],
+   r:`🟢 Doble → \`2B\`
+🎤 Di: "doble", "tubey", "dos bases"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=Sí, H=Sí. El bateador llegó a 2ª base.`},
+  {keys:['triple hit','3b','tres bases','triplete','tres esquinas'],
+   r:`🟢 Triple → \`3B\`
+🎤 Di: "triple", "tres bases", "triplete"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=Sí, H=Sí. El bateador llegó a 3ª base.`},
+  {keys:['jonron','hr','home run','cuadrangular','bambinazo','jonronazo','grand slam','toletazo'],
+   r:`🟢 Jonrón → \`HR\`
+🎤 Di: "jonrón", "cuadrangular", "bambinazo", "grand slam"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=Sí, H=Sí. Anota el bateador y todos los corredores. Grand Slam = bases llenas = 4 carreras.`},
+  {keys:['texas leaguer','texas hit','bloop','blooper','tx','palomita de hit','hit texas'],
+   r:`🟢 Texas Leaguer → \`TX\`
+🎤 Di: "texas leaguer", "bloop", "blooper", "texas"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=Sí, H=Sí. Batazo corto que cae entre cuadro y jardines.
+⚠️ "Texas" es el término coloquial latinoamericano para este hit.`},
+  {keys:['bunt hit','toque de hit','toque hit','plancha hit','b bunt hit'],
+   r:`🟢 Bunt Hit → \`B\`
+🎤 Di: "bunt hit", "toque de hit", "plancha hit"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=Sí, H=Sí. Diferente al SH (sacrificio): este cuenta como hit y AB.`},
+  {keys:['jonron inside park','ihr','inside park','jonron dentro del parque','jonron interior'],
+   r:`🟢 Jonrón Inside Park → \`IHR\`
+🎤 Di: "jonrón dentro del parque" o "inside park"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=Sí, H=Sí. Las 4 bases sin que la pelota saliera del parque.`},
+  {keys:['hit izquierda','ls','hit lado izquierdo','hit left side'],
+   r:`🟢 Hit Lado Izquierdo → \`LS\`
+🎤 Di: "hit lado izquierdo" o "hit izquierda"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅`},
+  {keys:['hit derecha','rs','hit lado derecho','hit right side'],
+   r:`🟢 Hit Lado Derecho → \`RS\`
+🎤 Di: "hit lado derecho" o "hit derecha"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅`},
+  {keys:['hit medio','mi','hit cuadro','hit middle','hit al medio'],
+   r:`🟢 Hit Medio Cuadro → \`MI\`
+🎤 Di: "hit medio", "hit cuadro" o "hit middle"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅`},
+  {keys:['hit left center','lc','left center','hit izquierda centro'],
+   r:`🟢 Hit Left-Center → \`LC\`
+🎤 Di: "hit left center" o "hit izquierda centro"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅. Suele ser doble.`},
+  {keys:['hit right center','rc','right center','hit derecha centro'],
+   r:`🟢 Hit Right-Center → \`RC\`
+🎤 Di: "hit right center" o "hit derecha centro"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅. Suele ser doble.`},
+  // ── BASES SIN BATAZO ──
+  {keys:['base por bolas','walk','boleto','bb','cuatro bolas','libre transito','pasaporte','plato de sopa','sopa de pichon','pichon'],
+   r:`🔵 Base por Bolas → \`BB\`
+🎤 Di: "base por bolas", "walk", "boleto", "cuatro bolas"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=No. 4 bolas del pitcher — el bateador va a 1ª sin batazo.
+⚠️ "Plato de sopa de pichón" es el término coloquial dominicano para la base por bolas.`},
+  {keys:['base intencional','bbi','intencional','ibb','base intencional intencionalmente'],
+   r:`🔵 Base Intencional → \`BBI\`
+🎤 Di: "base intencional" o "intencional"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=No. El pitcher da la base a propósito. No cuenta para ERA.`},
+  {keys:['golpe','pelotazo','hbp','hit by pitch','golpeado','base por golpe','bg'],
+   r:`🔵 Pelotazo (HBP) → \`BG\`
+🎤 Di: "golpe", "pelotazo" o "hit by pitch"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=No. El pitcher golpeó al bateador — va a 1ª automáticamente.`},
+  {keys:['interferencia','int','interference','interferencia catcher'],
+   r:`🔵 Interferencia → \`INT\`
+🎤 Di: "interferencia"
+📋 Toca casilla → mantén 🎤 → di "interferencia" → confirma ✅
+AB=No. El catcher u otro defensor interfirió con el batazo. El bateador va a base.`},
+  {keys:['obstruccion','ob','obstruction','obstruccion defensor'],
+   r:`🔵 Obstrucción → \`OB\`
+🎤 Di: "obstrucción"
+📋 Toca casilla → mantén 🎤 → di "obstrucción" → confirma ✅
+AB=No. Un defensor obstruyó el camino del corredor. Diferencia: obstrucción=defensor bloquea, interferencia=ofensor estorba.`},
+  // ── AVANCES ──
+  {keys:['robo base','robó','base robada','sb','stolen base','se robo','robo exitoso'],
+   r:`🟡 Base Robada → \`SB\`
+🎤 Di: "robo" o "base robada"
+📋 Toca la casilla del corredor → mantén 🎤 → di "robo" → confirma ✅
+AB=No. El corredor robó sin error ni batazo.`},
+  {keys:['robo de home','robó el home','sbh','robo home','anoto robando','robo del plato'],
+   r:`🔴🟡 Robo de Home → \`SBH\`
+🎤 Di: "robo de home" o "robó el home"
+📋 Toca la casilla del corredor en 3ª → mantén 🎤 → di "robo de home" → confirma ✅
+El corredor anota desde 3ª base robando el plato.`},
+  {keys:['wild pitch','wp','lanzamiento wild','tiro salvaje','lanzamiento loco'],
+   r:`🟡 Wild Pitch → \`WP\`
+🎤 Di: "wild pitch" o "lanzamiento wild"
+📋 Toca la casilla del corredor → mantén 🎤 → di "wild pitch" → confirma ✅
+El pitcher lanzó fuera de control. El error es del pitcher (≠ Passed Ball).`},
+  {keys:['passed ball','pasbol','pb','pelota pasada'],
+   r:`🟡 Passed Ball → \`PB\`
+🎤 Di: "passed ball" o "pasbol"
+📋 Toca la casilla del corredor → mantén 🎤 → di "passed ball" → confirma ✅
+El catcher dejó pasar una bola controlable. Diferencia: PB=culpa del receptor, WP=culpa del lanzador.`},
+  {keys:["fielder's choice",'fc','fielder choice','jugada de eleccion','eleccion del defensor'],
+   r:`🟡 Fielder's Choice → \`FC\`
+🎤 Di: "fielder's choice" o "fc"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+AB=Sí, H=No. El defensor eligió sacar a otro corredor en vez del bateador. El bateador llega a base pero no se cuenta como hit.`},
+  {keys:['pisa y corre','pc','tag up','espera y corre'],
+   r:`🟡 Pisa y Corre → \`PC\`
+🎤 Di: "pisa y corre" o "tag up"
+📋 Toca la casilla del corredor → mantén 🎤 → di comando → confirma ✅
+El corredor avanzó pisando la base luego de un fly atrapado. AB=No.`},
+  {keys:['hit and run','bateo y corrido','hnr','h&r','hit run','hit y corre'],
+   r:`🟡 Hit and Run → \`H&R\`
+🎤 Di: "hit and run" o "bateo y corrido"
+📋 Toca casilla → mantén 🎤 → di comando → confirma ✅
+Jugada táctica: el corredor arranca y el bateador debe conectar. AB=No (como evento).`},
+  // ── ERRORES ──
+  {keys:['error short','error 6','e6','error parador','error ss'],
+   r:`🟡 Error Short Stop → \`E6\`
+🎤 Di: "error short"
+📋 Toca casilla → mantén 🎤 → di "error short" → confirma ✅
+AB=Sí, H=No. El shortstop (6) cometió un error que embasó al bateador.`},
+  {keys:['error primera','error 3','e3','error 1b base'],
+   r:`🟡 Error Primera Base → \`E3\` — Di: "error primera" 📋 Toca → mantén 🎤 → confirma ✅`},
+  {keys:['error segunda','error 4','e4','error 2b base'],
+   r:`🟡 Error Segunda Base → \`E4\` — Di: "error segunda" 📋 Toca → mantén 🎤 → confirma ✅`},
+  {keys:['error tercera','error 5','e5','error 3b base'],
+   r:`🟡 Error Tercera Base → \`E5\` — Di: "error tercera" 📋 Toca → mantén 🎤 → confirma ✅`},
+  {keys:['error pitcher','e1','error lanzador'],
+   r:`🟡 Error Pitcher → \`E1\` — Di: "error pitcher" 📋 Toca → mantén 🎤 → confirma ✅`},
+  {keys:['error catcher','e2','error receptor'],
+   r:`🟡 Error Catcher → \`E2\` — Di: "error catcher" 📋 Toca → mantén 🎤 → confirma ✅`},
+  {keys:['error izquierda','e7','error left','error jardin izquierdo'],
+   r:`🟡 Error Left Field → \`E7\` — Di: "error izquierda" 📋 Toca → mantén 🎤 → confirma ✅`},
+  {keys:['error centro','e8','error center','error jardin central'],
+   r:`🟡 Error Centro → \`E8\` — Di: "error centro" 📋 Toca → mantén 🎤 → confirma ✅`},
+  {keys:['error derecha','e9','error right','error jardin derecho'],
+   r:`🟡 Error Right Field → \`E9\` — Di: "error derecha" 📋 Toca → mantén 🎤 → confirma ✅`},
+  {keys:['error','errors','cometo error','comete error','cometio error'],
+   r:`🟡 Errores → \`E1\`–\`E9\` según la posición del defensor
+Posiciones: 1=pitcher, 2=catcher, 3=1ª, 4=2ª, 5=3ª, 6=short, 7=left, 8=center, 9=right
+🎤 Di: "error [posición]" — ej: "error short", "error catcher", "error izquierda"
+AB=Sí, H=No. El bateador llegó a base por fallo del defensor.`},
+  // ── JUGADAS COMPLEJAS ──
+  {keys:['double switch','cambio doble','doble cambio','doble switch'],
+   r:`🔄 Double Switch (Cambio Doble)
+No tiene símbolo único — se registran dos cambios separados:
+📋 1. Botón 🔄 PITCHER → ingresa el nuevo lanzador
+2. Fila del jugador posicionado → botón ⇄ → di "entra [nombre] al [posición]" → confirma ✅
+El DS mueve al nuevo pitcher al lugar del jugador que salió en el orden al bate, y viceversa.`},
+  {keys:['dropped third strike','tercer strike caido','tercer strike cayendo','catcher falla tercer strike'],
+   r:`⚠️ Tercer Strike Caído (Dropped 3rd Strike)
+No hay símbolo propio — depende del resultado:
+• Bateador out igualmente → \`KS\` (ponche)
+• Bateador llega a 1ª → \`1B\` o \`E2\` (error del catcher)
+Regla: con 1ª vacía O 2 outs, el bateador puede correr aunque el catcher falle el 3er strike.`},
+  {keys:['appeal play','jugada apelacion','apelacion','corredor no piso'],
+   r:`⚠️ Jugada de Apelación — Usa \`OR\` (Out por Regla) si hay out.
+Casos: corredor no pisó una base, bateó fuera de turno, abandonó base antes del fly.
+📋 Toca casilla afectada → "REGISTRAR JUGADA" → sección OUTS → OR.`},
+  {keys:['out en home','out home','eliminado home','sacaron home','cadena de tiros','out segunda','out en segunda','out tercera','out en tercera'],
+   r:`🔴 Out en Base + Cadena de Tiros → símbolo = cadena (ej: \`8-2\`, \`6-4\`, \`7-5-2\`)
+🎤 Di: "out en home del 8 al 2" especificando quién tiró a quién
+📋 Toca casilla del corredor → mantén 🎤 → di el comando → confirma ✅
+Posiciones: 1=P, 2=C, 3=1ª, 4=2ª, 5=3ª, 6=SS, 7=LF, 8=CF, 9=RF`},
+  // ── ESTADÍSTICAS ──
+  {keys:['average','avg','promedio de bateo','batting average','promedio bateador'],
+   r:`📊 AVG — Promedio de Bateo
+Fórmula: AVG = H ÷ AB
+ScoreVoz lo calcula automáticamente en la última columna de cada bateador.
+Referencia: .300+ excelente · .250 promedio · .200 débil`},
+  {keys:['obp','on base percentage','porcentaje de embase','on base porcentaje'],
+   r:`📊 OBP — On Base Percentage (% Embasado)
+Fórmula: OBP = (H + BB + HBP) ÷ (AB + BB + HBP + SF)
+Incluye hits, bases por bolas y pelotazos. Excluye obstrucciones e interferencias.
+Referencia: .350+ muy bueno · .320 promedio. Disponible en reporte NUMERITOS.`},
+  {keys:['slg','slugging','porcentaje slugging','bases totales'],
+   r:`📊 SLG — Slugging Percentage
+Fórmula: SLG = Bases Totales ÷ AB
+Bases Totales: 1B=1pt, 2B=2pt, 3B=3pt, HR=4pt
+Ejemplo: 1B+2B+HR en 10 AB → (1+2+4)÷10 = .700 SLG
+Referencia: .450+ excelente · .400 bueno. En reporte NUMERITOS.`},
+  {keys:['ops','on base plus slugging','obp mas slg','obp slg'],
+   r:`📊 OPS — On Base + Slugging
+Fórmula: OPS = OBP + SLG (suma directa)
+Referencia: .900+ elite · .800 muy bueno · .700 promedio · <.700 por debajo
+ScoreVoz calcula OPS por jugador en el reporte 📊 NUMERITOS.`},
+  {keys:['era','earned run average','promedio carreras limpias','efectividad pitcher','era pitcher'],
+   r:`📊 ERA — Earned Run Average (Efectividad del Pitcher)
+Fórmula: ERA = (Carreras Limpias × 9) ÷ Innings Lanzados
+Ejemplo: 3 carreras limpias en 6 entradas = (3×9)÷6 = ERA 4.50
+Referencia: <3.00 elite · 3-4 bueno · >5 deficiente. Disponible en NUMERITOS (modo PRO).`},
+  {keys:['linear weights','lwts','pesos lineales','lw beisbol','valor lineal'],
+   r:`📊 Linear Weights (Pesos Lineales)
+Valores aproximados por jugada en carreras producidas:
+HR=+1.65 · 3B=+1.35 · 2B=+1.10 · 1B=+0.70 · BB=+0.55 · Out=-0.25
+Mide el valor ofensivo real más allá del AVG.
+ScoreVoz muestra LW por jugador en el reporte 📊 NUMERITOS.`},
+  {keys:['carrera limpia','carrera sucia','earned run','unearned run','limpia sucia','carrera inmerecida'],
+   r:`📊 Carrera Limpia vs Sucia (Modo PRO)
+En Modo PRO: toca la casilla del corredor en base → menú corredor → "Limpia" o "Sucia"
+🟢 Limpia (Earned): responsabilidad del pitcher — cuenta para ERA
+🔴 Sucia (Unearned): causada por error, passed ball u otra falla defensiva — NO cuenta para ERA
+Para activar PRO: botón BÁSICO → cambia a ⚡ PRO en la barra superior.`},
+  // ── COLOQUIALISMOS ──
+  {keys:['morla','pelota morla','batazo morla','morlazo'],
+   r:`🇩🇴 Morla → Rodado débil / Out sencillo
+En béisbol dominicano, "morla" describe un batazo débil (generalmente un rodado).
+📋 Según dónde vaya: "rodado short" = \`6-3\`, "rodado segunda" = \`4-3\`, "rodado tercera" = \`5-3\`
+Di la posición exacta al micrófono para el símbolo correcto.`},
+  {keys:['cancan','cancán beisbol','cancán dominicano'],
+   r:`🇩🇴 Cancán → Doble Play (\`DP 6-4-3\` o la cadena correspondiente)
+🎤 Di: "doble play del 6 al 4 al 3" para el DP clásico short-segunda-primera
+📋 Toca la casilla del bateador → mantén 🎤 → di "doble play" → confirma ✅
+Término coloquial dominicano para el double play.`},
+  {keys:['chocolate beisbol','chocolatear','se chocolateo'],
+   r:`🇦🇲 Chocolate → Ponche Swing (\`KS\`)
+🎤 Di: "chocolate", "abanicó" o "ponche"
+📋 Toca casilla → mantén 🎤 → di el comando → confirma ✅
+Término popular latinoamericano: el bateador tiró y falló el 3er strike.`},
+  {keys:['boc beisbol','balk boc','boc pitcher'],
+   r:`🇩🇴 Boc → Balk (\`BK\`)
+🎤 Di: "boc" o "balk"
+📋 Toca casilla del corredor que avanza → mantén 🎤 → di "boc" → confirma ✅
+"Boc" es el término coloquial latinoamericano (especialmente dominicano) para el balk.`},
+  {keys:['plato de sopa pichon','pichon base','sopa pichon'],
+   r:`🇩🇴 Plato de Sopa de Pichón → Base por Bolas (\`BB\`)
+🎤 Di: "base por bolas", "walk", "boleto" o "cuatro bolas"
+📋 Toca casilla → mantén 🎤 → di el comando → confirma ✅
+Expresión coloquial dominicana para cuando el pitcher da 4 bolas.`},
+  {keys:['morder el polvo','se lo comio','se lo comió swng'],
+   r:`🇦🇲 Morder el polvo / Se lo comió → Ponche Swing (\`KS\`)
+🎤 Di: "morder el polvo", "se lo comió" o "ponche"
+📋 Toca casilla → mantén 🎤 → di el comando → confirma ✅`},
+  // ── FLUJO GENERAL Y AYUDA ──
+  {keys:['como registro','como anoto','como uso','flujo registro','pasos registrar','como funciona'],
+   r:`📋 Flujo General de ScoreVoz:
+1. Toca la casilla del bateador en la planilla
+2. Mantén presionado 🎤 y di la jugada
+3. Confirma ✅ SÍ en el banner amarillo
+Para corredor en base: toca su casilla → aparece menú de movimiento
+Jugada manual: botón "+ REGISTRAR JUGADA" → modal completo con todos los símbolos`},
+  {keys:['corredor base','runner','avanzar corredor','corredor en base','menú corredor'],
+   r:`🏃 Corredor en Base:
+1. Registra primero la jugada del bateador (hit, walk, etc.)
+2. Toca la casilla del corredor en base
+3. Aparece menú: Avanzó a 2ª / 3ª · Anotó (Limpia/Sucia en PRO) · Out en 2ª/3ª/Home · Regresó
+También puedes usar el micrófono dentro del menú del corredor.`},
+  {keys:['cambio pitcher','cambio de pitcher','relevista','relevo','nuevo pitcher','pitching change'],
+   r:`🔄 Cambio de Pitcher:
+📋 Botón 🔄 PITCHER en la barra superior → selecciona equipo → escribe/dicta el nombre → CONFIRMAR CAMBIO
+El sistema registra la entrada, lanzamientos del pitcher saliente y resetea el contador.`},
+  {keys:['sustitucion','cambio jugador','cambiar jugador','pinch hitter','pinch runner','sub jugador'],
+   r:`🔄 Sustitución de Jugador:
+📋 Fila del jugador que sale → botón ⇄ → mantén 🎤 → di "entra [nombre] al [posición]" → confirma ✅
+El sistema registra la sustitución con el número de entrada.`},
+  {keys:['modo pro','modo basico','pro mode','basico mode','cambiar modo'],
+   r:`⚡ Modo BÁSICO vs PRO:
+Básico: colores estándar, sin carrera limpia/sucia
+PRO: colores latinoamericanos (rojo=hits, azul=walk, gris=outs), carrera limpia/sucia, narrativa de jugada
+📋 Cambiar: botón BÁSICO ↔ ⚡ PRO en la barra superior.`},
+  {keys:['numeritos','reporte pdf','estadisticas finales','reporte final','pdf beisbol'],
+   r:`📊 NUMERITOS — Reporte Final en PDF:
+📋 Botón 📊 NUMERITOS (barra superior) genera PDF con:
+• Box score: AB, H, R, RBI, 2B, 3B, HR, BB, K, AVG, OBP, SLG, OPS
+• Tabla de pitcheo: ERA, IP, K, BB, lanzamientos
+• Linear Weights y métricas avanzadas`},
+  {keys:['bateador designado','dh designated hitter','dh beisbol'],
+   r:`🟡 Bateador Designado (DH):
+📋 En Setup: activa el botón DH en la fila del jugador correspondiente.
+El DH batea en lugar del pitcher sin jugar en el campo.
+Si el pitcher también batea (Ohtani): activa ¿BATEA? en la sección del pitcher abridor.`},
+];
 
-CATÁLOGO COMPLETO DE SCOREVOZ:
+function normalizeKB(s){
+  return s.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+}
 
-OUTS (círculo rojo en la planilla):
-KS ponche swing: "ponche", "abanicó", "chocolate", "whiff"
-KL ponche cantado: "ponche cantado", "parado", "watching", "caught looking", "sin batear"
-F7 fly izquierda: "fly izquierda" o "fly al 7"
-F8 fly centro: "fly center" o "fly al 8"
-F9 fly derecha: "fly derecha" o "fly al 9"
-SF7/SF8/SF9 sacrificio fly: "sacrificio fly al 7/8/9"
-SQ squeeze play: "squeeze play", "squeeze suicida"
-P pop fly infield: "pop fly", "palomita"
-L línea atrapada: "línea atrapada"
-FF foul fly: "foul fly"
-6-3 rodado short: "rodado short" o "6 al 3"
-4-3 rodado segunda: "rodado segunda" o "4 al 3"
-5-3 rodado tercera: "rodado tercera" o "5 al 3"
-1-3 rodado pitcher: "rodado pitcher"
-SH sacrificio toque: "sacrificio hit", "plancha", "bunt"
-SH N-N con posiciones: "sacrificio hit del 5 al 3"
-DP N-N-N doble play: "doble play" + "N al N al N" (ej: "doble play del 6 al 4 al 3")
-CS cogido robando: "cogido robando", "atrapado robando"
-RD tira y tira/rundown: "tira y tira" + "N al N" opcional
-TP triple play: "triple play"
-IF infield fly: "infield fly"
-GDP bateado doble play: "bateado doble play"
-OUT-H / cadena (ej 8-2) out en home: "out en home del 8 al 2"
-OUT2 / cadena out en segunda: "out en segunda del 6 al 4"
-OUT3 / cadena out en tercera: "out en tercera del 7 al 5"
+function searchKB(raw){
+  const txt=normalizeKB(raw);
+  let best=null, bestScore=0;
+  for(const entry of KB){
+    let score=0;
+    for(const k of entry.keys){
+      const nk=normalizeKB(k);
+      if(txt.includes(nk)) score+=nk.split(' ').length;
+    }
+    if(score>bestScore){ bestScore=score; best=entry; }
+  }
+  if(!best||bestScore===0) return null;
+  return best.r;
+}
 
-HITS (líneas verdes en la planilla):
-1B sencillo: "sencillo", "single", "imparable"
-2B doble: "doble", "tubey"
-3B triple: "triple"
-HR jonrón: "jonrón", "cuadrangular", "bambinazo"
-TX Texas leaguer: "texas leaguer", "bloop", "blooper"
-B bunt hit: "bunt hit", "toque de hit"
-LS/RS/MI hits por zona: "hit izquierda/derecha/cuadro"
-LC/RC hits left-center/right-center
-IHR jonrón inside park: "jonron dentro del parque"
-
-BASES SIN BATAZO:
-BB base por bolas: "base por bolas", "walk", "boleto"
-BBI base intencional: "base intencional"
-BG pelotazo HBP: "golpe", "pelotazo", "hit by pitch"
-INT interferencia: "interferencia"
-OB obstrucción: "obstrucción"
-
-AVANCES EN BASE:
-SB base robada: "robo", "base robada"
-SBH robo de home: "robo de home", "robó el home"
-WP wild pitch: "wild pitch", "lanzamiento wild"
-PB passed ball: "passed ball", "pasbol"
-BK balk: "balk", "boc", "falta lanzador"
-FC fielder's choice: "fielder's choice", "fc"
-PC pisa y corre: "pisa y corre", "tag up"
-H&R hit and run: "hit and run", "bateo y corrido"
-
-ERRORES:
-E1 pitcher, E2 catcher, E3 primera, E4 segunda, E5 tercera, E6 short, E7 left, E8 center, E9 right
-Di: "error short", "error primera", etc.
-
-FLUJO DE REGISTRO:
-1) Toca la casilla del bateador en la planilla
-2) Mantén presionado el micrófono 🎤 y di la jugada
-3) Confirma con ✅ SÍ en el banner amarillo
-Para corredores ya en base: toca su casilla → aparece menú de corredor con opciones de avance/out.
-Para entradas complejas: botón "+ REGISTRAR JUGADA" abre el modal completo con todos los símbolos.`;
-
-let chatHistory=[];
 let chatRec=null, chatRecording=false;
 
 function openHelpChat(){
   document.getElementById('chat-panel').classList.add('open');
-  if(!chatHistory.length){
-    addBotMsg('¡Hola! Soy el asistente de ScoreVoz. Describeme cualquier jugada de béisbol y te digo exactamente cómo registrarla.\n\nEjemplos:\n• "el pitcher ponchó al bateador sin que tirara"\n• "rodado al short, sacaron al corredor en home del 6 al 5 al 2"\n• "sacrificio fly al jardín izquierdo, anotó el de tercera"');
+  const msgs=document.getElementById('chat-msgs');
+  if(!msgs.children.length){
+    addBotMsg('¡Hola! Soy el asistente de ScoreVoz.\nDescribeme cualquier situación de béisbol y te digo cómo registrarla.\n\nEjemplos:\n• "el bateador ponchó sin tirarle"\n• "sacrificio fly al jardín izquierdo"\n• "doble play del short al segunda al primera"\n• "¿qué es el cancán?" · "¿cómo calculo el ERA?" · "robo de home"');
   }
 }
 
@@ -2841,97 +3202,29 @@ function closeHelpChat(){
   document.getElementById('chat-panel').classList.remove('open');
 }
 
-function getApiKey(){ return localStorage.getItem('sv_claude_key')||''; }
-function saveApiKey(k){ localStorage.setItem('sv_claude_key',k.trim()); }
-
-function showKeyInput(){
-  const msgs=document.getElementById('chat-msgs');
-  const existing=document.getElementById('chat-key-form');
-  if(existing){ existing.remove(); return; }
-  const div=document.createElement('div');
-  div.id='chat-key-form'; div.className='chat-key-wrap';
-  div.innerHTML=`<p>Ingresa tu API Key de Anthropic (Claude). Se guarda solo en este dispositivo — nunca se envía a terceros.</p>
-    <input class="chat-key-input" id="chat-key-inp" placeholder="sk-ant-api03-..." type="password" value="${getApiKey()}">
-    <button class="chat-key-save" onclick="chatKeySave()">💾 GUARDAR CLAVE</button>`;
-  msgs.appendChild(div);
-  msgs.scrollTop=msgs.scrollHeight;
-  document.getElementById('chat-key-inp')?.focus();
-}
-
-function chatKeySave(){
-  const val=document.getElementById('chat-key-inp')?.value||'';
-  if(!val.startsWith('sk-ant-')){ showToast('⚠️ La clave debe comenzar con sk-ant-',true); return; }
-  saveApiKey(val);
-  document.getElementById('chat-key-form')?.remove();
-  showToast('✓ API Key guardada');
-}
-
 function chatAppendMsg(role,text){
   const msgs=document.getElementById('chat-msgs');
   const div=document.createElement('div');
   div.className=`chat-msg ${role}`;
-  // render newlines + backtick code spans
   const safe=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  div.innerHTML=safe
-    .replace(/`([^`]+)`/g,'<code>$1</code>')
-    .replace(/\n/g,'<br>');
+  div.innerHTML=safe.replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\n/g,'<br>');
   msgs.appendChild(div);
   msgs.scrollTop=msgs.scrollHeight;
 }
-
 function addBotMsg(text){ chatAppendMsg('bot',text); }
 function addUserMsg(text){ chatAppendMsg('user',text); }
 
-function showChatTyping(){
-  const msgs=document.getElementById('chat-msgs');
-  const div=document.createElement('div');
-  div.className='chat-typing'; div.id='chat-typing';
-  div.textContent='⏳ Consultando al asistente...';
-  msgs.appendChild(div); msgs.scrollTop=msgs.scrollHeight;
-}
-function hideChatTyping(){ document.getElementById('chat-typing')?.remove(); }
-
-async function sendChatMsg(){
+function sendChatMsg(){
   const inp=document.getElementById('chat-input');
   const text=(inp.value||'').trim();
   if(!text) return;
-  const key=getApiKey();
-  if(!key){ showKeyInput(); showToast('⚠️ Configura tu API Key de Claude primero',true); return; }
   inp.value='';
   addUserMsg(text);
-  chatHistory.push({role:'user',content:text});
-  showChatTyping();
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'x-api-key':key,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-client-side-origin-allowlist':'*'
-      },
-      body:JSON.stringify({
-        model:'claude-haiku-4-5-20251001',
-        max_tokens:400,
-        system:CHAT_SYSTEM,
-        messages:chatHistory.slice(-10)
-      })
-    });
-    hideChatTyping();
-    if(!resp.ok){
-      const err=await resp.json().catch(()=>({}));
-      const msg=err?.error?.message||`Error HTTP ${resp.status}`;
-      addBotMsg(`⚠️ ${msg}\n\nVerifica tu API Key con el botón 🔑 API KEY.`);
-      chatHistory.pop(); return;
-    }
-    const data=await resp.json();
-    const reply=data.content?.[0]?.text||'(sin respuesta)';
-    chatHistory.push({role:'assistant',content:reply});
+  const reply=searchKB(text);
+  if(reply){
     addBotMsg(reply);
-  }catch(e){
-    hideChatTyping();
-    addBotMsg('⚠️ Error de conexión. Verifica tu API Key y conexión a internet.');
-    chatHistory.pop();
+  } else {
+    addBotMsg('No encontré esa jugada en mi base de conocimiento de ScoreVoz.\n¿Puedes ser más específico? Describe la situación completa del juego:\n• ¿Qué hizo el bateador?\n• ¿Había corredores en base?\n• ¿Quién fieldeó y adónde tiró?\n\nPuedes preguntar sobre jugadas, términos coloquiales o estadísticas (AVG, ERA, OPS…)');
   }
 }
 
@@ -2961,7 +3254,6 @@ function stopChatMic(e){
   try{ if(chatRec) chatRec.stop(); }catch(ex){}
   chatRecording=false;
   document.getElementById('chat-mic-btn')?.classList.remove('recording');
-  // Auto-send if there's text
   setTimeout(()=>{
     const txt=(document.getElementById('chat-input')?.value||'').trim();
     if(txt) sendChatMsg();
