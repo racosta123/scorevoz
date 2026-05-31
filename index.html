@@ -55,7 +55,7 @@
   .btn-start:hover { background:#00cc7a; transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,229,153,.4); }
   /* ── GAME ───────────────────────────────────────────────── */
   #game-screen { display:none; padding:0; }
-  .game-content { padding-bottom:100px; }
+  .game-content { padding-bottom:200px; }
   /* ── LINE SCORE ─────────────────────────────────────────── */
   .line-score-bar { background:#081220; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.10); overflow-x:auto; }
   .ls-table { border-collapse:collapse; font-size:0.72rem; width:100%; }
@@ -182,7 +182,7 @@
   .confirm-no  { background:#ff4d67; color:#fff; }
   @media(max-width:768px){ .game-layout{grid-template-columns:1fr;} }
   /* ── PITCH COUNTER BAR ──────────────────────────────────── */
-  .pitch-bar { background:#081220; padding:8px 16px; border-bottom:1px solid rgba(255,255,255,.10); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .pitch-bar { position:fixed; left:0; right:0; bottom:72px; z-index:150; background:#081220; padding:8px 16px; border-top:1px solid rgba(255,255,255,.10); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .pitch-box { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:8px 14px; display:flex; align-items:center; gap:8px; flex:1; min-width:240px; }
   .pitch-pitcher-name { font-family:'Oswald',sans-serif; font-size:0.82rem; color:#00bfff; letter-spacing:1px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px; }
   .pitch-total { font-family:'Bebas Neue',sans-serif; font-size:2.6rem; color:#fff; line-height:1; min-width:44px; text-align:center; font-weight:900; }
@@ -254,7 +254,7 @@
   .chat-send-btn { width:38px; height:38px; border-radius:50%; border:none; background:var(--amber); color:#071018; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; transition:opacity .15s; padding:0; }
   .chat-send-btn:hover { opacity:.82; }
   /* ── FLOATING SBF COUNTER ───────────────────────────────── */
-  #sbf-float { position:fixed; bottom:90px; right:16px; z-index:9999; background:#0c1928; border:1.5px solid rgba(0,191,255,.35); border-radius:20px; padding:10px 12px; display:none; flex-direction:column; gap:7px; box-shadow:0 8px 32px rgba(0,0,0,.8); min-width:128px; user-select:none; touch-action:none; }
+  #sbf-float { position:fixed; bottom:162px; right:16px; z-index:9999; background:#0c1928; border:1.5px solid rgba(0,191,255,.35); border-radius:20px; padding:10px 12px; display:none; flex-direction:column; gap:7px; box-shadow:0 8px 32px rgba(0,0,0,.8); min-width:128px; user-select:none; touch-action:none; }
   #sbf-float.visible { display:flex; }
   .sbf-handle { display:flex; align-items:center; justify-content:space-between; cursor:grab; padding:2px 0; }
   .sbf-handle:active { cursor:grabbing; }
@@ -1246,7 +1246,8 @@ function selectCell(team,pidx,inn,td){
   const _sbfBtn=document.getElementById('sbf-team-btn');
   if(_sbfBtn){ _sbfBtn.textContent=pitchTeam.toUpperCase(); _sbfBtn.className='sbf-team-btn'+(pitchTeam==='l'?' l':''); }
   gs.pitchAB[pitchTeam]={s:0,b:0,f:0,history:[]};
-  unlockPitchButtons(pitchTeam);
+  unlockPitchButtons('v');
+  unlockPitchButtons('l');
   ['s','b','f'].forEach(t=>{ const b=document.getElementById(`sbf-btn-${t}`); if(b) b.disabled=false; });
   sbfRefresh();
 
