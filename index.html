@@ -55,7 +55,7 @@
   .btn-start:hover { background:#00cc7a; transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,229,153,.4); }
   /* ── GAME ───────────────────────────────────────────────── */
   #game-screen { display:none; padding:0; }
-  .game-content { padding-bottom:200px; }
+  .game-content { padding-bottom:220px; }
   /* ── LINE SCORE ─────────────────────────────────────────── */
   .line-score-bar { background:#081220; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.10); overflow-x:auto; }
   .ls-table { border-collapse:collapse; font-size:0.72rem; width:100%; }
@@ -181,8 +181,12 @@
   .confirm-yes { background:#00e599; color:#071018; }
   .confirm-no  { background:#ff4d67; color:#fff; }
   @media(max-width:768px){ .game-layout{grid-template-columns:1fr;} }
+  @media(max-width:524px){
+    .game-content { padding-bottom:300px; }
+    #sbf-float { bottom:288px; }
+  }
   /* ── PITCH COUNTER BAR ──────────────────────────────────── */
-  .pitch-bar { position:fixed; left:0; right:0; bottom:72px; z-index:150; background:#081220; padding:8px 16px; border-top:1px solid rgba(255,255,255,.10); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .pitch-bar { position:fixed; left:0; right:0; bottom:100px; z-index:150; background:#081220; padding:8px 16px; border-top:2px solid rgba(0,229,153,.20); box-shadow:0 -4px 24px rgba(0,0,0,.65); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .pitch-box { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:8px 14px; display:flex; align-items:center; gap:8px; flex:1; min-width:240px; }
   .pitch-pitcher-name { font-family:'Oswald',sans-serif; font-size:0.82rem; color:#00bfff; letter-spacing:1px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px; }
   .pitch-total { font-family:'Bebas Neue',sans-serif; font-size:2.6rem; color:#fff; line-height:1; min-width:44px; text-align:center; font-weight:900; }
@@ -229,7 +233,7 @@
   /* ── CHAT ASISTENTE ─────────────────────────────────────── */
   .help-btn { width:44px; height:44px; border-radius:50%; border:2px solid var(--amber); background:rgba(255,182,72,.12); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0; transition:all .2s; padding:0; }
   .help-btn:hover { background:rgba(255,182,72,.28); transform:scale(1.08); }
-  #chat-panel { position:fixed; bottom:72px; left:0; right:0; z-index:190; background:#060d1e; border-top:2px solid rgba(255,182,72,.3); display:flex; flex-direction:column; height:68vh; max-height:500px; transform:translateY(110%); transition:transform .32s cubic-bezier(.4,0,.2,1); box-shadow:0 -8px 48px rgba(0,0,0,.85); }
+  #chat-panel { position:fixed; bottom:100px; left:0; right:0; z-index:190; background:#060d1e; border-top:2px solid rgba(255,182,72,.3); display:flex; flex-direction:column; height:68vh; max-height:500px; transform:translateY(110%); transition:transform .32s cubic-bezier(.4,0,.2,1); box-shadow:0 -8px 48px rgba(0,0,0,.85); }
   #chat-panel.open { transform:translateY(0); }
   .chat-hdr { background:#081220; border-bottom:1px solid rgba(255,255,255,.08); padding:10px 16px; display:flex; align-items:center; gap:10px; flex-shrink:0; }
   .chat-hdr-info { flex:1; min-width:0; }
@@ -254,7 +258,7 @@
   .chat-send-btn { width:38px; height:38px; border-radius:50%; border:none; background:var(--amber); color:#071018; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; transition:opacity .15s; padding:0; }
   .chat-send-btn:hover { opacity:.82; }
   /* ── FLOATING SBF COUNTER ───────────────────────────────── */
-  #sbf-float { position:fixed; bottom:162px; right:16px; z-index:9999; background:#0c1928; border:1.5px solid rgba(0,191,255,.35); border-radius:20px; padding:10px 12px; display:none; flex-direction:column; gap:7px; box-shadow:0 8px 32px rgba(0,0,0,.8); min-width:128px; user-select:none; touch-action:none; }
+  #sbf-float { position:fixed; bottom:184px; right:16px; z-index:9999; background:#0c1928; border:1.5px solid rgba(0,191,255,.35); border-radius:20px; padding:10px 12px; display:none; flex-direction:column; gap:7px; box-shadow:0 8px 32px rgba(0,0,0,.8); min-width:128px; user-select:none; touch-action:none; }
   #sbf-float.visible { display:flex; }
   .sbf-handle { display:flex; align-items:center; justify-content:space-between; cursor:grab; padding:2px 0; }
   .sbf-handle:active { cursor:grabbing; }
