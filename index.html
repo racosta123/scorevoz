@@ -570,7 +570,7 @@ let gs = {
   subs:{ v:[], l:[] },
   pitcher:{ v:{name:'',batea:false}, l:{name:'',batea:false} },
   pitcherChanges:{ v:[], l:[] },
-  pitchCount:{ v:{total:0,strikes:0,balls:0,fouls:0}, l:{total:0,strikes:0,balls:0,fouls:0} },
+  pitchCount:{ v:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}}, l:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}} },
   pitchAB:{ v:{s:0,b:0,f:0,history:[]}, l:{s:0,b:0,f:0,history:[]} },
   selected:null,
   lang:'es-MX'
@@ -1254,6 +1254,15 @@ function selectCell(team,pidx,inn,td){
   const p=gs.teams[team].players[pidx];
   document.getElementById('selinfo').innerHTML=`<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
   document.getElementById('reg-btn').disabled=false;
+  // Cambio 18: resetear contador S/B/F del pitcher que enfrenta al bateador
+  const pitchTeam=team==='v'?'l':'v';
+  resetPitchAB(pitchTeam);
+  if(typeof sbfTeam!=='undefined'){
+    sbfTeam=pitchTeam;
+    const sbfBtn=document.getElementById('sbf-team-btn');
+    if(sbfBtn){ sbfBtn.textContent=pitchTeam.toUpperCase(); sbfBtn.className='sbf-team-btn'+(pitchTeam==='l'?' l':''); }
+    sbfRefresh();
+  }
 }
 
 function openModalForSelected(){
@@ -1422,9 +1431,67 @@ function applyPlay(team,pidx,inn,play){
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
   updateScores();
-  // Desbloquear contador del pitcher contrario
-  resetPitchAB(team==='v'?'l':'v');
+  // Resetear contador del pitcher contrario
+  const oppTeam=team==='v'?'l':'v';
+  resetPitchAB(oppTeam);
   showToast(`✓ ${play.label}`);
+  // Auto-avanzar solo cuando es turno al bate real (no movimiento de corredor)
+  if(play.type!=='score') autoAdvance(team,pidx,inn);
+}
+
+// ─── AVANCE AUTOMÁTICO (cambio 19) ────────────────────────
+function countOutsInInning(team,inn){
+  let outs=0;
+  gs.teams[team].players.forEach((_,i)=>{
+    const pl=(gs.plays[team][i]||{})[inn];
+    if(pl && pl.type==='out') outs++;
+  });
+  return outs;
+}
+
+function findNextEmptyBatter(team,fromPidx,inn){
+  const n=gs.teams[team].players.length;
+  for(let i=1;i<=n;i++){
+    const idx=(fromPidx+i)%n;
+    if(!(gs.plays[team][idx]||{})[inn]) return idx;
+  }
+  return (fromPidx+1)%n; // todos llenos, avanzar igual
+}
+
+function findFirstEmptyBatter(team,inn){
+  const n=gs.teams[team].players.length;
+  for(let i=0;i<n;i++){
+    if(!(gs.plays[team][i]||{})[inn]) return i;
+  }
+  return 0;
+}
+
+function autoAdvance(team,pidx,inn){
+  const outs=countOutsInInning(team,inn);
+  let nextTeam, nextInn, nextPidx;
+  if(outs>=3){
+    if(team==='v'){
+      nextTeam='l'; nextInn=inn;
+    } else {
+      nextTeam='v'; nextInn=inn+1;
+      if(nextInn>INNINGS) return;
+    }
+    nextPidx=findFirstEmptyBatter(nextTeam,nextInn);
+    if(nextInn!==inn){
+      // Cambiar a la nueva entrada en la nav
+      const ib=document.getElementById(`ib${nextInn}`);
+      if(ib){ setInning(nextInn); ib.scrollIntoView({behavior:'smooth',inline:'nearest'}); }
+    }
+  } else {
+    nextTeam=team; nextInn=inn;
+    nextPidx=findNextEmptyBatter(team,pidx,inn);
+  }
+  const nextTd=document.getElementById(`c-${nextTeam}-${nextPidx}-${nextInn}`);
+  if(!nextTd) return;
+  setTimeout(()=>{
+    selectCell(nextTeam,nextPidx,nextInn,nextTd);
+    nextTd.scrollIntoView({behavior:'smooth',block:'nearest'});
+  },250);
 }
 
 function refreshCell(team,pidx,inn){
@@ -1739,10 +1806,35 @@ function renderCambioPitFields(){
   const changes=gs.pitcherChanges[pitCambioTeam];
   const curName=changes.length?changes[changes.length-1].inName:gs.pitcher[pitCambioTeam].name;
   const inn=gs.currentInning||1;
+  const pc=gs.pitchCount[pitCambioTeam];
+  const log=pc.inningLog||{};
+  const innKeys=Object.keys(log).sort((a,b)=>+a-+b);
+  let innHTML='';
+  if(innKeys.length){
+    innHTML='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;margin-bottom:4px">';
+    innKeys.forEach(k=>{
+      const r=log[k];
+      const tot=r.s+r.b+r.f;
+      innHTML+=`<div style="background:rgba(0,191,255,.07);border:1px solid rgba(0,191,255,.2);border-radius:8px;padding:4px 8px;text-align:center;min-width:54px"><div style="font-size:0.45rem;color:var(--text-dim);font-family:'Oswald';letter-spacing:1px">E${k}</div><div style="font-size:0.68rem;color:var(--cyan);font-family:'Roboto Mono';white-space:nowrap">${r.s}S ${r.b}B ${r.f}F</div><div style="font-size:0.62rem;color:#fff;font-family:'Bebas Neue'">${tot}</div></div>`;
+    });
+    innHTML+='</div>';
+  }
+  // Historial de pitchers anteriores
+  let histHTML='';
+  if(changes.length){
+    histHTML='<div class="modal-section" style="margin-top:8px">HISTORIAL</div>';
+    changes.forEach(ch=>{
+      const iLog=ch.inningLog||{};
+      const iKeys=Object.keys(iLog).sort((a,b)=>+a-+b);
+      let iDetail=iKeys.map(k=>`E${k}:${iLog[k].s}S${iLog[k].b}B${iLog[k].f}F`).join(' | ');
+      histHTML+=`<div style="font-size:0.68rem;padding:3px 0;color:var(--text-dim);border-bottom:1px solid rgba(255,255,255,.06)"><span style="color:#fff;font-weight:600">${ch.outName}</span> — E${ch.inn} · ${ch.pitches.total} lanz (${ch.pitches.strikes}S ${ch.pitches.balls}B ${ch.pitches.fouls}F)<br><span style="font-size:0.58rem;color:var(--blue)">${iDetail||'sin desglose'}</span></div>`;
+    });
+  }
   fieldsDiv.innerHTML=`
-    <div class="modal-section" style="margin-top:10px">SALE</div>
-    <div style="font-size:0.82rem;padding:4px 0 8px;color:var(--text-dim)">${curName||'Pitcher actual'}</div>
-    <div class="modal-section">ENTRA — ENTRADA ${inn}</div>
+    <div class="modal-section" style="margin-top:10px">SALE — ${curName||'Pitcher actual'}</div>
+    ${innHTML}
+    <div class="modal-section" style="margin-top:4px">ENTRA — ENTRADA ${inn}</div>
+    ${histHTML}
     <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
       <input class="player-input" id="pit-cambio-input" placeholder="Nombre del relevista" maxlength="25" style="flex:1">
       <button class="setup-mic-row" id="pit-cambio-mic"
@@ -1794,8 +1886,8 @@ function applyCambioPitcher(inn){
   const changes=gs.pitcherChanges[pitCambioTeam];
   const outName=changes.length?changes[changes.length-1].inName:gs.pitcher[pitCambioTeam].name;
   const pc=gs.pitchCount[pitCambioTeam];
-  gs.pitcherChanges[pitCambioTeam].push({inn,inName,outName,pitches:{...pc}});
-  gs.pitchCount[pitCambioTeam]={total:0,strikes:0,balls:0,fouls:0};
+  gs.pitcherChanges[pitCambioTeam].push({inn,inName,outName,pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},inningLog:{...pc.inningLog}});
+  gs.pitchCount[pitCambioTeam]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
   updatePitchCounterUI();
   closeModal();
   showToast(`✓ E${inn}: sale ${outName} (${pc.total} lanz) — entra ${inName}`);
@@ -2153,6 +2245,12 @@ function openNumeritos(){
 function addPitch(team,type){
   gs.pitchCount[team].total++;
   if(type) gs.pitchCount[team][type]++;
+  // Per-inning log (cambio 20)
+  const logInn=gs.currentInning||1;
+  if(!gs.pitchCount[team].inningLog) gs.pitchCount[team].inningLog={};
+  if(!gs.pitchCount[team].inningLog[logInn]) gs.pitchCount[team].inningLog[logInn]={s:0,b:0,f:0};
+  const iMap={strikes:'s',balls:'b',fouls:'f'};
+  if(type && iMap[type]) gs.pitchCount[team].inningLog[logInn][iMap[type]]++;
   // Per-AB counter
   const ab=gs.pitchAB[team];
   const tKey={strikes:'s',balls:'b',fouls:'f'}[type];
