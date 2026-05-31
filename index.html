@@ -226,6 +226,39 @@
   .jug-lw-box { background:rgba(0,191,255,.07); border:1px solid rgba(0,191,255,.2); border-radius:12px; padding:10px 16px; margin-top:10px; display:flex; align-items:center; justify-content:space-between; }
   .mode-btn-pro { background:rgba(0,229,153,.15) !important; color:var(--green) !important; border-color:var(--green) !important; }
   .narrative-panel { background:rgba(0,191,255,.07); border:1px solid rgba(0,191,255,.22); border-radius:12px; padding:14px 16px; margin:6px 0 0; font-size:0.84rem; color:#c8dff0; line-height:1.7; }
+  /* ── CHAT ASISTENTE ─────────────────────────────────────── */
+  .help-btn { width:44px; height:44px; border-radius:50%; border:2px solid var(--amber); background:rgba(255,182,72,.12); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0; transition:all .2s; padding:0; }
+  .help-btn:hover { background:rgba(255,182,72,.28); transform:scale(1.08); }
+  #chat-panel { position:fixed; bottom:72px; left:0; right:0; z-index:190; background:#060d1e; border-top:2px solid rgba(255,182,72,.3); display:flex; flex-direction:column; height:68vh; max-height:500px; transform:translateY(110%); transition:transform .32s cubic-bezier(.4,0,.2,1); box-shadow:0 -8px 48px rgba(0,0,0,.85); }
+  #chat-panel.open { transform:translateY(0); }
+  .chat-hdr { background:#081220; border-bottom:1px solid rgba(255,255,255,.08); padding:10px 16px; display:flex; align-items:center; gap:10px; flex-shrink:0; }
+  .chat-hdr-info { flex:1; min-width:0; }
+  .chat-hdr-title { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:3px; color:var(--amber); }
+  .chat-hdr-sub { font-size:0.58rem; color:var(--text-dim); letter-spacing:.5px; }
+  .chat-key-btn { font-size:0.6rem; color:var(--text-dim); border:1px solid rgba(255,255,255,.1); border-radius:8px; padding:4px 9px; background:transparent; cursor:pointer; white-space:nowrap; transition:all .15s; }
+  .chat-key-btn:hover { border-color:var(--amber); color:var(--amber); }
+  .chat-close { width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,.14); background:transparent; color:var(--text-dim); cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; transition:all .15s; flex-shrink:0; padding:0; }
+  .chat-close:hover { border-color:var(--red); color:var(--red); }
+  .chat-msgs { flex:1; overflow-y:auto; padding:12px 14px; display:flex; flex-direction:column; gap:9px; scroll-behavior:smooth; }
+  .chat-msg { max-width:90%; border-radius:14px; padding:9px 13px; font-size:0.82rem; line-height:1.55; word-break:break-word; }
+  .chat-msg.user { align-self:flex-end; background:rgba(0,191,255,.13); border:1px solid rgba(0,191,255,.22); color:#c8dff0; border-bottom-right-radius:3px; }
+  .chat-msg.bot  { align-self:flex-start; background:rgba(255,182,72,.09); border:1px solid rgba(255,182,72,.18); color:#fff; border-bottom-left-radius:3px; }
+  .chat-msg.bot code { background:rgba(0,229,153,.15); border-radius:4px; padding:1px 5px; font-family:'Roboto Mono',monospace; font-size:0.83em; color:var(--green); }
+  .chat-typing { align-self:flex-start; color:var(--text-dim); font-size:0.75rem; font-style:italic; padding:4px 2px; }
+  .chat-input-row { background:#081220; border-top:1px solid rgba(255,255,255,.08); padding:9px 12px; display:flex; gap:7px; align-items:center; flex-shrink:0; }
+  .chat-input { flex:1; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; color:#fff; font-family:'Inter',sans-serif; font-size:0.82rem; padding:9px 12px; outline:none; transition:border-color .2s; }
+  .chat-input:focus { border-color:var(--amber); }
+  .chat-input::placeholder { color:#3d5566; }
+  .chat-mic-btn { width:38px; height:38px; border-radius:50%; border:2px solid rgba(255,77,103,.45); background:rgba(255,77,103,.1); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.95rem; flex-shrink:0; transition:all .2s; padding:0; }
+  .chat-mic-btn.recording { border-color:var(--red); background:rgba(255,77,103,.28); animation:pulse-red .7s infinite; }
+  .chat-send-btn { width:38px; height:38px; border-radius:50%; border:none; background:var(--amber); color:#071018; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; transition:opacity .15s; padding:0; }
+  .chat-send-btn:hover { opacity:.82; }
+  .chat-key-wrap { background:rgba(255,182,72,.07); border:1px solid rgba(255,182,72,.2); border-radius:14px; margin:6px 0; padding:14px; }
+  .chat-key-wrap p { font-size:0.76rem; color:var(--text-dim); margin-bottom:10px; line-height:1.5; }
+  .chat-key-input { width:100%; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:10px; color:#fff; font-family:'Roboto Mono',monospace; font-size:0.73rem; padding:8px 10px; outline:none; margin-bottom:8px; }
+  .chat-key-input:focus { border-color:var(--amber); }
+  .chat-key-save { width:100%; background:var(--amber); color:#071018; border:none; border-radius:10px; font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:2px; padding:9px; cursor:pointer; transition:opacity .15s; }
+  .chat-key-save:hover { opacity:.88; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -429,9 +462,31 @@
   </div>
 </div>
 
+<!-- CHAT ASISTENTE -->
+<div id="chat-panel">
+  <div class="chat-hdr">
+    <div class="chat-hdr-info">
+      <div class="chat-hdr-title">❓ ASISTENTE SCOREVOZ</div>
+      <div class="chat-hdr-sub">Describe cualquier jugada y te digo cómo anotarla</div>
+    </div>
+    <button class="chat-key-btn" onclick="showKeyInput()" title="Configurar API Key de Claude">🔑 API KEY</button>
+    <button class="chat-close" onclick="closeHelpChat()">✕</button>
+  </div>
+  <div class="chat-msgs" id="chat-msgs"></div>
+  <div class="chat-input-row">
+    <input class="chat-input" id="chat-input" placeholder="Ej: rodado al short, sacaron al corredor en home del 6 al 5 al 2" onkeydown="chatInputKey(event)">
+    <button class="chat-mic-btn" id="chat-mic-btn"
+      onmousedown="startChatMic(event)" onmouseup="stopChatMic(event)"
+      ontouchstart="startChatMic(event)" ontouchend="stopChatMic(event)"
+      ontouchcancel="stopChatMic(event)" title="Mantén para dictar">🎙</button>
+    <button class="chat-send-btn" onclick="sendChatMsg()" title="Enviar">➤</button>
+  </div>
+</div>
+
 <!-- VOICE PANEL -->
 <div class="voice-panel" id="vpanel" style="display:none">
   <button class="voice-btn" id="vbtn" onmousedown="pttStart(event)" onmouseup="pttEnd(event)" ontouchstart="pttStart(event)" ontouchend="pttEnd(event)" ontouchcancel="pttEnd(event)"><span class="mic-icon" id="mic-icon">🎤</span></button>
+  <button class="help-btn" onclick="openHelpChat()" title="Asistente — ¿Cómo registro esta jugada?">❓</button>
   <div class="voice-status">
     <div class="voice-label">RECONOCIMIENTO DE VOZ</div>
     <div class="voice-transcript" id="vtr">Selecciona una casilla, luego mantén presionado el micrófono y habla...</div>
@@ -2695,6 +2750,222 @@ function showToast(msg,err=false){
   const t=document.getElementById('toast');
   t.textContent=msg; t.className='toast show'+(err?' error':'');
   setTimeout(()=>{ t.className='toast'; },3000);
+}
+
+// ─── ASISTENTE CHAT ───────────────────────────────────────
+const CHAT_SYSTEM=`Eres el asistente de ScoreVoz, app de anotación de béisbol latinoamericano.
+Tu función: decirle al anotador cómo registrar en ScoreVoz la jugada que describe.
+Responde SIEMPRE en español. Sé conciso: 2-4 líneas máximo.
+Usa backticks para los símbolos: \`KS\`, \`4-3\`, \`SF9\`, \`DP 6-4-3\`, etc.
+Formato preferido: símbolo → comando de voz exacto → nota breve si aplica.
+
+CATÁLOGO COMPLETO DE SCOREVOZ:
+
+OUTS (círculo rojo en la planilla):
+KS ponche swing: "ponche", "abanicó", "chocolate", "whiff"
+KL ponche cantado: "ponche cantado", "parado", "watching", "caught looking", "sin batear"
+F7 fly izquierda: "fly izquierda" o "fly al 7"
+F8 fly centro: "fly center" o "fly al 8"
+F9 fly derecha: "fly derecha" o "fly al 9"
+SF7/SF8/SF9 sacrificio fly: "sacrificio fly al 7/8/9"
+SQ squeeze play: "squeeze play", "squeeze suicida"
+P pop fly infield: "pop fly", "palomita"
+L línea atrapada: "línea atrapada"
+FF foul fly: "foul fly"
+6-3 rodado short: "rodado short" o "6 al 3"
+4-3 rodado segunda: "rodado segunda" o "4 al 3"
+5-3 rodado tercera: "rodado tercera" o "5 al 3"
+1-3 rodado pitcher: "rodado pitcher"
+SH sacrificio toque: "sacrificio hit", "plancha", "bunt"
+SH N-N con posiciones: "sacrificio hit del 5 al 3"
+DP N-N-N doble play: "doble play" + "N al N al N" (ej: "doble play del 6 al 4 al 3")
+CS cogido robando: "cogido robando", "atrapado robando"
+RD tira y tira/rundown: "tira y tira" + "N al N" opcional
+TP triple play: "triple play"
+IF infield fly: "infield fly"
+GDP bateado doble play: "bateado doble play"
+OUT-H / cadena (ej 8-2) out en home: "out en home del 8 al 2"
+OUT2 / cadena out en segunda: "out en segunda del 6 al 4"
+OUT3 / cadena out en tercera: "out en tercera del 7 al 5"
+
+HITS (líneas verdes en la planilla):
+1B sencillo: "sencillo", "single", "imparable"
+2B doble: "doble", "tubey"
+3B triple: "triple"
+HR jonrón: "jonrón", "cuadrangular", "bambinazo"
+TX Texas leaguer: "texas leaguer", "bloop", "blooper"
+B bunt hit: "bunt hit", "toque de hit"
+LS/RS/MI hits por zona: "hit izquierda/derecha/cuadro"
+LC/RC hits left-center/right-center
+IHR jonrón inside park: "jonron dentro del parque"
+
+BASES SIN BATAZO:
+BB base por bolas: "base por bolas", "walk", "boleto"
+BBI base intencional: "base intencional"
+BG pelotazo HBP: "golpe", "pelotazo", "hit by pitch"
+INT interferencia: "interferencia"
+OB obstrucción: "obstrucción"
+
+AVANCES EN BASE:
+SB base robada: "robo", "base robada"
+SBH robo de home: "robo de home", "robó el home"
+WP wild pitch: "wild pitch", "lanzamiento wild"
+PB passed ball: "passed ball", "pasbol"
+BK balk: "balk", "boc", "falta lanzador"
+FC fielder's choice: "fielder's choice", "fc"
+PC pisa y corre: "pisa y corre", "tag up"
+H&R hit and run: "hit and run", "bateo y corrido"
+
+ERRORES:
+E1 pitcher, E2 catcher, E3 primera, E4 segunda, E5 tercera, E6 short, E7 left, E8 center, E9 right
+Di: "error short", "error primera", etc.
+
+FLUJO DE REGISTRO:
+1) Toca la casilla del bateador en la planilla
+2) Mantén presionado el micrófono 🎤 y di la jugada
+3) Confirma con ✅ SÍ en el banner amarillo
+Para corredores ya en base: toca su casilla → aparece menú de corredor con opciones de avance/out.
+Para entradas complejas: botón "+ REGISTRAR JUGADA" abre el modal completo con todos los símbolos.`;
+
+let chatHistory=[];
+let chatRec=null, chatRecording=false;
+
+function openHelpChat(){
+  document.getElementById('chat-panel').classList.add('open');
+  if(!chatHistory.length){
+    addBotMsg('¡Hola! Soy el asistente de ScoreVoz. Describeme cualquier jugada de béisbol y te digo exactamente cómo registrarla.\n\nEjemplos:\n• "el pitcher ponchó al bateador sin que tirara"\n• "rodado al short, sacaron al corredor en home del 6 al 5 al 2"\n• "sacrificio fly al jardín izquierdo, anotó el de tercera"');
+  }
+}
+
+function closeHelpChat(){
+  document.getElementById('chat-panel').classList.remove('open');
+}
+
+function getApiKey(){ return localStorage.getItem('sv_claude_key')||''; }
+function saveApiKey(k){ localStorage.setItem('sv_claude_key',k.trim()); }
+
+function showKeyInput(){
+  const msgs=document.getElementById('chat-msgs');
+  const existing=document.getElementById('chat-key-form');
+  if(existing){ existing.remove(); return; }
+  const div=document.createElement('div');
+  div.id='chat-key-form'; div.className='chat-key-wrap';
+  div.innerHTML=`<p>Ingresa tu API Key de Anthropic (Claude). Se guarda solo en este dispositivo — nunca se envía a terceros.</p>
+    <input class="chat-key-input" id="chat-key-inp" placeholder="sk-ant-api03-..." type="password" value="${getApiKey()}">
+    <button class="chat-key-save" onclick="chatKeySave()">💾 GUARDAR CLAVE</button>`;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+  document.getElementById('chat-key-inp')?.focus();
+}
+
+function chatKeySave(){
+  const val=document.getElementById('chat-key-inp')?.value||'';
+  if(!val.startsWith('sk-ant-')){ showToast('⚠️ La clave debe comenzar con sk-ant-',true); return; }
+  saveApiKey(val);
+  document.getElementById('chat-key-form')?.remove();
+  showToast('✓ API Key guardada');
+}
+
+function chatAppendMsg(role,text){
+  const msgs=document.getElementById('chat-msgs');
+  const div=document.createElement('div');
+  div.className=`chat-msg ${role}`;
+  // render newlines + backtick code spans
+  const safe=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  div.innerHTML=safe
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\n/g,'<br>');
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+
+function addBotMsg(text){ chatAppendMsg('bot',text); }
+function addUserMsg(text){ chatAppendMsg('user',text); }
+
+function showChatTyping(){
+  const msgs=document.getElementById('chat-msgs');
+  const div=document.createElement('div');
+  div.className='chat-typing'; div.id='chat-typing';
+  div.textContent='⏳ Consultando al asistente...';
+  msgs.appendChild(div); msgs.scrollTop=msgs.scrollHeight;
+}
+function hideChatTyping(){ document.getElementById('chat-typing')?.remove(); }
+
+async function sendChatMsg(){
+  const inp=document.getElementById('chat-input');
+  const text=(inp.value||'').trim();
+  if(!text) return;
+  const key=getApiKey();
+  if(!key){ showKeyInput(); showToast('⚠️ Configura tu API Key de Claude primero',true); return; }
+  inp.value='';
+  addUserMsg(text);
+  chatHistory.push({role:'user',content:text});
+  showChatTyping();
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':key,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-client-side-origin-allowlist':'*'
+      },
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:400,
+        system:CHAT_SYSTEM,
+        messages:chatHistory.slice(-10)
+      })
+    });
+    hideChatTyping();
+    if(!resp.ok){
+      const err=await resp.json().catch(()=>({}));
+      const msg=err?.error?.message||`Error HTTP ${resp.status}`;
+      addBotMsg(`⚠️ ${msg}\n\nVerifica tu API Key con el botón 🔑 API KEY.`);
+      chatHistory.pop(); return;
+    }
+    const data=await resp.json();
+    const reply=data.content?.[0]?.text||'(sin respuesta)';
+    chatHistory.push({role:'assistant',content:reply});
+    addBotMsg(reply);
+  }catch(e){
+    hideChatTyping();
+    addBotMsg('⚠️ Error de conexión. Verifica tu API Key y conexión a internet.');
+    chatHistory.pop();
+  }
+}
+
+function chatInputKey(e){
+  if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendChatMsg(); }
+}
+
+function startChatMic(e){
+  e.preventDefault();
+  if(chatRecording) return;
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ showToast('⚠️ Sin soporte de voz en este navegador',true); return; }
+  chatRec=new SR();
+  chatRec.continuous=true; chatRec.interimResults=true; chatRec.lang=gs.lang||'es-MX';
+  let tr='';
+  chatRec.onresult=ev=>{ tr=Array.from(ev.results).map(r=>r[0].transcript).join(''); document.getElementById('chat-input').value=tr; };
+  chatRec.onend=()=>{ chatRecording=false; document.getElementById('chat-mic-btn')?.classList.remove('recording'); };
+  chatRec.onerror=()=>{ chatRecording=false; document.getElementById('chat-mic-btn')?.classList.remove('recording'); };
+  chatRec.start();
+  chatRecording=true;
+  document.getElementById('chat-mic-btn')?.classList.add('recording');
+}
+
+function stopChatMic(e){
+  e.preventDefault();
+  if(!chatRecording) return;
+  try{ if(chatRec) chatRec.stop(); }catch(ex){}
+  chatRecording=false;
+  document.getElementById('chat-mic-btn')?.classList.remove('recording');
+  // Auto-send if there's text
+  setTimeout(()=>{
+    const txt=(document.getElementById('chat-input')?.value||'').trim();
+    if(txt) sendChatMsg();
+  },300);
 }
 </script>
 </body>
