@@ -43,7 +43,7 @@
   .player-input:focus { border-color:#00e599; }
   .pos-input { font-size:0.78rem; padding:7px 6px; width:100%; color:#ffb648; text-align:center; text-transform:uppercase; }
   .pos-input:focus { border-color:#ffb648; }
-  .players-grid { display:grid; grid-template-columns:26px 1fr 50px 24px 28px 28px; gap:5px; align-items:center; margin-bottom:5px; }
+  .players-grid { display:grid; grid-template-columns:26px 1fr 50px 24px 28px; gap:5px; align-items:center; margin-bottom:5px; }
   .dh-pill { font-size:0.52rem; font-family:'Inter',sans-serif; background:transparent; border:1px solid rgba(255,255,255,.08); border-radius:8px; color:#8fa3b7; cursor:pointer; letter-spacing:1px; padding:0; width:24px; height:24px; transition:all .15s; flex-shrink:0; }
   .dh-pill:hover { border-color:#ffb648; color:#ffb648; }
   .dh-pill.active { background:#ffb648; color:#071018; border-color:#ffb648; font-weight:700; }
@@ -337,7 +337,7 @@
       <button class="setup-team-mic" id="tnmb-v" onmousedown="teamNamePttStart('v',event)" onmouseup="teamNamePttEnd(event)" ontouchstart="teamNamePttStart('v',event)" ontouchend="teamNamePttEnd(event)" ontouchcancel="teamNamePttEnd(event)" title="Mantén: di el nombre del equipo">🎤</button>
     </div>
     <div class="players-grid">
-      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div><div class="col-header"></div>
+      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div>
     </div>
     <div id="pl-v"></div>
     <div class="pitcher-section">
@@ -359,7 +359,7 @@
       <button class="setup-team-mic" id="tnmb-l" onmousedown="teamNamePttStart('l',event)" onmouseup="teamNamePttEnd(event)" ontouchstart="teamNamePttStart('l',event)" ontouchend="teamNamePttEnd(event)" ontouchcancel="teamNamePttEnd(event)" title="Mantén: di el nombre del equipo">🎤</button>
     </div>
     <div class="players-grid">
-      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div><div class="col-header"></div>
+      <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div>
     </div>
     <div id="pl-l"></div>
     <div class="pitcher-section">
@@ -486,7 +486,7 @@ const PLAY_CATALOG = {
   outs:[
     // Ponches
     { id:'KS',  label:'K ⚾ Ponche Swing',      sym:'KS',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche','ponche swing','strike out swing','abanicó','abaniq','chocolate','abanicar','whiff','abanico','morder el polvo','se lo comió'] },
-    { id:'KL',  label:'KL Ponche Cantado',       sym:'KL',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche cantado','ponche mirando','ponche llamado','strike out looking','sin tirarle','sin mover','ponche viendo','parado','ponche parado','sin mover el bate','ponche sin tirarle','tercer strike cantado','se quedó parado','se quedo parado','le cantaron el strike','strike tres cantado'] },
+    { id:'KL',  label:'KL Ponche Cantado',       sym:'KL',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche cantado','ponche mirando','ponche llamado','strike out looking','sin tirarle','sin mover','ponche viendo','parado','ponche parado','sin mover el bate','ponche sin tirarle','tercer strike cantado','se quedó parado','se quedo parado','le cantaron el strike','strike tres cantado','caught looking','watching','ponche sin swing','tres strikes','sin batear','strike three'] },
     // Fly outs
     { id:'F7',  label:'F7 Fly Left Field',       sym:'F7',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly izquierda','elevado izquierda','fly left'] },
     { id:'F8',  label:'F8 Fly Center',           sym:'F8',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly center','elevado centro','fly central'] },
@@ -506,6 +506,7 @@ const PLAY_CATALOG = {
     // Sacrificios
     { id:'SH',  label:'SH Sacrificio Hit Toque', sym:'SH',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio hit','toque de sacrificio','bunt sacrificio','sacrificio toque','plancha','toque de bola','bunt','toque corto','toque al cuadro','bunt de sacrificio','plancha de sacrificio'] },
     { id:'SF',  label:'SF Sacrificio Fly',       sym:'SF',  bases:0, type:'out', ab:false, color:'amber', voice:['sacrificio fly','fly de sacrificio'] },
+    { id:'SQ',  label:'SQ Squeeze Play',         sym:'SQ',  bases:0, type:'out', ab:false, color:'amber', voice:['squeeze play','squeeze suicida','squeeze bunt','jugada de apriete'] },
     // Infield fly, out regla
     { id:'IF',  label:'IF Infield Fly',          sym:'IF',  bases:0, type:'out', ab:true,  color:'red',   voice:['infield fly'] },
     { id:'OR',  label:'OR Out por Regla',        sym:'OR',  bases:0, type:'out', ab:true,  color:'red',   voice:['out por regla','out regla'] },
@@ -518,7 +519,7 @@ const PLAY_CATALOG = {
 
   // ── HITS ──
   hits:[
-    { id:'1B',  label:'1B Sencillo',             sym:'1B',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['sencillo','single','hit sencillo','hit uno','una base','imparable','hit infield','infield hit','texas leaguer','hit al cuadro'] },
+    { id:'1B',  label:'1B Sencillo',             sym:'1B',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['sencillo','single','hit sencillo','hit uno','una base','imparable','hit infield','infield hit','hit al cuadro'] },
     { id:'2B',  label:'2B Doble',                sym:'2B',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['doble','double','dos bases','hit doble','tubey','tubei','two bagger','hit de dos'] },
     { id:'3B',  label:'3B Triple',               sym:'3B',  bases:3, type:'hit',  ab:true,  h:true, color:'green', voice:['triple','tres bases','hit triple','triplete','tres esquinas','hit de tres'] },
     { id:'HR',  label:'HR Jonrón',               sym:'HR',  bases:4, type:'hit',  ab:true,  h:true, color:'green', voice:['jonron','jonrón','home run','jonronazo','cuadrangular','cuadrangula','grand slam','bambinazo','toletazo','largo','se la llevó','cuadrangulo'] },
@@ -533,6 +534,7 @@ const PLAY_CATALOG = {
     { id:'RL',  label:'RL Hit Línea Derecha',    sym:'RL',  bases:2, type:'hit',  ab:true,  h:true, color:'green', voice:['hit linea derecha','hit línea derecha'] },
     // Toque de hit
     { id:'B',   label:'B  Bunt Hit',             sym:'B',   bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['bunt hit','toque de hit','toque hit','plancha hit','toque por hit','bunt sorpresa','toque sorpresa'] },
+    { id:'TX',  label:'TX Texas Leaguer',         sym:'TX',  bases:1, type:'hit',  ab:true,  h:true, color:'green', voice:['texas leaguer','texas hit','bloop','blooper','palomita de hit','texas'] },
   ],
 
   // ── EMBASADO SIN BATAZO ──
@@ -563,10 +565,11 @@ const PLAY_CATALOG = {
     { id:'SBH', label:'SBH Robo de Home',         sym:'SBH', bases:null, type:'advance', ab:false, color:'red',   voice:['robo de home','robó el home','robo home','anotó robando home','anoto robando home','se robó el home','se robo el home','robó el plato','robo del plato'] },
     { id:'WP',  label:'WP Wild Pitch',            sym:'WP',  bases:null, type:'advance', ab:false, color:'amber', voice:['wild pitch','lanzamiento wild','tiro salvaje','wp','lanzamiento loco','lanzamiento descontrolado','tiro descontrolado'] },
     { id:'PB',  label:'PB Passed Ball',           sym:'PB',  bases:null, type:'advance', ab:false, color:'amber', voice:['passed ball','pasbol','pelota pasada','pb'] },
-    { id:'BK',  label:'BK Balk / Falta',          sym:'BK',  bases:null, type:'advance', ab:false, color:'amber', voice:['balk','falta lanzador','falta del pitcher','bk','engaño','infracción del lanzador','infraccion del lanzador'] },
+    { id:'BK',  label:'BK Balk / Falta',          sym:'BK',  bases:null, type:'advance', ab:false, color:'amber', voice:['balk','falta lanzador','falta del pitcher','bk','engaño','infracción del lanzador','infraccion del lanzador','boc'] },
     { id:'T',   label:'T  Avance por Tiro',       sym:'T',   bases:null, type:'advance', ab:false, color:'amber', voice:['avance por tiro'] },
-    { id:'FC',  label:'FC Fielder\'s Choice',     sym:'FC',  bases:1,    type:'advance', ab:true,  color:'amber', voice:["fielder's choice",'fielder choice','jugada de eleccion','jugada elección','jugada de elección','fc','bateo y corrido','hit and run'] },
-    { id:'PC',  label:'PC Pisa y Corre',          sym:'PC',  bases:null, type:'advance', ab:false, color:'amber', voice:['pisa y corre','squeeze play','squeeze suicida','jugada de cuña','jugada de cuna','toque suicida','tag up','espera y corre'] },
+    { id:'FC',  label:'FC Fielder\'s Choice',     sym:'FC',  bases:1,    type:'advance', ab:true,  color:'amber', voice:["fielder's choice",'fielder choice','jugada de eleccion','jugada elección','jugada de elección','fc'] },
+    { id:'PC',  label:'PC Pisa y Corre',          sym:'PC',  bases:null, type:'advance', ab:false, color:'amber', voice:['pisa y corre','tag up','espera y corre'] },
+    { id:'HNR', label:'H&R Hit and Run',          sym:'H&R', bases:1,    type:'advance', ab:false, color:'amber', voice:['hit and run','bateo y corrido','hit y corre','h&r','hit run'] },
   ],
 
   // ── CARRERA / ESPECIAL ──
@@ -897,11 +900,7 @@ function buildSetup(t) {
       <button class="setup-mic-row" id="smb-${t}-${i}"
         onmousedown="setupRowPttStart('${t}',${i},event)" onmouseup="setupRowPttEnd(event)"
         ontouchstart="setupRowPttStart('${t}',${i},event)" ontouchend="setupRowPttEnd(event)"
-        ontouchcancel="setupRowPttEnd(event)" title="Mantén: di nombre al número">🎤</button>
-      <button class="setup-pos-mic" id="posmb-${t}-${i}"
-        onmousedown="posPttStart('${t}',${i},event)" onmouseup="posPttEnd(event)"
-        ontouchstart="posPttStart('${t}',${i},event)" ontouchend="posPttEnd(event)"
-        ontouchcancel="posPttEnd(event)" title="Mantén: di la posición">P</button>`;
+        ontouchcancel="setupRowPttEnd(event)" title="Mantén: di nombre al número">🎤</button>`;
     c.appendChild(d);
   }
 }
@@ -1174,8 +1173,8 @@ function showModal(team,pidx,inn){
     {title:'PONCHES',    plays:PLAY_CATALOG.outs.filter(p=>['KS','KL'].includes(p.id))},
     {title:'GROUND OUTS',plays:PLAY_CATALOG.outs.filter(p=>p.id.startsWith('R'))},
     {title:'FLY OUTS',   plays:PLAY_CATALOG.outs.filter(p=>['F7','F8','F9','P','L','FF','IF'].includes(p.id))},
-    {title:'DOBLE PLAY / OTROS OUTS', plays:PLAY_CATALOG.outs.filter(p=>['DP643','DP543','SH','SF','CS','OR','GDP'].includes(p.id))},
-    {title:'HITS',       plays:PLAY_CATALOG.hits.filter(p=>['1B','2B','3B','HR','IHR','B'].includes(p.id))},
+    {title:'DOBLE PLAY / OTROS OUTS', plays:PLAY_CATALOG.outs.filter(p=>['DP643','DP543','SH','SF','SQ','CS','OR','GDP'].includes(p.id))},
+    {title:'HITS',       plays:PLAY_CATALOG.hits.filter(p=>['1B','2B','3B','HR','IHR','B','TX'].includes(p.id))},
     {title:'HITS POR ZONA', plays:PLAY_CATALOG.hits.filter(p=>['LS','RS','MI','LC','RC','LL','RL'].includes(p.id))},
     {title:'BASE SIN BATAZO', plays:PLAY_CATALOG.walks},
     {title:'ERRORES',    plays:PLAY_CATALOG.errors},
@@ -1500,21 +1499,49 @@ function hideBanner(){
   document.getElementById('confirm-banner').classList.remove('show');
 }
 
+// Extrae hasta 3 posiciones numéricas de secuencias tipo "N al M [al P]"
+function extractOutPositions(text){
+  const m3=text.match(/\b([1-9])\s+al\s+([1-9])\s+al\s+([1-9])\b/);
+  if(m3) return [m3[1],m3[2],m3[3]];
+  const m2=text.match(/\b([1-9])\s+al\s+([1-9])\b/);
+  if(m2) return [m2[1],m2[2]];
+  return [];
+}
+
 function interpretVoice(text){
   document.getElementById('vtr').textContent=`"${text}"`;
   const {team,pidx,inn}=gs.selected;
   let matched=null;
 
-  // Busca en el catálogo completo por palabras clave de voz
-  for(const play of ALL_PLAYS){
-    if(!play.voice) continue;
-    for(const kw of play.voice){
-      if(text.includes(kw)){ matched=play; break; }
+  // Detección de fly outs con jardinero específico (fly al 7/8/9, sacrificio fly al 7/8/9)
+  if(/\bfly\b|elevado/.test(text)){
+    const jar=/\b7\b/.test(text)||/izquierda|left\b/.test(text)?'7'
+             :/\b8\b/.test(text)||/centr|center\b/.test(text)?'8'
+             :/\b9\b/.test(text)||/derecha|right\b/.test(text)?'9':null;
+    if(jar){
+      const isSacri=/sacrificio|sacri\b/.test(text);
+      if(isSacri){
+        const sfPlay=PLAY_CATALOG.outs.find(p=>p.id==='SF');
+        if(sfPlay) matched={...sfPlay,sym:`SF${jar}`,label:`SF${jar} Sacrificio Fly`};
+      } else {
+        const fPlay=PLAY_CATALOG.outs.find(p=>p.id===('F'+jar));
+        if(fPlay) matched=fPlay;
+      }
     }
-    if(matched) break;
   }
 
-  // Detección de error con posición específica (ej: "error del short avanzó a segunda")
+  // Busca en el catálogo completo por palabras clave de voz
+  if(!matched){
+    for(const play of ALL_PLAYS){
+      if(!play.voice) continue;
+      for(const kw of play.voice){
+        if(text.includes(kw)){ matched=play; break; }
+      }
+      if(matched) break;
+    }
+  }
+
+  // Detección de error con posición específica
   if(!matched && text.includes('error')){
     let sym='E?', bases=1;
     if(text.includes('short')||text.includes('parador')||text.includes('ss')) sym='E6';
@@ -1531,7 +1558,7 @@ function interpretVoice(text){
     matched={...PLAY_CATALOG.errors[0], sym, label:`Error ${sym}`, bases, type:'error', ab:true};
   }
 
-  // Detección de ground out con posiciones (ej: "rodado de short a primera")
+  // Detección de ground out con posiciones
   if(!matched && (text.includes('rodado')||text.includes('rolata')||text.includes('rola'))){
     let sym='6-3';
     if(text.includes('short')) sym='6-3';
@@ -1539,6 +1566,37 @@ function interpretVoice(text){
     else if(text.includes('tercera')||text.includes('third')) sym='5-3';
     else if(text.includes('pitcher')) sym='1-3';
     matched={...PLAY_CATALOG.outs[0],sym,label:`Rodado ${sym}`,bases:0,type:'out',ab:true};
+  }
+
+  // Detección de outs en base específica con cadena de tiros ("out en home del 8 al 2")
+  if(!matched){
+    const isHome=/out.*home|lo.{0,10}sacaron.*home|out.*plato|eliminado.*home|sacado.*home/.test(text);
+    const isTer =/out.*tercera|sacaron.*tercera|eliminado.*tercera|out.*en.*tercera/.test(text);
+    const isSeg =/out.*segunda|sacaron.*segunda|eliminado.*segunda|out.*en.*segunda/.test(text);
+    if(isHome||isTer||isSeg){
+      const posNums=extractOutPositions(text);
+      const chain=posNums.join('-');
+      const baseLbl=isHome?'Home':isTer?'3ª':'2ª';
+      const sym=chain||(isHome?'OUTH':isTer?'OUT3':'OUT2');
+      const csBase=PLAY_CATALOG.outs.find(p=>p.id==='CS');
+      matched={...csBase,sym,label:`Out en ${baseLbl}${chain?' '+chain:''}`,type:'out',ab:false};
+    }
+  }
+
+  // Extraer posiciones numéricas "N al M [al P]" y aplicarlas al símbolo del out
+  if(matched && matched.type==='out'){
+    const posNums=extractOutPositions(text);
+    if(posNums.length>=2){
+      const posSym=posNums.join('-');
+      let newSym=null;
+      if(matched.sym==='SH')                              newSym=`SH ${posSym}`;
+      else if(matched.sym==='SF')                         newSym=`SF ${posSym}`;
+      else if(matched.sym==='RD')                         newSym=`RD ${posSym}`;
+      else if(matched.sym==='CS')                         newSym=`CS ${posSym}`;
+      else if(matched.id&&matched.id.startsWith('DP'))    newSym=`DP ${posSym}`;
+      else                                                newSym=posSym;
+      if(newSym) matched={...matched,sym:newSym,label:newSym};
+    }
   }
 
   if(matched){
