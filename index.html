@@ -254,7 +254,7 @@
   .chat-send-btn { width:38px; height:38px; border-radius:50%; border:none; background:var(--amber); color:#071018; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; transition:opacity .15s; padding:0; }
   .chat-send-btn:hover { opacity:.82; }
   /* ── FLOATING SBF COUNTER ───────────────────────────────── */
-  #sbf-float { position:fixed; bottom:90px; right:16px; z-index:250; background:#0c1928; border:1.5px solid rgba(0,191,255,.35); border-radius:20px; padding:10px 12px; display:none; flex-direction:column; gap:7px; box-shadow:0 8px 32px rgba(0,0,0,.8); min-width:128px; user-select:none; touch-action:none; }
+  #sbf-float { position:fixed; bottom:90px; right:16px; z-index:9999; background:#0c1928; border:1.5px solid rgba(0,191,255,.35); border-radius:20px; padding:10px 12px; display:none; flex-direction:column; gap:7px; box-shadow:0 8px 32px rgba(0,0,0,.8); min-width:128px; user-select:none; touch-action:none; }
   #sbf-float.visible { display:flex; }
   .sbf-handle { display:flex; align-items:center; justify-content:space-between; cursor:grab; padding:2px 0; }
   .sbf-handle:active { cursor:grabbing; }
@@ -1240,6 +1240,16 @@ function drawDiamond(play){
 // ─── SELECCIÓN DE CELDA ───────────────────────────────────
 let selCell=null;
 function selectCell(team,pidx,inn,td){
+  // Reset S/B/F SIEMPRE, sin excepción, antes de cualquier return
+  const pitchTeam=team==='v'?'l':'v';
+  sbfTeam=pitchTeam;
+  const _sbfBtn=document.getElementById('sbf-team-btn');
+  if(_sbfBtn){ _sbfBtn.textContent=pitchTeam.toUpperCase(); _sbfBtn.className='sbf-team-btn'+(pitchTeam==='l'?' l':''); }
+  gs.pitchAB[pitchTeam]={s:0,b:0,f:0,history:[]};
+  unlockPitchButtons(pitchTeam);
+  ['s','b','f'].forEach(t=>{ const b=document.getElementById(`sbf-btn-${t}`); if(b) b.disabled=false; });
+  sbfRefresh();
+
   const pl=gs.plays[team][pidx][inn];
   if(pl && pl.type!=='out' && pl.type!=='clear' && !pl.scored && !pl.runnerOut){
     showRunnerModal(team,pidx,inn); return;
@@ -1254,15 +1264,6 @@ function selectCell(team,pidx,inn,td){
   const p=gs.teams[team].players[pidx];
   document.getElementById('selinfo').innerHTML=`<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
   document.getElementById('reg-btn').disabled=false;
-  // Cambio 18: resetear S/B/F — actualizar sbfTeam ANTES de resetPitchAB
-  // para que resetPitchAB → sbfRefresh() opere sobre el equipo correcto
-  const pitchTeam=team==='v'?'l':'v';
-  if(typeof sbfTeam!=='undefined'){
-    sbfTeam=pitchTeam;
-    const sbfBtn=document.getElementById('sbf-team-btn');
-    if(sbfBtn){ sbfBtn.textContent=pitchTeam.toUpperCase(); sbfBtn.className='sbf-team-btn'+(pitchTeam==='l'?' l':''); }
-  }
-  resetPitchAB(pitchTeam); // ahora sbfTeam===pitchTeam → sbfRefresh() se ejecuta siempre
 }
 
 function openModalForSelected(){
@@ -3376,40 +3377,47 @@ function sbfToggleTeam(){
 function sbfAdd(type){ addPitch(sbfTeam,type); }
 function sbfUndo(){ undoPitch(sbfTeam); }
 
-// Drag logic
+// Drag lógica — mouse y touch, todo el handle, diferencia click vs drag
 (function(){
-  let el=null,ox=0,oy=0,sx=0,sy=0;
+  let dragging=false, el=null, ox=0,oy=0,sx=0,sy=0, moved=false;
   function getXY(e){ return e.touches?e.touches[0]:e; }
+
   function onDown(e){
-    if(e.target.tagName==='BUTTON') return;
     e.preventDefault();
     el=document.getElementById('sbf-float');
     const r=el.getBoundingClientRect();
     sx=r.left; sy=r.top;
-    const p=getXY(e);
-    ox=p.clientX; oy=p.clientY;
     el.style.right='auto'; el.style.bottom='auto';
     el.style.left=sx+'px'; el.style.top=sy+'px';
+    const p=getXY(e);
+    ox=p.clientX; oy=p.clientY;
+    moved=false; dragging=true;
     document.addEventListener('mousemove',onMove);
     document.addEventListener('mouseup',onUp);
     document.addEventListener('touchmove',onMove,{passive:false});
     document.addEventListener('touchend',onUp);
   }
+
   function onMove(e){
-    if(!el) return;
+    if(!dragging||!el) return;
     e.preventDefault();
     const p=getXY(e);
-    const nx=Math.max(0,Math.min(window.innerWidth-el.offsetWidth, sx+(p.clientX-ox)));
-    const ny=Math.max(0,Math.min(window.innerHeight-el.offsetHeight, sy+(p.clientY-oy)));
+    const dx=p.clientX-ox, dy=p.clientY-oy;
+    if(Math.abs(dx)>4||Math.abs(dy)>4) moved=true;
+    if(!moved) return;
+    const nx=Math.max(0,Math.min(window.innerWidth-el.offsetWidth, sx+dx));
+    const ny=Math.max(0,Math.min(window.innerHeight-el.offsetHeight, sy+dy));
     el.style.left=nx+'px'; el.style.top=ny+'px';
   }
-  function onUp(){
-    el=null;
+
+  function onUp(e){
+    dragging=false; el=null;
     document.removeEventListener('mousemove',onMove);
     document.removeEventListener('mouseup',onUp);
     document.removeEventListener('touchmove',onMove);
     document.removeEventListener('touchend',onUp);
   }
+
   document.addEventListener('DOMContentLoaded',()=>{
     const h=document.getElementById('sbf-handle');
     if(h){
