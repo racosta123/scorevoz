@@ -1195,11 +1195,12 @@ function drawDiamond(play){
 let selCell=null;
 function selectCell(team,pidx,inn,td){
   // Reset S/B/F SIEMPRE, sin excepción, antes de cualquier return
-  const pitchTeam=team==='v'?'l':'v';
-  gs.pitchAB[pitchTeam]={s:0,b:0,f:0,history:[]};
+  gs.pitchAB['v']={s:0,b:0,f:0,history:[]};
+  gs.pitchAB['l']={s:0,b:0,f:0,history:[]};
   unlockPitchButtons('v');
   unlockPitchButtons('l');
-  updatePitchABDisplay(pitchTeam);
+  updatePitchABDisplay('v');
+  updatePitchABDisplay('l');
 
   const pl=gs.plays[team][pidx][inn];
   if(pl && pl.type!=='out' && pl.type!=='clear' && !pl.scored && !pl.runnerOut){
@@ -1383,9 +1384,7 @@ function applyPlay(team,pidx,inn,play){
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
   updateScores();
-  // Resetear contador del pitcher contrario
-  const oppTeam=team==='v'?'l':'v';
-  resetPitchAB(oppTeam);
+  resetPitchAB();
   showToast(`✓ ${play.label}`);
   // Auto-avanzar solo cuando es turno al bate real (no movimiento de corredor)
   if(play.type!=='score') autoAdvance(team,pidx,inn);
@@ -2244,10 +2243,13 @@ function updatePitchABDisplay(team){
   if(el) el.innerHTML=`S: ${ab.s}<br>B: ${ab.b}<br>F: ${ab.f}`;
 }
 
-function resetPitchAB(pitcherTeam){
-  gs.pitchAB[pitcherTeam]={s:0,b:0,f:0,history:[]};
-  unlockPitchButtons(pitcherTeam);
-  updatePitchABDisplay(pitcherTeam);
+function resetPitchAB(){
+  gs.pitchAB['v']={s:0,b:0,f:0,history:[]};
+  gs.pitchAB['l']={s:0,b:0,f:0,history:[]};
+  unlockPitchButtons('v');
+  unlockPitchButtons('l');
+  updatePitchABDisplay('v');
+  updatePitchABDisplay('l');
 }
 
 function getCurrentPitcherName(team){
