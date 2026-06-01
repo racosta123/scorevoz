@@ -1109,6 +1109,9 @@ function drawDiamond(play){
   // PRO: color según sistema latinoamericano
   function proLineColor(p){
     if(!p) return 'var(--green)';
+    if(p.runNote==='SB'||p.runNote==='SBH') return 'var(--red)';
+    if(p.runNote==='E')  return 'var(--amber)';
+    if(p.runNote==='WP') return 'rgba(200,215,230,0.65)';
     if(p.type==='hit') return 'var(--red)';
     if(p.type==='walk') return 'var(--cyan)';
     if(p.type==='error') return 'var(--amber)';
@@ -1167,7 +1170,10 @@ function drawDiamond(play){
   }
 
   if(p && p.runnerOut){
-    s+=`<circle cx="27" cy="27" r="9" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="3 2" opacity="0.7"/>`;
+    if(p.csOut)
+      s+=`<circle cx="27" cy="27" r="9" fill="none" stroke="var(--red)" stroke-width="1.8" opacity="0.85"/>`;
+    else
+      s+=`<circle cx="27" cy="27" r="9" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="3 2" opacity="0.7"/>`;
   }
 
   // Carrera anotada: PRO → mitad rellena=limpia / completo rellena=sucia
@@ -1187,7 +1193,7 @@ function drawDiamond(play){
 
   if(p && p.sym && p.type!=='clear'){
     const cls = p.type==='out'?'out-lbl':p.type==='hit'?'hit-lbl':p.type==='walk'?'walk-lbl':'other-lbl';
-    s+=`<div class="play-lbl ${cls}">${p.sym}</div>`;
+    s+=`<div class="play-lbl ${cls}">${p.runNote||p.sym}</div>`;
   }
   return s;
 }
@@ -1275,28 +1281,51 @@ function showRunnerModal(team,pidx,inn){
   const grid=document.createElement('div');
   grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px';
 
-  const scoreMoves = appMode==='pro'
-    ? [{a:'score-earned',   lbl:'🏠 Limpia',  show:true, cls:'run-btn-score', full:false},
-       {a:'score-unearned', lbl:'🏠 Sucia',   show:true, cls:'run-btn-score', full:false}]
-    : [{a:'score',          lbl:'🏠 Anotó',   show:true, cls:'run-btn-score', full:true}];
-  const moves=[
-    {a:'to2',  lbl:'▶ Avanzó a 2ª',  show:pl.bases<2, cls:'run-btn-adv',  full:false},
-    {a:'to3',  lbl:'▶▶ Avanzó a 3ª', show:pl.bases<3, cls:'run-btn-adv',  full:false},
-    ...scoreMoves,
-    {a:'out2', lbl:'✕ Out en 2ª',     show:pl.bases<2, cls:'run-btn-out',  full:false},
-    {a:'out3', lbl:'✕ Out en 3ª',     show:pl.bases<3, cls:'run-btn-out',  full:false},
-    {a:'outH', lbl:'✕ Out en Home',   show:true,       cls:'run-btn-out',  full:false},
-    {a:'back', lbl:'↩ Regresó',       show:true,       cls:'run-btn-back', full:true},
-  ];
-  moves.filter(m=>m.show).forEach(m=>{
-    const btn=document.createElement('button');
-    btn.className=`run-btn ${m.cls}`;
-    btn.textContent=m.lbl;
-    if(m.full) btn.style.gridColumn='1/-1';
-    btn.onclick=()=>{ applyRunnerMove(team,pidx,inn,m.a); closeModal(); };
-    grid.appendChild(btn);
-  });
-  body.appendChild(grid);
+  const nb=pl.bases<3?pl.bases+1:4;
+  const nbN={2:'2ª',3:'3ª',4:'Home'}[nb];
+
+  const mkBtn=(lbl,cls,action,full)=>{
+    const b=document.createElement('button');
+    b.className=`run-btn ${cls}`; b.textContent=lbl;
+    if(full) b.style.gridColumn='1/-1';
+    b.onclick=()=>{ applyRunnerMove(team,pidx,inn,action); closeModal(); };
+    return b;
+  };
+  const sec=(txt)=>{
+    const d=document.createElement('div');
+    d.className='modal-section'; d.style.marginTop='10px'; d.textContent=txt;
+    return d;
+  };
+
+  // ── AVANZAR ──────────────────────────────────────────────
+  body.appendChild(sec('AVANZAR'));
+  const gAdv=document.createElement('div'); gAdv.className='play-buttons'; body.appendChild(gAdv);
+  gAdv.appendChild(mkBtn(`⚡ Robó ${nbN} (SB)`,        'run-btn-adv', 'rob',    false));
+  gAdv.appendChild(mkBtn(`⚠ Error → ${nbN}`,           'run-btn-adv', 'err',    false));
+  gAdv.appendChild(mkBtn(`🌀 WP / PB / Balk → ${nbN}`, 'run-btn-adv', 'wp',     false));
+  if(pl.bases<3) gAdv.appendChild(mkBtn('▶▶ Avanzó a 3ª','run-btn-adv','to3',  false));
+
+  // ── ANOTAR ───────────────────────────────────────────────
+  body.appendChild(sec('ANOTAR'));
+  const gScr=document.createElement('div'); gScr.className='play-buttons'; body.appendChild(gScr);
+  if(appMode==='pro'){
+    gScr.appendChild(mkBtn('🏠 Limpia',  'run-btn-score','score-earned',  false));
+    gScr.appendChild(mkBtn('🏠 Sucia',   'run-btn-score','score-unearned',false));
+  } else {
+    const sa=mkBtn('🏠 Anotó','run-btn-score','score',true); gScr.appendChild(sa);
+  }
+
+  // ── OUTS ─────────────────────────────────────────────────
+  body.appendChild(sec('OUTS'));
+  const gOut=document.createElement('div'); gOut.className='play-buttons'; body.appendChild(gOut);
+  gOut.appendChild(mkBtn('✕ Out robando (CS)',   'run-btn-out','cs',     false));
+  gOut.appendChild(mkBtn('✕ Out por revire (PO)','run-btn-out','po',     false));
+  gOut.appendChild(mkBtn('✕ Out al avanzar',     'run-btn-out','outAdv', true));
+
+  // ── OTROS ────────────────────────────────────────────────
+  body.appendChild(sec('OTROS'));
+  const gOtr=document.createElement('div'); gOtr.className='play-buttons'; body.appendChild(gOtr);
+  gOtr.appendChild(mkBtn('↩ Regresó','run-btn-back','back',true));
 
   if('webkitSpeechRecognition' in window||'SpeechRecognition' in window){
     const micBtn=document.createElement('button');
@@ -1482,7 +1511,7 @@ function countOutsInInning(team,inn){
   let outs=0;
   gs.teams[team].players.forEach((_,i)=>{
     const pl=(gs.plays[team][i]||{})[inn];
-    if(pl && pl.type==='out') outs++;
+    if(pl && (pl.type==='out' || pl.csOut)) outs++;
   });
   return outs;
 }
