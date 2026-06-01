@@ -1522,7 +1522,7 @@ function updateStats(team,pidx){
     if(p.ab) ab++;
     if(p.h)  h++;
     if(p.type==='walk') bb++;
-    if(p.sym==='KS'||p.sym==='KL') k++;
+    if(p.sym==='KS'||p.sym==='KL'||p.sym==='KC'||p.sym==='KC 2-3') k++;
     if(p.rbi) rbi+=p.rbi;
   });
   const avg=ab>0?(h/ab).toFixed(3).replace('0.','.'):'.000';
@@ -1954,7 +1954,7 @@ function openNumeritos(){
       if(p.scored) r++;
       if(p.sym==='BB'||p.sym==='BBI') bb++;
       if(p.sym==='BG') hbp++;
-      if(p.sym==='KS'||p.sym==='KL') k++;
+      if(p.sym==='KS'||p.sym==='KL'||p.sym==='KC'||p.sym==='KC 2-3') k++;
       if(p.sym==='SB') sb++;
       if(p.sym==='SF') sf++;
       if(p.rbi) rbi+=p.rbi;
@@ -2007,7 +2007,7 @@ function openNumeritos(){
           if(!p) return;
           if(p.h) h++; if(p.scored) r++;
           if(p.sym==='BB'||p.sym==='BBI') bb++;
-          if(p.sym==='KS'||p.sym==='KL') k++;
+          if(p.sym==='KS'||p.sym==='KL'||p.sym==='KC'||p.sym==='KC 2-3') k++;
           if(p.sym==='HR'||p.sym==='IHR') hr++;
         }
       });
@@ -2264,7 +2264,7 @@ function addPitch(team,type){
   const el=document.getElementById(`pc-total-${team}`);
   if(el) el.textContent=gs.pitchCount[team].total;
   // Auto-lock
-  if(ab.s>=3){ lockPitchButtons(team); showToast('⛔ 3 strikes — registra la jugada'); }
+  if(ab.s>=3){ lockPitchButtons(team); showStrikeoutMenu(team); }
   else if(ab.b>=4){ lockPitchButtons(team); showToast('⛔ 4 bolas — registra BB/BBI'); }
   updatePitchABDisplay(team);
 }
@@ -2304,6 +2304,53 @@ function resetPitchAB(){
   unlockPitchButtons('l');
   updatePitchABDisplay('v');
   updatePitchABDisplay('l');
+}
+
+function showStrikeoutMenu(team){
+  if(!gs.selected||gs.selected.team!==team){
+    showToast('⚠️ Selecciona la casilla del bateador primero',true); return;
+  }
+  const {pidx,inn}=gs.selected;
+  const pl=gs.teams[team].players[pidx];
+  document.getElementById('mtitle').textContent=`PONCHE — ${pl.name} · E${inn}`;
+  const body=document.getElementById('mbody'); body.innerHTML='';
+  const sec=document.createElement('div'); sec.className='modal-section';
+  sec.textContent='TIPO DE PONCHE'; body.appendChild(sec);
+  const grid=document.createElement('div'); grid.className='play-buttons'; body.appendChild(grid);
+  const KS=PLAY_CATALOG.outs.find(p=>p.id==='KS');
+  const KL=PLAY_CATALOG.outs.find(p=>p.id==='KL');
+  const mk=(text,cls,fn)=>{
+    const b=document.createElement('button');
+    b.className=`play-btn ${cls}`; b.textContent=text; b.onclick=fn; grid.appendChild(b);
+  };
+  mk('K ⚾ Ponche tirándole', 'out-btn',()=>{ closeModal(); applyPlay(team,pidx,inn,KS); });
+  mk('KL Ponche sin tirarle','out-btn',()=>{ closeModal(); applyPlay(team,pidx,inn,KL); });
+  mk('K Ponche corrido',     '',       ()=>showKCorridoMenu(team,pidx,inn));
+  document.getElementById('modal').classList.add('show');
+}
+
+function showKCorridoMenu(team,pidx,inn){
+  const pl=gs.teams[team].players[pidx];
+  document.getElementById('mtitle').textContent=`PONCHE CORRIDO — ${pl.name} · E${inn}`;
+  const body=document.getElementById('mbody'); body.innerHTML='';
+  const back=document.createElement('button');
+  back.className='play-btn'; back.textContent='← Volver';
+  back.style.marginBottom='8px';
+  back.onclick=()=>showStrikeoutMenu(team);
+  body.appendChild(back);
+  const sec=document.createElement('div'); sec.className='modal-section';
+  sec.textContent='RESULTADO'; body.appendChild(sec);
+  const grid=document.createElement('div'); grid.className='play-buttons'; body.appendChild(grid);
+  const mk=(text,cls,play)=>{
+    const b=document.createElement('button');
+    b.className=`play-btn ${cls}`; b.textContent=text;
+    b.onclick=()=>{ closeModal(); applyPlay(team,pidx,inn,play); };
+    grid.appendChild(b);
+  };
+  mk('✅ Safe en 1ª',      'hit-btn',
+    {id:'KC',  sym:'KC',     bases:1, type:'reach', ab:true, h:false, label:'K corrido → 1ª'});
+  mk('❌ Out en 1ª (2-3)','out-btn',
+    {id:'KC23',sym:'KC 2-3', bases:0, type:'out',   ab:true, h:false, label:'K corrido 2-3'});
 }
 
 function getCurrentPitcherName(team){
@@ -2482,7 +2529,7 @@ function showPlayerFicha(team,pidx){
     if(pl.scored) r++;
     if(pl.sym==='BB'||pl.sym==='BBI') bb++;
     if(pl.sym==='BG') hbp++;
-    if(pl.sym==='KS'||pl.sym==='KL') k++;
+    if(pl.sym==='KS'||pl.sym==='KL'||pl.sym==='KC'||pl.sym==='KC 2-3') k++;
     if(pl.sym==='SB') sb++;
     if(pl.sym==='SF') sf++;
     if(pl.rbi) rbi+=pl.rbi;
@@ -2622,7 +2669,7 @@ function downloadPlayerFichaPDF(team,pidx){
     if(pl.scored) r++;
     if(pl.sym==='BB'||pl.sym==='BBI') bb++;
     if(pl.sym==='BG') hbp++;
-    if(pl.sym==='KS'||pl.sym==='KL') k++;
+    if(pl.sym==='KS'||pl.sym==='KL'||pl.sym==='KC'||pl.sym==='KC 2-3') k++;
     if(pl.sym==='SB') sb++;
     if(pl.sym==='SF') sf++;
     if(pl.rbi) rbi+=pl.rbi;
