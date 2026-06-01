@@ -256,6 +256,9 @@
   .chat-mic-btn.recording { border-color:var(--red); background:rgba(255,77,103,.28); animation:pulse-red .7s infinite; }
   .chat-send-btn { width:38px; height:38px; border-radius:50%; border:none; background:var(--amber); color:#071018; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; transition:opacity .15s; padding:0; }
   .chat-send-btn:hover { opacity:.82; }
+  /* ── UNDO BUTTON ────────────────────────────────────────── */
+  .btn-undo-play { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); border-radius:10px; color:#8fa3b7; font-family:'Bebas Neue',sans-serif; font-size:0.95rem; letter-spacing:1px; padding:7px 14px; cursor:pointer; transition:all .15s; white-space:nowrap; align-self:center; }
+  .btn-undo-play:hover { border-color:var(--amber); color:var(--amber); background:rgba(255,182,72,.08); }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
@@ -439,6 +442,7 @@
         <button class="btn-pc btn-pc-f" id="pc-btn-f-l" onclick="addPitch('l','fouls')">F</button>
         <button class="btn-pc btn-pc-undo" id="pc-btn-undo-l" onclick="undoPitch('l')" title="Deshacer último pitch">←</button>
       </div>
+      <button class="btn-undo-play" onclick="undoLastPlay()" title="Deshacer última jugada registrada">↩ DESHACER</button>
     </div>
     <div class="game-layout">
       <div class="team-panel">
@@ -533,7 +537,8 @@ let gs = {
     A:[{name:'Carlos'},{name:'Miguel'},{name:'Juan'},{name:'Diego'},{name:'Pedro'},{name:'Fernando'},{name:'Roberto'},{name:'Luis'},{name:'Andrés'}],
     B:[{name:'Alberto'},{name:'Javier'},{name:'Ricardo'},{name:'Sergio'},{name:'Raúl'},{name:'Enrique'},{name:'Gustavo'},{name:'Héctor'},{name:'Óscar'}]
   },
-  currentBatter:{ v:0, l:0 }
+  currentBatter:{ v:0, l:0 },
+  playHistory:[]
 };
 
 // ─── CATÁLOGO OFICIAL DE JUGADAS ───────────────────────────
@@ -993,6 +998,7 @@ function startGame(){
     }
   });
   gs.currentBatter = { v:0, l:0 };
+  gs.playHistory = [];
   document.getElementById('setup-screen').style.display='none';
   document.getElementById('game-screen').style.display='block';
   document.getElementById('vpanel').style.display='flex';
@@ -1512,10 +1518,24 @@ function applyPlay(team,pidx,inn,play){
   resetPitchAB();
   showToast(runSummary?`✓ ${play.label} · ${runSummary}`:`✓ ${play.label}`);
   if(play.type!=='score' && play.type!=='clear'){
+    gs.playHistory.push({team, pidx, inn});
     gs.currentBatter[team]=(gs.currentBatter[team]+1)%(gs.teams[team].players.length||9);
   }
   // Auto-avanzar solo cuando es turno al bate real (no movimiento de corredor)
   if(play.type!=='score') autoAdvance(team,pidx,inn);
+}
+
+// ─── DESHACER ÚLTIMA JUGADA ───────────────────────────────
+function undoLastPlay(){
+  if(!gs.playHistory.length){ showToast('⚠️ No hay jugadas para deshacer',true); return; }
+  const {team,pidx,inn}=gs.playHistory.pop();
+  delete gs.plays[team][pidx][inn];
+  const n=gs.teams[team].players.length||9;
+  gs.currentBatter[team]=(gs.currentBatter[team]-1+n)%n;
+  refreshCell(team,pidx,inn);
+  gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
+  updateScores();
+  showToast('↩ Jugada deshecha');
 }
 
 // ─── AVANCE AUTOMÁTICO (cambio 19) ────────────────────────
@@ -1745,6 +1765,8 @@ function extractOutPositions(text){
 
 function interpretVoice(text){
   document.getElementById('vtr').textContent=`"${text}"`;
+  if(/deshacer|undo|borra(r)?\s+últ/.test(text)){ undoLastPlay(); return; }
+  if(!gs.selected){ showToast('⚠️ Selecciona una casilla primero',true); return; }
   const {team,pidx,inn}=gs.selected;
   let matched=null;
 
