@@ -1385,15 +1385,18 @@ function advanceRunners(team,pidx,inn,play){
   const moved=[];
   const nm=i=>gs.teams[team].players[i].name;
   const bNames=['','1ª','2ª','3ª'];
+  let rbiCount=0;
 
   function score(r){
-    r.play.bases=Math.max(r.play.bases,3);
-    r.play.scored=true;
+    const pl=gs.plays[team][r.pidx][inn];
+    pl.bases=Math.max(pl.bases,3);
+    pl.scored=true;
     refreshCell(team,r.pidx,inn);
+    rbiCount++;
     moved.push(nm(r.pidx)+' anotó');
   }
   function adv(r,to){
-    r.play.bases=to;
+    gs.plays[team][r.pidx][inn].bases=to;
     refreshCell(team,r.pidx,inn);
     moved.push(nm(r.pidx)+' →'+bNames[to]);
   }
@@ -1411,6 +1414,8 @@ function advanceRunners(team,pidx,inn,play){
     if(st.second) score(st.second);
     if(st.first)  score(st.first);
   }
+  if(b===4) rbiCount++;  // HR: el bateador se impulsa a sí mismo
+  if(rbiCount>0) gs.plays[team][pidx][inn].rbi=(gs.plays[team][pidx][inn].rbi||0)+rbiCount;
 
   return moved.join(' · ');
 }
@@ -1518,17 +1523,7 @@ function updateStats(team,pidx){
     if(p.h)  h++;
     if(p.type==='walk') bb++;
     if(p.sym==='KS'||p.sym==='KL') k++;
-    // RBI: carreras que este bateador impulsó en esta entrada.
-    // Si su jugada no fue un out, cuenta los corredores anteriores en el orden
-    // de bateo (índice < pidx) que anotaron en la misma entrada.
-    // Un jonrón (play.scored + type==='hit') también se impulsa a sí mismo.
-    if(p.type!=='out'&&p.type!=='clear'){
-      if(p.scored&&p.type==='hit') rbi++; // jonrón: se impulsa a sí mismo
-      for(let j=0;j<pidx;j++){
-        const jp=(gs.plays[team][j]||{})[inn];
-        if(jp&&jp.scored) rbi++;
-      }
-    }
+    if(p.rbi) rbi+=p.rbi;
   });
   const avg=ab>0?(h/ab).toFixed(3).replace('0.','.'):'.000';
   const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
@@ -1962,13 +1957,7 @@ function openNumeritos(){
       if(p.sym==='KS'||p.sym==='KL') k++;
       if(p.sym==='SB') sb++;
       if(p.sym==='SF') sf++;
-      if(p.type!=='out'&&p.type!=='clear'){
-        if(p.scored&&p.type==='hit') rbi++;
-        for(let j=0;j<pidx;j++){
-          const jp=(gs.plays[team][j]||{})[inn];
-          if(jp&&jp.scored) rbi++;
-        }
-      }
+      if(p.rbi) rbi+=p.rbi;
     });
     const s1=Math.max(0,h-d2-d3-hr);
     const tb=s1+d2*2+d3*3+hr*4;
@@ -2496,13 +2485,7 @@ function showPlayerFicha(team,pidx){
     if(pl.sym==='KS'||pl.sym==='KL') k++;
     if(pl.sym==='SB') sb++;
     if(pl.sym==='SF') sf++;
-    if(pl.type!=='out'&&pl.type!=='clear'){
-      if(pl.scored&&pl.type==='hit') rbi++;
-      for(let j=0;j<pidx;j++){
-        const jp=(gs.plays[team][j]||{})[inn];
-        if(jp&&jp.scored) rbi++;
-      }
-    }
+    if(pl.rbi) rbi+=pl.rbi;
   });
   const s1=Math.max(0,h-d2-d3-hr);
   const tb=s1+d2*2+d3*3+hr*4;
@@ -2642,13 +2625,7 @@ function downloadPlayerFichaPDF(team,pidx){
     if(pl.sym==='KS'||pl.sym==='KL') k++;
     if(pl.sym==='SB') sb++;
     if(pl.sym==='SF') sf++;
-    if(pl.type!=='out'&&pl.type!=='clear'){
-      if(pl.scored&&pl.type==='hit') rbi++;
-      for(let j=0;j<pidx;j++){
-        const jp=(gs.plays[team][j]||{})[inn];
-        if(jp&&jp.scored) rbi++;
-      }
-    }
+    if(pl.rbi) rbi+=pl.rbi;
   });
   const s1=Math.max(0,h-d2-d3-hr);
   const tb=s1+d2*2+d3*3+hr*4;
