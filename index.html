@@ -1378,6 +1378,33 @@ function computeBaseState(team,inn,excludePidx){
 
 // ─── AVANCE AUTOMÁTICO DE CORREDORES EN HITS ─────────────
 function advanceRunners(team,pidx,inn,play){
+  // ── Bases por bola: avance forzado ──────────────────────
+  if(play.type==='walk'){
+    const st=computeBaseState(team,inn,pidx);
+    const moved=[];
+    const nm=i=>gs.teams[team].players[i].name;
+    let rbiCount=0;
+    const scoreW=r=>{
+      const pl=gs.plays[team][r.pidx][inn];
+      pl.bases=3; pl.scored=true;
+      refreshCell(team,r.pidx,inn);
+      rbiCount++; moved.push(nm(r.pidx)+' anotó');
+    };
+    const advW=(r,to)=>{
+      gs.plays[team][r.pidx][inn].bases=to;
+      refreshCell(team,r.pidx,inn);
+      moved.push(nm(r.pidx)+' →'+['','1ª','2ª','3ª'][to]);
+    };
+    if(st.first){
+      if(st.second){
+        if(st.third) scoreW(st.third);
+        advW(st.second,3);
+      }
+      advW(st.first,2);
+    }
+    if(rbiCount>0) gs.plays[team][pidx][inn].rbi=(gs.plays[team][pidx][inn].rbi||0)+rbiCount;
+    return moved.join(' · ');
+  }
   if(play.type!=='hit') return '';
   const b=play.bases===4?4:(play.bases||0);
   if(!b) return '';
