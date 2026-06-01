@@ -528,7 +528,12 @@ let gs = {
   pitchCount:{ v:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}}, l:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}} },
   pitchAB:{ v:{s:0,b:0,f:0,history:[]}, l:{s:0,b:0,f:0,history:[]} },
   selected:null,
-  lang:'es-MX'
+  lang:'es-MX',
+  lineups:{
+    A:[{name:'Carlos'},{name:'Miguel'},{name:'Juan'},{name:'Diego'},{name:'Pedro'},{name:'Fernando'},{name:'Roberto'},{name:'Luis'},{name:'Andrés'}],
+    B:[{name:'Alberto'},{name:'Javier'},{name:'Ricardo'},{name:'Sergio'},{name:'Raúl'},{name:'Enrique'},{name:'Gustavo'},{name:'Héctor'},{name:'Óscar'}]
+  },
+  currentBatter:{ v:0, l:0 }
 };
 
 // ─── CATÁLOGO OFICIAL DE JUGADAS ───────────────────────────
@@ -943,6 +948,7 @@ function applySubstitution(team,outPidx,inName,inPos){
 function buildSetup(t) {
   const c = document.getElementById(`pl-${t}`);
   c.innerHTML = '';
+  const lineup = t==='v' ? gs.lineups.A : gs.lineups.B;
   for(let i=1;i<=9;i++){
     const d = document.createElement('div');
     d.className = 'players-grid'; d.style.marginBottom='4px';
@@ -955,6 +961,7 @@ function buildSetup(t) {
         ontouchstart="setupRowPttStart('${t}',${i},event)" ontouchend="setupRowPttEnd(event)"
         ontouchcancel="setupRowPttEnd(event)" title="Mantén: di nombre al número">🎤</button>`;
     c.appendChild(d);
+    if(lineup[i-1]) document.getElementById(`p-${t}-${i}`).value = lineup[i-1].name;
   }
 }
 buildSetup('v'); buildSetup('l');
@@ -963,9 +970,10 @@ function startGame(){
   ['v','l'].forEach(t=>{
     gs.teams[t].name = (document.getElementById(`tn-${t}`).value.trim()||( t==='v'?'VISITANTE':'LOCAL')).toUpperCase();
     const pl=[];
+    const lineup = t==='v' ? gs.lineups.A : gs.lineups.B;
     for(let i=1;i<=9;i++){
       pl.push({
-        name:(document.getElementById(`p-${t}-${i}`).value.trim()||`JUGADOR ${i}`).toUpperCase(),
+        name:(document.getElementById(`p-${t}-${i}`).value.trim()||(lineup[i-1]?lineup[i-1].name:`JUGADOR ${i}`)).toUpperCase(),
         pos:(document.getElementById(`o-${t}-${i}`).value.trim()||'—').toUpperCase(),
         bat:i
       });
@@ -984,6 +992,7 @@ function startGame(){
       gs.plays[t][idx]={};
     }
   });
+  gs.currentBatter = { v:0, l:0 };
   document.getElementById('setup-screen').style.display='none';
   document.getElementById('game-screen').style.display='block';
   document.getElementById('vpanel').style.display='flex';
@@ -1502,6 +1511,9 @@ function applyPlay(team,pidx,inn,play){
   updateScores();
   resetPitchAB();
   showToast(runSummary?`✓ ${play.label} · ${runSummary}`:`✓ ${play.label}`);
+  if(play.type!=='score' && play.type!=='clear'){
+    gs.currentBatter[team]=(gs.currentBatter[team]+1)%(gs.teams[team].players.length||9);
+  }
   // Auto-avanzar solo cuando es turno al bate real (no movimiento de corredor)
   if(play.type!=='score') autoAdvance(team,pidx,inn);
 }
@@ -1553,6 +1565,7 @@ function autoAdvance(team,pidx,inn){
     nextTeam=team; nextInn=inn;
     nextPidx=findNextEmptyBatter(team,pidx,inn);
   }
+  gs.currentBatter[nextTeam]=nextPidx;
   const nextTd=document.getElementById(`c-${nextTeam}-${nextPidx}-${nextInn}`);
   if(!nextTd) return;
   setTimeout(()=>{
