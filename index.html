@@ -1048,6 +1048,7 @@ function setInning(n){
   document.querySelectorAll('.inn-btn').forEach(b=>b.classList.remove('current'));
   const b=document.getElementById(`ib${n}`); if(b) b.classList.add('current');
   highlightInn();
+  if(typeof updateBattingTeamButtons==='function') updateBattingTeamButtons();
 }
 function addExtra(){
   INNINGS++;
@@ -1223,6 +1224,7 @@ function selectCell(team,pidx,inn,td){
   unlockPitchButtons('l');
   updatePitchABDisplay('v');
   updatePitchABDisplay('l');
+  updateBattingTeamButtons();
 
   const pl=gs.plays[team][pidx][inn];
   if(pl && pl.type!=='out' && pl.type!=='clear' && !pl.scored && !pl.runnerOut){
@@ -2399,26 +2401,52 @@ function openNumeritos(){
 
 // (función de reporte antiguo eliminada)
 
+// ─── EQUIPO AL BAT ────────────────────────────────────────
+function battingTeam(){ return (gs.currentInning||1)%2===1?'v':'l'; }
+
+function updateBattingTeamButtons(){
+  const batter=battingTeam(), fielder=batter==='v'?'l':'v';
+  ['s','b','f'].forEach(t=>{
+    const bEl=document.getElementById(`pc-btn-${t}-${fielder}`);
+    if(bEl) bEl.disabled=true;
+    const aEl=document.getElementById(`pc-btn-${t}-${batter}`);
+    if(aEl){
+      const ab=gs.pitchAB[batter];
+      aEl.disabled=(ab.s>=3||ab.b>=4);
+    }
+  });
+}
+
 // ─── CONTADOR DE LANZAMIENTOS ──────────────────────────────
 function addPitch(team,type){
-  gs.pitchCount[team].total++;
-  if(type) gs.pitchCount[team][type]++;
-  // Per-inning log (cambio 20)
+  const ab=gs.pitchAB[team];
   const logInn=gs.currentInning||1;
   if(!gs.pitchCount[team].inningLog) gs.pitchCount[team].inningLog={};
   if(!gs.pitchCount[team].inningLog[logInn]) gs.pitchCount[team].inningLog[logInn]={s:0,b:0,f:0};
-  const iMap={strikes:'s',balls:'b',fouls:'f'};
-  if(type && iMap[type]) gs.pitchCount[team].inningLog[logInn][iMap[type]]++;
-  // Per-AB counter
-  const ab=gs.pitchAB[team];
-  const tKey={strikes:'s',balls:'b',fouls:'f'}[type];
-  if(tKey){ ab[tKey]++; ab.history.push(type); }
-  // UI
+  gs.pitchCount[team].total++;
+  if(type==='fouls'){
+    gs.pitchCount[team].fouls++;
+    gs.pitchCount[team].inningLog[logInn].f++;
+    ab.f++;
+    if(ab.s<2){
+      ab.s++;                          // foul con <2 strikes cuenta como strike
+      ab.history.push('fouls-strike');
+    } else {
+      ab.history.push('fouls');        // foul con 2 strikes: solo foul, jamás K
+    }
+  } else if(type==='strikes'){
+    gs.pitchCount[team].strikes++;
+    gs.pitchCount[team].inningLog[logInn].s++;
+    ab.s++; ab.history.push('strikes');
+  } else if(type==='balls'){
+    gs.pitchCount[team].balls++;
+    gs.pitchCount[team].inningLog[logInn].b++;
+    ab.b++; ab.history.push('balls');
+  }
   const el=document.getElementById(`pc-total-${team}`);
   if(el) el.textContent=gs.pitchCount[team].total;
-  // Auto-lock
   if(ab.s>=3){ lockPitchButtons(team); showStrikeoutMenu(team); }
-  else if(ab.b>=4){ lockPitchButtons(team); showToast('⛔ 4 bolas — registra BB/BBI'); }
+  else if(ab.b>=4){ lockPitchButtons(team); autoWalk(team); }
   updatePitchABDisplay(team);
 }
 
@@ -2426,13 +2454,24 @@ function undoPitch(team){
   const ab=gs.pitchAB[team];
   if(!ab.history.length){ showToast('No hay pitch para deshacer',true); return; }
   const last=ab.history.pop();
-  const tKey={strikes:'s',balls:'b',fouls:'f'}[last];
-  if(tKey) ab[tKey]=Math.max(0,ab[tKey]-1);
   gs.pitchCount[team].total=Math.max(0,gs.pitchCount[team].total-1);
-  if(last) gs.pitchCount[team][last]=Math.max(0,gs.pitchCount[team][last]-1);
+  if(last==='fouls-strike'){
+    ab.f=Math.max(0,ab.f-1); ab.s=Math.max(0,ab.s-1);
+    gs.pitchCount[team].fouls=Math.max(0,gs.pitchCount[team].fouls-1);
+  } else if(last==='fouls'){
+    ab.f=Math.max(0,ab.f-1);
+    gs.pitchCount[team].fouls=Math.max(0,gs.pitchCount[team].fouls-1);
+  } else if(last==='strikes'){
+    ab.s=Math.max(0,ab.s-1);
+    gs.pitchCount[team].strikes=Math.max(0,gs.pitchCount[team].strikes-1);
+  } else if(last==='balls'){
+    ab.b=Math.max(0,ab.b-1);
+    gs.pitchCount[team].balls=Math.max(0,gs.pitchCount[team].balls-1);
+  }
   const el=document.getElementById(`pc-total-${team}`);
   if(el) el.textContent=gs.pitchCount[team].total;
   if(ab.s<3&&ab.b<4) unlockPitchButtons(team);
+  updateBattingTeamButtons();
   updatePitchABDisplay(team);
 }
 
@@ -2457,6 +2496,16 @@ function resetPitchAB(){
   unlockPitchButtons('l');
   updatePitchABDisplay('v');
   updatePitchABDisplay('l');
+  updateBattingTeamButtons();
+}
+
+function autoWalk(team){
+  if(!gs.selected||gs.selected.team!==team){
+    showToast('⚠️ Selecciona la casilla del bateador primero',true); return;
+  }
+  const {pidx,inn}=gs.selected;
+  const BB=PLAY_CATALOG.walks.find(p=>p.id==='BB');
+  applyPlay(team,pidx,inn,BB);
 }
 
 function showStrikeoutMenu(team){
