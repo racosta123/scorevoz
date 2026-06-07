@@ -1078,7 +1078,7 @@ function addInnCol(team,n){
     const tr=document.getElementById(`row-${team}-${idx}`);
     const stat=tr.querySelector('.stat-cell');
     const td=document.createElement('td'); td.className='dc'; td.id=`c-${team}-${idx}-${n}`;
-    td.innerHTML=drawDiamond(null); td.onclick=()=>selectCell(team,idx,n,td); td.ondblclick=()=>showModal(team,idx,n);
+    td.innerHTML=drawDiamond(null); td.onclick=()=>selectCell(team,idx,n,td); td.ondblclick=()=>handleCellDblClick(team,idx,n);
     tr.insertBefore(td,stat);
   });
 }
@@ -1104,7 +1104,7 @@ function buildScoresheets(){
       tr.innerHTML=`<td class="player-cell" id="pc-${t}-${idx}">${getPlayerCellInnerHTML(t,idx)}</td>`;
       for(let i=1;i<=INNINGS;i++){
         const td=document.createElement('td'); td.className='dc'; td.id=`c-${t}-${idx}-${i}`;
-        td.innerHTML=drawDiamond(null); td.onclick=()=>selectCell(t,idx,i,td); td.ondblclick=()=>showModal(t,idx,i);
+        td.innerHTML=drawDiamond(null); td.onclick=()=>selectCell(t,idx,i,td); td.ondblclick=()=>handleCellDblClick(t,idx,i);
         tr.appendChild(td);
       }
       ['ab','h','rbi','bb','k'].forEach(s=>{
@@ -1227,11 +1227,8 @@ function selectCell(team,pidx,inn,td){
     existingPl.type!=='out' && existingPl.type!=='clear' &&
     !existingPl.scored && !existingPl.runnerOut;
 
-  // ── MODO CORREDOR: hay bateador activo en el mismo equipo y se seleccionó corredor vivo ──
-  if(gs.activeBatter &&
-     gs.activeBatter.team===team &&
-     (gs.activeBatter.pidx!==pidx||gs.activeBatter.inn!==inn) &&
-     isLiveRunner){
+  // ── MODO CORREDOR: 1 clic en corredor vivo → selección sin abrir modal ──
+  if(isLiveRunner){
     document.querySelectorAll('.dc.active').forEach(c=>c.classList.remove('active'));
     document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
     td.classList.add('active','runner-sel');
@@ -1240,10 +1237,12 @@ function selectCell(team,pidx,inn,td){
     document.getElementById('selinfo').innerHTML=
       `<strong>${p.name}</strong><span style="color:#ffb648">⚡ MODO CORREDOR · E${inn}</span>`;
     document.getElementById('runner-mode-banner').style.display='block';
-    return; // NO resetear pitchAB, NO cambiar activeBatter
+    // Limpiar activeBatter si es de otro equipo; preservar si es del mismo
+    if(gs.activeBatter && gs.activeBatter.team!==team) gs.activeBatter=null;
+    return; // NO resetear pitchAB
   }
 
-  // ── MODO NORMAL ──
+  // ── MODO NORMAL (bateador) ──
   document.getElementById('runner-mode-banner').style.display='none';
   document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
 
@@ -1256,19 +1255,14 @@ function selectCell(team,pidx,inn,td){
   updatePitchABDisplay('l');
   lockPitchButtons(team==='v'?'l':'v');
 
-  const pl=gs.plays[team][pidx][inn];
-  if(pl && pl.type!=='out' && pl.type!=='clear' && !pl.scored && !pl.runnerOut){
-    gs.activeBatter=null;
-    showRunnerModal(team,pidx,inn); return;
-  }
-  if(appMode==='pro' && pl && pl.type!=='clear'){
+  if(appMode==='pro' && existingPl && existingPl.type!=='clear'){
     showNarrativeModal(team,pidx,inn); return;
   }
   document.querySelectorAll('.dc.active').forEach(c=>c.classList.remove('active'));
   td.classList.add('active');
   selCell={team,pidx,inn,td};
   gs.selected=selCell;
-  gs.activeBatter={team,pidx,inn,td}; // registrar bateador activo
+  gs.activeBatter={team,pidx,inn,td};
   const p=gs.teams[team].players[pidx];
   document.getElementById('selinfo').innerHTML=`<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
   document.getElementById('reg-btn').disabled=false;
@@ -1276,7 +1270,18 @@ function selectCell(team,pidx,inn,td){
 
 function openModalForSelected(){
   if(!gs.selected) return;
-  showModal(gs.selected.team,gs.selected.pidx,gs.selected.inn);
+  const {team,pidx,inn}=gs.selected;
+  const pl=gs.plays[team]?.[pidx]?.[inn];
+  const isLiveRunner=pl&&pl.type!=='out'&&pl.type!=='clear'&&!pl.scored&&!pl.runnerOut;
+  if(isLiveRunner) showRunnerModal(team,pidx,inn);
+  else showModal(team,pidx,inn);
+}
+
+function handleCellDblClick(team,pidx,inn){
+  const pl=gs.plays[team]?.[pidx]?.[inn];
+  const isLiveRunner=pl&&pl.type!=='out'&&pl.type!=='clear'&&!pl.scored&&!pl.runnerOut;
+  if(isLiveRunner) showRunnerModal(team,pidx,inn);
+  else showModal(team,pidx,inn);
 }
 
 // ─── MODAL ───────────────────────────────────────────────
@@ -1337,7 +1342,7 @@ function showRunnerModal(team,pidx,inn){
     const b=document.createElement('button');
     b.className=`run-btn ${cls}`; b.textContent=lbl;
     if(full) b.style.gridColumn='1/-1';
-    b.onclick=()=>{ applyRunnerMove(team,pidx,inn,action); closeModal(); };
+    b.onclick=()=>{ applyRunnerMove(team,pidx,inn,action); closeModal(); returnToActiveBatter(); };
     return b;
   };
   const sec=(txt)=>{
@@ -1417,14 +1422,21 @@ function applyRunnerMove(team,pidx,inn,action){
 
 // ─── REGRESO AL BATEADOR ACTIVO ──────────────────────────
 function returnToActiveBatter(){
-  if(!gs.activeBatter) return;
+  document.getElementById('runner-mode-banner').style.display='none';
+  document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
+  if(!gs.activeBatter){
+    // Sin bateador activo: limpiar selección
+    document.querySelectorAll('.dc.active').forEach(c=>c.classList.remove('active'));
+    gs.selected=null; selCell=null;
+    document.getElementById('selinfo').innerHTML=`<strong>— SIN SELECCIÓN —</strong><span>Toca una casilla</span>`;
+    document.getElementById('reg-btn').disabled=true;
+    return;
+  }
   const {team,pidx,inn,td}=gs.activeBatter;
   document.querySelectorAll('.dc.active').forEach(c=>c.classList.remove('active'));
-  document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
   td.classList.add('active');
   gs.selected=gs.activeBatter;
   selCell=gs.activeBatter;
-  document.getElementById('runner-mode-banner').style.display='none';
   const p=gs.teams[team].players[pidx];
   document.getElementById('selinfo').innerHTML=
     `<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
@@ -1888,17 +1900,23 @@ function confirmYes(){
   const a=pendingAction;
   hideBanner();
   if(a.type==='play'){
-    // Detectar si estamos en modo corredor (la celda confirmada no es el bateador activo)
-    const inRunnerMode=gs.activeBatter &&
-      gs.activeBatter.team===a.team &&
-      (gs.activeBatter.pidx!==a.pidx||gs.activeBatter.inn!==a.inn);
-    if(inRunnerMode){
-      applyRunnerOutVoice(a.team,a.pidx,a.inn,a.play);
-      document.getElementById('vrs').textContent=`✓ ${a.play.sym} (corredor)`;
-    } else {
-      applyPlay(a.team,a.pidx,a.inn,a.play);
-      document.getElementById('vrs').textContent=`✓ ${a.play.label||a.play.sym}`;
+    applyPlay(a.team,a.pidx,a.inn,a.play);
+    document.getElementById('vrs').textContent=`✓ ${a.play.label||a.play.sym}`;
+  } else if(a.type==='runner-action'){
+    const pl=gs.plays[a.team]?.[a.pidx]?.[a.inn];
+    if(pl){
+      if(a.action==='po'||a.action==='cs'||a.action==='rd'){
+        pl.runnerOut=true; pl.runnerOutSym=a.sym;
+        refreshCell(a.team,a.pidx,a.inn);
+        gs.teams[a.team].players.forEach((_,i)=>updateStats(a.team,i));
+        updateScores();
+        showToast(`✓ ${a.sym} — corredor out`);
+      } else {
+        applyRunnerMove(a.team,a.pidx,a.inn,a.action);
+      }
     }
+    document.getElementById('vrs').textContent=`✓ ${a.sym||''}`;
+    returnToActiveBatter();
   } else if(a.type==='sub'){
     applySubstitution(a.team,a.pidx,a.inName,a.inPos);
   }
@@ -1923,11 +1941,59 @@ function extractOutPositions(text){
   return [];
 }
 
+// ─── INTÉRPRETE DE VOZ PARA CORREDOR EN BASE ─────────────
+function interpretRunnerVoice(text,team,pidx,inn){
+  const t=text.toLowerCase();
+  let action=null,sym=null,label=null;
+
+  if(/reviré|revire|pickoff|pick off|puesto out.*reviré|out.*reviré|reviré.*out/.test(t)){
+    const pos=extractOutPositions(t); const chain=pos.join('-');
+    sym=chain?`PO ${chain}`:'PO'; label=sym; action='po';
+  } else if(/atrapado robando|cogido robando|caught stealing|lo atraparon|se la jalaron/.test(t)){
+    const pos=extractOutPositions(t); const chain=pos.join('-');
+    sym=chain?`CS ${chain}`:'CS'; label=sym; action='cs';
+  } else if(/out al avanzar|out avanzando|avanzar.*out/.test(t)){
+    sym='OUT'; label='Out al avanzar'; action='outAdv';
+  } else if(/out.*home|home.*out|out.*plato|eliminado.*home/.test(t)){
+    const pos=extractOutPositions(t); const chain=pos.join('-');
+    sym=chain||'OUTH'; label=`Out en Home${chain?' '+chain:''}`; action='outH';
+  } else if(/out.*tercera|tercera.*out|out en 3|eliminado.*tercera/.test(t)){
+    const pos=extractOutPositions(t); const chain=pos.join('-');
+    sym=chain||'OUT3'; label=`Out en 3ª${chain?' '+chain:''}`; action='out3';
+  } else if(/out.*segunda|segunda.*out|out en 2|eliminado.*segunda/.test(t)){
+    const pos=extractOutPositions(t); const chain=pos.join('-');
+    sym=chain||'OUT2'; label=`Out en 2ª${chain?' '+chain:''}`; action='out2';
+  } else if(/robó|se rob|base robada|stolen|robo de base/.test(t)){
+    sym='SB'; label='Base Robada'; action='rob';
+  } else if(/tira y tira|rundown|pickle|tierra de nadie|entre bases/.test(t)){
+    sym='RD'; label='Rundown'; action='rd';
+  } else if(/anotó|anoto|carrera|score/.test(t)){
+    action=typeof appMode!=='undefined'&&appMode==='pro'?'score-earned':'score';
+    sym='R'; label='Corredor anotó';
+  }
+
+  if(action){
+    document.getElementById('vrs').textContent=`? ${sym}`;
+    const pname=gs.teams[team].players[pidx].name;
+    showConfirmBanner(`${label} — ${pname}`,{type:'runner-action',team,pidx,inn,action,sym,label});
+  } else {
+    document.getElementById('vrs').textContent='⚠️ No reconocido';
+    showToast('⚠️ No reconocido — prueba: "robó", "reviré out", "atrapado robando"',true);
+  }
+}
+
 function interpretVoice(text){
   document.getElementById('vtr').textContent=`"${text}"`;
   if(/deshacer|undo|borra(r)?\s+últ/.test(text)){ undoLastPlay(); return; }
   if(!gs.selected){ showToast('⚠️ Selecciona una casilla primero',true); return; }
   const {team,pidx,inn}=gs.selected;
+
+  // Si la celda activa es un corredor en base → intérprete específico de corredor
+  const selPl=gs.plays[team]?.[pidx]?.[inn];
+  if(selPl && selPl.type!=='out' && selPl.type!=='clear' && !selPl.scored && !selPl.runnerOut){
+    interpretRunnerVoice(text,team,pidx,inn); return;
+  }
+
   let matched=null;
 
   // Foul fly con fildeador específico — ANTES del fly regular para evitar falso match
