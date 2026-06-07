@@ -1184,10 +1184,11 @@ function drawDiamond(play){
     s+=dot(D.home,  p&&(p.scored||p.bases>=4)?hc:'#2a3a50',4);
   }
 
-  // Círculo de out: PRO → rojo solo en KS/DP/TP, gris en el resto
+  // Círculo de out: PRO → rojo en KS/DP (cualquier ruta N-M-P)/TP, gris en el resto
   if(p && p.type==='out'){
     const redSym=['KS','6-4-3','5-4-3','TP','K corrido'];
-    const oc = (appMode==='pro' && !redSym.includes(p.sym)) ? 'rgba(180,195,210,0.7)' : 'var(--red)';
+    const isDPRoute=p.sym&&/^\d-\d(-\d)+$/.test(p.sym); // cualquier ruta DP: 6-4-3, 5-5-3, 2-2-3…
+    const oc = (appMode==='pro' && !redSym.includes(p.sym) && !isDPRoute) ? 'rgba(180,195,210,0.7)' : 'var(--red)';
     s+=`<circle cx="27" cy="27" r="11" fill="none" stroke="${oc}" stroke-width="1.8" opacity="0.85"/>`;
   }
 
@@ -1215,7 +1216,11 @@ function drawDiamond(play){
 
   if(p && p.sym && p.type!=='clear'){
     const cls = p.type==='out'?'out-lbl':p.type==='hit'?'hit-lbl':p.type==='walk'?'walk-lbl':'other-lbl';
-    s+=`<div class="play-lbl ${cls}">${p.runNote||p.sym}</div>`;
+    let dispLbl=p.runNote||p.sym;
+    // DP: mostrar hit original + ruta del corredor (ej. "1B" arriba, "6-4" abajo)
+    if(p.runnerOut && p.dpRoute)
+      dispLbl=`<span style="display:block;line-height:1">${p.sym}</span><span style="display:block;font-size:.48rem;opacity:.8;letter-spacing:.4px">${p.dpRoute}</span>`;
+    s+=`<div class="play-lbl ${cls}">${dispLbl}</div>`;
   }
   return s;
 }
@@ -1559,13 +1564,30 @@ function advanceRunners(team,pidx,inn,play){
     }
     return '';
   }
-  // ── DP: corredor forzado queda out → 2° out en la entrada ─
+  // ── DP: identificar corredor forzado por ruta, preservar su hit ──
   if(play.id&&play.id.startsWith('DP')){
     const st=computeBaseState(team,inn,pidx);
-    const runner=st.first||st.second||st.third;
+    // Parsear ruta del DP: sym puede ser "6-4-3", "DP 6-4-3", "5-5-3", etc.
+    const rawSym=(play.sym||'').replace(/^DP\s*/i,'');
+    const parts=rawSym.split('-').map(x=>x.trim()).filter(x=>/^[1-9]$/.test(x));
+    const fp=play._dpForcedPos||(parts.length>=2?parts[1]:null);
+    // Seleccionar corredor forzado según la base donde lo ponen out
+    // pos[1]: 4 o 6 → 2ª base (corredor venía de 1ª)
+    //         5     → 3ª base (corredor venía de 2ª)
+    //         2     → home    (corredor venía de 3ª)
+    let runner=null;
+    if(fp==='4'||fp==='6')      runner=st.first;
+    else if(fp==='5')           runner=st.second;
+    else if(fp==='2')           runner=st.third;
+    if(!runner) runner=st.first||st.second||st.third; // fallback
     if(runner){
       const rpl=gs.plays[team][runner.pidx][inn];
-      rpl.csOut=true; rpl.runnerOut=true;
+      // Preservar hit: NO tocar sym, bases, type, h, ab
+      rpl.runnerOut=true;
+      rpl.runnerOutBase=(fp==='4'||fp==='6')?2:(fp==='5')?3:(fp==='2')?4:2;
+      // Guardar ruta del corredor para mostrar en su celda (ej. "6-4", "5-5")
+      const rr=play._dpRunnerRoute||(parts.length>=2?`${parts[0]}-${parts[1]}`:null);
+      if(rr) rpl.dpRoute=rr;
       refreshCell(team,runner.pidx,inn);
       return 'DP — '+nm(runner.pidx)+' out';
     }
@@ -1981,6 +2003,21 @@ function extractOutPositions(text){
   return [];
 }
 
+// Extrae TODAS las posiciones de un doble play dictado por voz.
+// Acepta: "del 6 al 4 al 3" / "del 6 al 4, del 4 al 3" / "del 5 al 5 del 5 al 3" etc.
+function extractDPPositions(text){
+  const t=text.toLowerCase();
+  // Captura todos los dígitos precedidos por "del" o "al"
+  const hits=[...t.matchAll(/(?:del|al)\s+([1-9])/g)].map(m=>m[1]);
+  if(hits.length>=2) return hits;
+  // Fallback: N al M al P
+  const m3=t.match(/\b([1-9])\s+al\s+([1-9])\s+al\s+([1-9])\b/);
+  if(m3) return [m3[1],m3[2],m3[3]];
+  const m2=t.match(/\b([1-9])\s+al\s+([1-9])\b/);
+  if(m2) return [m2[1],m2[2]];
+  return [];
+}
+
 // ─── INTÉRPRETE DE VOZ PARA CORREDOR EN BASE ─────────────
 function interpretRunnerVoice(text,team,pidx,inn){
   const t=text.toLowerCase();
@@ -2075,6 +2112,19 @@ function interpretVoice(text){
       :PLAY_CATALOG.outs.find(p=>p.id==='SH');
   }
 
+  // ── DOBLE PLAY: detectar gatillo + ruta dictada ("del 6 al 4 al 3", "del 5 al 5, del 5 al 3") ──
+  if(!matched && /doble[\s-]?play|double[\s-]?play|canc[aá]n|doble\s*matanza/.test(text)){
+    const dpPos=extractDPPositions(text);
+    if(dpPos.length>=2){
+      const dpBase=PLAY_CATALOG.outs.find(p=>p.id==='DP643');
+      const runnerRoute=`${dpPos[0]}-${dpPos[1]}`;
+      const longRoute=`${dpPos[0]}-${dpPos[1]}-${dpPos[dpPos.length-1]}`;
+      matched={...dpBase,sym:longRoute,label:`DP ${longRoute}`,
+               _dpRunnerRoute:runnerRoute,_dpForcedPos:dpPos[1]};
+    }
+    // Si no hay posiciones → deja que el catálogo resuelva (DP643 / DP543)
+  }
+
   // Busca en el catálogo completo por palabras clave de voz
   if(!matched){
     for(const play of ALL_PLAYS){
@@ -2131,7 +2181,8 @@ function interpretVoice(text){
   }
 
   // Extraer posiciones numéricas "N al M [al P]" y aplicarlas al símbolo del out
-  if(matched && matched.type==='out'){
+  // (se omite para DP que ya tienen ruta calculada por extractDPPositions)
+  if(matched && matched.type==='out' && !matched._dpForcedPos){
     const posNums=extractOutPositions(text);
     if(posNums.length>=2){
       const posSym=posNums.join('-');
