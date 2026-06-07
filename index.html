@@ -424,6 +424,7 @@
       </table>
     </div>
     <div class="inning-nav" id="innav"></div>
+    <div id="outs-indicator" style="display:flex;align-items:center;gap:10px;padding:3px 16px;background:#081220;border-bottom:1px solid rgba(255,255,255,.07);font-family:'Oswald',sans-serif;font-size:0.72rem;letter-spacing:.08em;color:#7a8fa6;min-height:26px"><span style="opacity:.35">— outs —</span></div>
     <div class="pitch-bar" id="pitch-bar">
       <div class="pitch-box">
         <div style="min-width:0"><div style="font-size:0.58rem;color:var(--text-dim);letter-spacing:1px;font-family:'Oswald'">VISITANTE</div><div class="pitch-pitcher-name" id="pc-name-v">—</div></div>
@@ -1239,6 +1240,7 @@ function selectCell(team,pidx,inn,td){
     document.getElementById('runner-mode-banner').style.display='block';
     // Limpiar activeBatter si es de otro equipo; preservar si es del mismo
     if(gs.activeBatter && gs.activeBatter.team!==team) gs.activeBatter=null;
+    renderOutsIndicator();
     return; // NO resetear pitchAB
   }
 
@@ -1266,6 +1268,7 @@ function selectCell(team,pidx,inn,td){
   const p=gs.teams[team].players[pidx];
   document.getElementById('selinfo').innerHTML=`<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
   document.getElementById('reg-btn').disabled=false;
+  renderOutsIndicator();
 }
 
 function openModalForSelected(){
@@ -1418,6 +1421,7 @@ function applyRunnerMove(team,pidx,inn,action){
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
   updateScores();
+  renderOutsIndicator();
 }
 
 // ─── REVISAR CAMBIO DE TURNO TRAS OUT DE CORREDOR ────────
@@ -1428,12 +1432,29 @@ function checkRunnerOutAdvance(team,pidx,inn,action){
   const outs=countOutsInInning(team,inn);
   if(outs>=3){
     gs.activeBatter=null;
-    document.getElementById('runner-mode-banner').style.display='none';
+    const _banner=document.getElementById('runner-mode-banner');
+    if(_banner) _banner.style.display='none';
     document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
+    renderOutsIndicator();
     autoAdvance(team,pidx,inn);
   } else {
     returnToActiveBatter();
   }
+}
+
+// ─── INDICADOR DE OUTS VISIBLE ───────────────────────────
+function renderOutsIndicator(){
+  const el=document.getElementById('outs-indicator');
+  if(!el) return;
+  const sel=gs.selected;
+  if(!sel){ el.innerHTML='<span style="opacity:.3">— outs —</span>'; return; }
+  const {team,inn}=sel;
+  const outs=Math.min(countOutsInInning(team,inn),3);
+  const dots=[0,1,2].map(i=>
+    `<span style="font-size:1.25rem;line-height:1;color:${i<outs?'#ff4455':'rgba(255,255,255,.18)'}">${i<outs?'⬤':'○'}</span>`
+  ).join('');
+  const tname=(gs.teams[team]&&gs.teams[team].name)||'—';
+  el.innerHTML=`<span>E${inn} · ${tname}</span><span style="display:flex;gap:6px;align-items:center">${dots}</span><span style="color:${outs>=3?'#ff4455':'#7a8fa6'}">${outs} OUT${outs!==1?'S':''}</span>`;
 }
 
 // ─── REGRESO AL BATEADOR ACTIVO ──────────────────────────
@@ -1446,6 +1467,7 @@ function returnToActiveBatter(){
     gs.selected=null; selCell=null;
     document.getElementById('selinfo').innerHTML=`<strong>— SIN SELECCIÓN —</strong><span>Toca una casilla</span>`;
     document.getElementById('reg-btn').disabled=true;
+    renderOutsIndicator();
     return;
   }
   const {team,pidx,inn,td}=gs.activeBatter;
@@ -1456,6 +1478,7 @@ function returnToActiveBatter(){
   const p=gs.teams[team].players[pidx];
   document.getElementById('selinfo').innerHTML=
     `<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
+  renderOutsIndicator();
 }
 
 // ─── JUGADA DE CORREDOR POR VOZ (en modo corredor) ────────
@@ -1695,6 +1718,7 @@ function applyPlay(team,pidx,inn,play){
   gs.activeBatter=null;
   document.getElementById('runner-mode-banner').style.display='none';
   document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
+  renderOutsIndicator();
   showToast(runSummary?`✓ ${play.label} · ${runSummary}`:`✓ ${play.label}`);
   if(play.type!=='score' && play.type!=='clear'){
     gs.playHistory.push({team, pidx, inn});
