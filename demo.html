@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ScoreVoz ⚾</title>
+<title>VozScore ⚾</title>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -252,7 +252,7 @@
 (function(){
   if(new Date()<new Date('2026-06-14')){return;}
   document.open();
-  document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Demo Expirado — ScoreVoz</title><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;600&family=Roboto+Mono&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0e14;color:#e8f0fe;font-family:"Roboto Mono",monospace;min-height:100vh;display:flex;align-items:center;justify-content:center}.w{text-align:center;padding:40px;max-width:420px}.ic{font-size:5rem;margin-bottom:24px}.ti{font-family:"Bebas Neue",sans-serif;font-size:3rem;color:#ff4455;letter-spacing:5px;margin-bottom:10px}.su{color:#7a8fa6;font-size:0.85rem;line-height:1.8;margin-bottom:24px}.ca{background:#131c28;border:1px solid #ffb800;border-radius:14px;padding:24px}.lb{font-size:0.65rem;color:#7a8fa6;letter-spacing:3px;margin-bottom:8px}.br{font-family:"Bebas Neue",sans-serif;font-size:2rem;color:#ffb800;letter-spacing:4px}</style></head><body><div class="w"><div class="ic">⏰</div><h1 class="ti">DEMO EXPIRADO</h1><p class="su">Esta versión de demostración ha caducado.<br>Para acceder a la aplicación completa<br>y obtener tu licencia:</p><div class="ca"><p class="lb">CONTACTA A</p><div class="br">DIAGONAL CATORCE</div></div></div></body></html>');
+  document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Demo Expirado — VozScore</title><link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;600&family=Roboto+Mono&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0a0e14;color:#e8f0fe;font-family:"Roboto Mono",monospace;min-height:100vh;display:flex;align-items:center;justify-content:center}.w{text-align:center;padding:40px;max-width:420px}.ic{font-size:5rem;margin-bottom:24px}.ti{font-family:"Bebas Neue",sans-serif;font-size:3rem;color:#ff4455;letter-spacing:5px;margin-bottom:10px}.su{color:#7a8fa6;font-size:0.85rem;line-height:1.8;margin-bottom:24px}.ca{background:#131c28;border:1px solid #ffb800;border-radius:14px;padding:24px}.lb{font-size:0.65rem;color:#7a8fa6;letter-spacing:3px;margin-bottom:8px}.br{font-family:"Bebas Neue",sans-serif;font-size:2rem;color:#ffb800;letter-spacing:4px}</style></head><body><div class="w"><div class="ic">⏰</div><h1 class="ti">DEMO EXPIRADO</h1><p class="su">Esta versión de demostración ha caducado.<br>Para acceder a la aplicación completa<br>y obtener tu licencia:</p><div class="ca"><p class="lb">CONTACTA A</p><div class="br">DIAGONAL CATORCE</div></div></div></body></html>');
   document.close();
 })();
 </script>
@@ -267,7 +267,7 @@
 </div>
 
 <header>
-  <div class="logo">Score<span>Voz</span> ⚾</div>
+  <div class="logo">Voz<span>Score</span> ⚾</div>
   <div style="display:flex;align-items:center;gap:12px">
     <div id="game-status" style="display:none;align-items:center;gap:8px">
       <span style="color:var(--text-dim);font-size:0.65rem;letter-spacing:1px">ENTRADA</span>
@@ -1602,7 +1602,7 @@ function openNumeritos(){
 
   doc.setDrawColor(...BRD); doc.setLineWidth(0.3); doc.line(20,PH-18,PW-18,PH-18);
   doc.setFontSize(7); doc.setTextColor(...DIM);
-  doc.text('ScoreVoz ⚾  — Generado automáticamente',PW/2,PH-13,{align:'center'});
+  doc.text('VozScore ⚾  — Generado automáticamente',PW/2,PH-13,{align:'center'});
 
   // ════════════════════════════════════════════════════════
   // PÁG 2 — BOX SCORE
@@ -2708,7 +2708,7 @@ function downloadPlayerFichaPDF(team,pidx){
 
   const today=new Date().toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'});
   doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(...DIM);
-  doc.text(`ScoreVoz ⚾ · ${today}`,PW/2,y+4,{align:'center'});
+  doc.text(`VozScore ⚾ · ${today}`,PW/2,y+4,{align:'center'});
 
   const safeName=curName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
   doc.save(`ficha_${safeName}.pdf`);

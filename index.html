@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ScoreVoz ⚾</title>
+<title>VozScore ⚾</title>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400;500&family=Bebas+Neue&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -343,7 +343,7 @@
 </div>
 
 <header>
-  <div class="logo">Score<span>Voz</span> ⚾</div>
+  <div class="logo">Voz<span>Score</span> ⚾</div>
   <div style="display:flex;align-items:center;gap:12px">
     <div id="game-status" style="display:none;align-items:center;gap:8px">
       <span style="color:var(--text-dim);font-size:0.65rem;letter-spacing:1px">ENTRADA</span>
@@ -2232,7 +2232,7 @@ function openNumeritos(){
 
   doc.setDrawColor(...BRD); doc.setLineWidth(0.3); doc.line(20,PH-18,PW-18,PH-18);
   doc.setFontSize(7); doc.setTextColor(...DIM);
-  doc.text('ScoreVoz ⚾  — Generado automáticamente',PW/2,PH-13,{align:'center'});
+  doc.text('VozScore ⚾  — Generado automáticamente',PW/2,PH-13,{align:'center'});
 
   // ════════════════════════════════════════════════════════
   // PÁG 2 — BOX SCORE
@@ -3043,7 +3043,7 @@ function downloadPlayerFichaPDF(team,pidx){
   // ── Footer ────────────────────────────────────────────────
   const today=new Date().toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'});
   doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(...DIM);
-  doc.text(`ScoreVoz ⚾ · ${today}`,PW/2,y+4,{align:'center'});
+  doc.text(`VozScore ⚾ · ${today}`,PW/2,y+4,{align:'center'});
 
   const safeName=curName.replace(/[^a-z0-9]/gi,'_').toLowerCase();
   doc.save(`ficha_${safeName}.pdf`);
@@ -3499,7 +3499,7 @@ Posiciones: 1=P, 2=C, 3=1ª, 4=2ª, 5=3ª, 6=SS, 7=LF, 8=CF, 9=RF`},
   {keys:['average','avg','promedio de bateo','batting average','promedio bateador'],
    r:`📊 AVG — Promedio de Bateo
 Fórmula: AVG = H ÷ AB
-ScoreVoz lo calcula automáticamente en la última columna de cada bateador.
+VozScore lo calcula automáticamente en la última columna de cada bateador.
 Referencia: .300+ excelente · .250 promedio · .200 débil`},
   {keys:['obp','on base percentage','porcentaje de embase','on base porcentaje'],
    r:`📊 OBP — On Base Percentage (% Embasado)
@@ -3516,7 +3516,7 @@ Referencia: .450+ excelente · .400 bueno. En reporte NUMERITOS.`},
    r:`📊 OPS — On Base + Slugging
 Fórmula: OPS = OBP + SLG (suma directa)
 Referencia: .900+ elite · .800 muy bueno · .700 promedio · <.700 por debajo
-ScoreVoz calcula OPS por jugador en el reporte 📊 NUMERITOS.`},
+VozScore calcula OPS por jugador en el reporte 📊 NUMERITOS.`},
   {keys:['era','earned run average','promedio carreras limpias','efectividad pitcher','era pitcher'],
    r:`📊 ERA — Earned Run Average (Efectividad del Pitcher)
 Fórmula: ERA = (Carreras Limpias × 9) ÷ Innings Lanzados
@@ -3527,7 +3527,7 @@ Referencia: <3.00 elite · 3-4 bueno · >5 deficiente. Disponible en NUMERITOS (
 Valores aproximados por jugada en carreras producidas:
 HR=+1.65 · 3B=+1.35 · 2B=+1.10 · 1B=+0.70 · BB=+0.55 · Out=-0.25
 Mide el valor ofensivo real más allá del AVG.
-ScoreVoz muestra LW por jugador en el reporte 📊 NUMERITOS.`},
+VozScore muestra LW por jugador en el reporte 📊 NUMERITOS.`},
   {keys:['carrera limpia','carrera sucia','earned run','unearned run','limpia sucia','carrera inmerecida'],
    r:`📊 Carrera Limpia vs Sucia (Modo PRO)
 En Modo PRO: toca la casilla del corredor en base → menú corredor → "Limpia" o "Sucia"
@@ -3566,7 +3566,7 @@ Expresión coloquial dominicana para cuando el pitcher da 4 bolas.`},
 📋 Toca casilla → mantén 🎤 → di el comando → confirma ✅`},
   // ── FLUJO GENERAL Y AYUDA ──
   {keys:['como registro','como anoto','como uso','flujo registro','pasos registrar','como funciona'],
-   r:`📋 Flujo General de ScoreVoz:
+   r:`📋 Flujo General de VozScore:
 1. Toca la casilla del bateador en la planilla
 2. Mantén presionado 🎤 y di la jugada
 3. Confirma ✅ SÍ en el banner amarillo
@@ -3632,7 +3632,7 @@ function openHelpChat(){
   document.getElementById('chat-panel').classList.add('open');
   const msgs=document.getElementById('chat-msgs');
   if(!msgs.children.length){
-    addBotMsg('¡Hola! Soy el asistente de ScoreVoz.\nDescribeme cualquier situación de béisbol y te digo cómo registrarla.\n\nEjemplos:\n• "el bateador ponchó sin tirarle"\n• "sacrificio fly al jardín izquierdo"\n• "doble play del short al segunda al primera"\n• "¿qué es el cancán?" · "¿cómo calculo el ERA?" · "robo de home"');
+    addBotMsg('¡Hola! Soy el asistente de VozScore.\nDescribeme cualquier situación de béisbol y te digo cómo registrarla.\n\nEjemplos:\n• "el bateador ponchó sin tirarle"\n• "sacrificio fly al jardín izquierdo"\n• "doble play del short al segunda al primera"\n• "¿qué es el cancán?" · "¿cómo calculo el ERA?" · "robo de home"');
   }
 }
 
@@ -3662,7 +3662,7 @@ function sendChatMsg(){
   if(reply){
     addBotMsg(reply);
   } else {
-    addBotMsg('No encontré esa jugada en mi base de conocimiento de ScoreVoz.\n¿Puedes ser más específico? Describe la situación completa del juego:\n• ¿Qué hizo el bateador?\n• ¿Había corredores en base?\n• ¿Quién fieldeó y adónde tiró?\n\nPuedes preguntar sobre jugadas, términos coloquiales o estadísticas (AVG, ERA, OPS…)');
+    addBotMsg('No encontré esa jugada en mi base de conocimiento de VozScore.\n¿Puedes ser más específico? Describe la situación completa del juego:\n• ¿Qué hizo el bateador?\n• ¿Había corredores en base?\n• ¿Quién fieldeó y adónde tiró?\n\nPuedes preguntar sobre jugadas, términos coloquiales o estadísticas (AVG, ERA, OPS…)');
   }
 }
 
