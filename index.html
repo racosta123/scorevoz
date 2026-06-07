@@ -1994,19 +1994,34 @@ function hideBanner(){
   document.getElementById('confirm-banner').classList.remove('show');
 }
 
+// Convierte palabras cardinales de posición a dígitos para que los extractores funcionen
+// tanto con dígitos ("del 5 al 5") como con palabras ("del cinco al cinco").
+function normalizeNumberWords(text){
+  const map={
+    'uno':'1','dos':'2','tres':'3','cuatro':'4','cinco':'5',
+    'seis':'6','siete':'7','ocho':'8','nueve':'9'
+  };
+  let t=text.toLowerCase();
+  for(const [word,digit] of Object.entries(map)){
+    t=t.replace(new RegExp(`\\b${word}\\b`,'g'),digit);
+  }
+  return t;
+}
+
 // Extrae hasta 3 posiciones numéricas de secuencias tipo "N al M [al P]"
 function extractOutPositions(text){
-  const m3=text.match(/\b([1-9])\s+al\s+([1-9])\s+al\s+([1-9])\b/);
+  const t=normalizeNumberWords(text);
+  const m3=t.match(/\b([1-9])\s+al\s+([1-9])\s+al\s+([1-9])\b/);
   if(m3) return [m3[1],m3[2],m3[3]];
-  const m2=text.match(/\b([1-9])\s+al\s+([1-9])\b/);
+  const m2=t.match(/\b([1-9])\s+al\s+([1-9])\b/);
   if(m2) return [m2[1],m2[2]];
   return [];
 }
 
 // Extrae TODAS las posiciones de un doble play dictado por voz.
-// Acepta: "del 6 al 4 al 3" / "del 6 al 4, del 4 al 3" / "del 5 al 5 del 5 al 3" etc.
+// Acepta dígitos O palabras: "del cinco al cinco del cinco al tres", "del 6 al 4 al 3", etc.
 function extractDPPositions(text){
-  const t=text.toLowerCase();
+  const t=normalizeNumberWords(text);
   // Captura todos los dígitos precedidos por "del" o "al"
   const hits=[...t.matchAll(/(?:del|al)\s+([1-9])/g)].map(m=>m[1]);
   if(hits.length>=2) return hits;
