@@ -94,6 +94,7 @@
   .dc { width:54px; height:54px; cursor:pointer; position:relative; transition:background .15s; }
   .dc:hover { background:rgba(0,229,153,.06); }
   .dc.active { background:rgba(0,229,153,.12); outline:2px solid #00e599; outline-offset:-2px; }
+  .dc.runner-sel { outline:2px solid #ffb648; outline-offset:-2px; background:rgba(255,182,72,.1); }
   .dc svg { width:100%; height:100%; }
   .play-lbl { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:0.58rem; font-weight:700; white-space:nowrap; pointer-events:none; text-shadow:0 0 4px rgba(0,0,0,.9); }
   .play-lbl.out-lbl  { color:#ff4d67; }
@@ -495,6 +496,7 @@
   </div>
   <div style="display:flex;flex-direction:column;gap:5px;min-width:150px">
     <div class="selected-info" id="selinfo"><strong>— SIN SELECCIÓN —</strong><span>Toca una casilla</span></div>
+    <div id="runner-mode-banner" style="display:none;background:#ffb648;color:#071018;font-size:0.7rem;font-weight:700;font-family:'Oswald',sans-serif;letter-spacing:.06em;padding:3px 8px;border-radius:5px;text-align:center">⚡ MODO CORREDOR · dicta la jugada</div>
     <button id="reg-btn" class="btn-register" onclick="openModalForSelected()" disabled>+ REGISTRAR JUGADA</button>
   </div>
 </div>
@@ -538,7 +540,8 @@ let gs = {
     B:[{name:'Alberto'},{name:'Javier'},{name:'Ricardo'},{name:'Sergio'},{name:'Raúl'},{name:'Enrique'},{name:'Gustavo'},{name:'Héctor'},{name:'Óscar'}]
   },
   currentBatter:{ v:0, l:0 },
-  playHistory:[]
+  playHistory:[],
+  activeBatter:null
 };
 
 // ─── CATÁLOGO OFICIAL DE JUGADAS ───────────────────────────
@@ -577,6 +580,7 @@ const PLAY_CATALOG = {
     { id:'GDP', label:'GDP Bateado DP',          sym:'GDP', bases:0, type:'out', ab:true,  color:'red',   voice:['bateado doble play','gdp'] },
     // Cogido robando
     { id:'CS',  label:'CS Cogido Robando',       sym:'CS',  bases:0, type:'out', ab:false, color:'red',   voice:['cogido robando','out robando','caught stealing','out en el intento','se la jalaron','atrapado robando'] },
+    { id:'PO',  label:'PO Reviré / Pickoff Out', sym:'PO',  bases:0, type:'out', ab:false, color:'red',   voice:['reviré out','revire out','pickoff out','pickoff','pick off','out por reviré','out en reviré','corredor out en reviré','corredor puesto out en reviré','corredor puesto out'] },
     { id:'RD',  label:'RD Tira y Tira / Rundown', sym:'RD', bases:0, type:'out', ab:false, color:'red',   voice:['tira y tira','rundown','pickle','atrapado entre bases','corredor atrapado','tierra de nadie'] },
     { id:'TP',  label:'TP Triple Play / Triple Matanza', sym:'TP', bases:0, type:'out', ab:false, color:'red',   voice:['triple play','triple matanza'] },
   ],
@@ -1218,7 +1222,32 @@ function drawDiamond(play){
 // ─── SELECCIÓN DE CELDA ───────────────────────────────────
 let selCell=null;
 function selectCell(team,pidx,inn,td){
-  // Reset S/B/F SIEMPRE, sin excepción, antes de cualquier return
+  const existingPl=gs.plays[team]?.[pidx]?.[inn];
+  const isLiveRunner=existingPl &&
+    existingPl.type!=='out' && existingPl.type!=='clear' &&
+    !existingPl.scored && !existingPl.runnerOut;
+
+  // ── MODO CORREDOR: hay bateador activo en el mismo equipo y se seleccionó corredor vivo ──
+  if(gs.activeBatter &&
+     gs.activeBatter.team===team &&
+     (gs.activeBatter.pidx!==pidx||gs.activeBatter.inn!==inn) &&
+     isLiveRunner){
+    document.querySelectorAll('.dc.active').forEach(c=>c.classList.remove('active'));
+    document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
+    td.classList.add('active','runner-sel');
+    gs.selected={team,pidx,inn,td};
+    const p=gs.teams[team].players[pidx];
+    document.getElementById('selinfo').innerHTML=
+      `<strong>${p.name}</strong><span style="color:#ffb648">⚡ MODO CORREDOR · E${inn}</span>`;
+    document.getElementById('runner-mode-banner').style.display='block';
+    return; // NO resetear pitchAB, NO cambiar activeBatter
+  }
+
+  // ── MODO NORMAL ──
+  document.getElementById('runner-mode-banner').style.display='none';
+  document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
+
+  // Reset S/B/F SIEMPRE en modo normal
   gs.pitchAB['v']={s:0,b:0,f:0,history:[]};
   gs.pitchAB['l']={s:0,b:0,f:0,history:[]};
   unlockPitchButtons('v');
@@ -1229,6 +1258,7 @@ function selectCell(team,pidx,inn,td){
 
   const pl=gs.plays[team][pidx][inn];
   if(pl && pl.type!=='out' && pl.type!=='clear' && !pl.scored && !pl.runnerOut){
+    gs.activeBatter=null;
     showRunnerModal(team,pidx,inn); return;
   }
   if(appMode==='pro' && pl && pl.type!=='clear'){
@@ -1238,6 +1268,7 @@ function selectCell(team,pidx,inn,td){
   td.classList.add('active');
   selCell={team,pidx,inn,td};
   gs.selected=selCell;
+  gs.activeBatter={team,pidx,inn,td}; // registrar bateador activo
   const p=gs.teams[team].players[pidx];
   document.getElementById('selinfo').innerHTML=`<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
   document.getElementById('reg-btn').disabled=false;
@@ -1371,11 +1402,49 @@ function applyRunnerMove(team,pidx,inn,action){
     case 'out2': pl.runnerOut=true; pl.runnerOutBase=2; showToast('Out en 2ª'); break;
     case 'out3': pl.runnerOut=true; pl.runnerOutBase=3; showToast('Out en 3ª'); break;
     case 'outH': pl.runnerOut=true; pl.runnerOutBase=4; showToast('Out en Home'); break;
+    case 'outAdv': pl.runnerOut=true; showToast('Out al avanzar'); break;
+    case 'cs':   pl.runnerOut=true; pl.runnerOutSym='CS'; showToast('CS — Cogido robando'); break;
+    case 'po':   pl.runnerOut=true; pl.runnerOutSym='PO'; showToast('PO — Reviré out'); break;
+    case 'rob':  pl.bases=Math.min(pl.bases+1,3); showToast(`Robó ${pl.bases===2?'2ª':pl.bases===3?'3ª':'base'} (SB)`); break;
+    case 'err':  pl.bases=Math.min(pl.bases+1,3); showToast('Avanzó por error'); break;
+    case 'wp':   pl.bases=Math.min(pl.bases+1,3); showToast('Avanzó (WP/PB/Balk)'); break;
     case 'back': showToast('Corredor regresó a su base'); return;
   }
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
   updateScores();
+}
+
+// ─── REGRESO AL BATEADOR ACTIVO ──────────────────────────
+function returnToActiveBatter(){
+  if(!gs.activeBatter) return;
+  const {team,pidx,inn,td}=gs.activeBatter;
+  document.querySelectorAll('.dc.active').forEach(c=>c.classList.remove('active'));
+  document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
+  td.classList.add('active');
+  gs.selected=gs.activeBatter;
+  selCell=gs.activeBatter;
+  document.getElementById('runner-mode-banner').style.display='none';
+  const p=gs.teams[team].players[pidx];
+  document.getElementById('selinfo').innerHTML=
+    `<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
+}
+
+// ─── JUGADA DE CORREDOR POR VOZ (en modo corredor) ────────
+function applyRunnerOutVoice(team,pidx,inn,play){
+  const pl=gs.plays[team]?.[pidx]?.[inn];
+  if(!pl){ showToast('⚠️ No hay corredor en esa celda',true); returnToActiveBatter(); return; }
+  if(!play.ab && play.type==='out'){
+    pl.runnerOut=true;
+    pl.runnerOutSym=play.sym;  // 'PO', 'CS', 'PO 1-3', etc.
+    refreshCell(team,pidx,inn);
+    gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
+    updateScores();
+    showToast(`✓ ${play.sym} — corredor out`);
+  } else {
+    showToast(`⚠️ Usa "PO", "CS" u otra jugada de corredor`,true);
+  }
+  returnToActiveBatter();
 }
 
 let _runnerRecog=null;
@@ -1595,6 +1664,9 @@ function applyPlay(team,pidx,inn,play){
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
   updateScores();
   resetPitchAB();
+  gs.activeBatter=null;
+  document.getElementById('runner-mode-banner').style.display='none';
+  document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
   showToast(runSummary?`✓ ${play.label} · ${runSummary}`:`✓ ${play.label}`);
   if(play.type!=='score' && play.type!=='clear'){
     gs.playHistory.push({team, pidx, inn});
@@ -1816,8 +1888,17 @@ function confirmYes(){
   const a=pendingAction;
   hideBanner();
   if(a.type==='play'){
-    applyPlay(a.team,a.pidx,a.inn,a.play);
-    document.getElementById('vrs').textContent=`✓ ${a.play.label||a.play.sym}`;
+    // Detectar si estamos en modo corredor (la celda confirmada no es el bateador activo)
+    const inRunnerMode=gs.activeBatter &&
+      gs.activeBatter.team===a.team &&
+      (gs.activeBatter.pidx!==a.pidx||gs.activeBatter.inn!==a.inn);
+    if(inRunnerMode){
+      applyRunnerOutVoice(a.team,a.pidx,a.inn,a.play);
+      document.getElementById('vrs').textContent=`✓ ${a.play.sym} (corredor)`;
+    } else {
+      applyPlay(a.team,a.pidx,a.inn,a.play);
+      document.getElementById('vrs').textContent=`✓ ${a.play.label||a.play.sym}`;
+    }
   } else if(a.type==='sub'){
     applySubstitution(a.team,a.pidx,a.inName,a.inPos);
   }
@@ -1953,6 +2034,7 @@ function interpretVoice(text){
       else if(matched.sym==='SF')                         newSym=`SF ${posSym}`;
       else if(matched.sym==='RD')                         newSym=`RD ${posSym}`;
       else if(matched.sym==='CS')                         newSym=`CS ${posSym}`;
+      else if(matched.sym==='PO')                         newSym=`PO ${posSym}`;
       else if(matched.id&&matched.id.startsWith('DP'))    newSym=`DP ${posSym}`;
       else                                                newSym=posSym;
       if(newSym) matched={...matched,sym:newSym,label:newSym};
