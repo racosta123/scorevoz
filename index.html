@@ -549,6 +549,7 @@ const PLAY_CATALOG = {
     // Ponches
     { id:'KS',  label:'K ⚾ Ponche Swing',      sym:'KS',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche','ponche swing','strike out swing','abanicó','abaniq','chocolate','abanicar','whiff','abanico','morder el polvo','se lo comió'] },
     { id:'KL',  label:'KL Ponche Cantado',       sym:'KL',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche cantado','ponche mirando','ponche llamado','strike out looking','sin tirarle','sin mover','ponche viendo','parado','ponche parado','sin mover el bate','ponche sin tirarle','tercer strike cantado','se quedó parado','se quedo parado','le cantaron el strike','strike tres cantado','caught looking','watching','ponche sin swing','tres strikes','sin batear','strike three'] },
+    { id:'KBF', label:'KBF Ponche Foul de Bunt', sym:'KBF', bases:0, type:'out', ab:true,  color:'red',   voice:['foul de bunt dos strikes','foul de toque dos strikes','foul de plancha dos strikes','bunt foul dos strikes','kbf','toque fallido dos strikes','plancha fallida dos strikes','foul bunt strike'] },
     // Fly outs
     { id:'F7',  label:'F7 Fly Left Field',       sym:'F7',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly izquierda','elevado izquierda','fly left'] },
     { id:'F8',  label:'F8 Fly Center',           sym:'F8',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly center','elevado centro','fly central'] },
@@ -1224,7 +1225,7 @@ function selectCell(team,pidx,inn,td){
   unlockPitchButtons('l');
   updatePitchABDisplay('v');
   updatePitchABDisplay('l');
-  updateBattingTeamButtons();
+  lockPitchButtons(team==='v'?'l':'v');
 
   const pl=gs.plays[team][pidx][inn];
   if(pl && pl.type!=='out' && pl.type!=='clear' && !pl.scored && !pl.runnerOut){
@@ -1541,6 +1542,24 @@ function advanceRunners(team,pidx,inn,play){
   return moved.join(' · ');
 }
 
+// ─── PELOTA BATEADA ──────────────────────────────────────
+function isBattedBallPlay(play){
+  if(!play||play.type==='clear'||play.type==='score') return false;
+  if(play.type==='hit') return true;
+  if(play.type==='error') return true;
+  if(play.type==='out'){
+    const sym=play.sym||'';
+    // Ponches y outs de corredor: ya cuentan por S/B/F o no son pelota bateada
+    if(sym==='KS'||sym==='KL'||sym==='KBF'||sym==='K corrido'||sym.startsWith('K ')) return false;
+    if(sym==='CS'||sym.startsWith('CS ')) return false;
+    if(sym==='RD'||sym.startsWith('RD ')) return false;
+    return true;
+  }
+  if(play.type==='walk') return false;
+  if(play.type==='advance') return play.id==='FC'||play.id==='HNR';
+  return false;
+}
+
 // ─── APLICAR JUGADA ───────────────────────────────────────
 function applyPlay(team,pidx,inn,play){
   if(play.type==='clear'){
@@ -1550,6 +1569,16 @@ function applyPlay(team,pidx,inn,play){
     updateScores();
     showToast('Jugada borrada');
     return;
+  }
+  // Pelota bateada: sumar 1 lanzamiento (strike) al pitcher antes de procesar la jugada
+  if(isBattedBallPlay(play)){
+    if(!gs.pitchCount[team].inningLog) gs.pitchCount[team].inningLog={};
+    if(!gs.pitchCount[team].inningLog[inn]) gs.pitchCount[team].inningLog[inn]={s:0,b:0,f:0};
+    gs.pitchCount[team].total++;
+    gs.pitchCount[team].strikes++;
+    gs.pitchCount[team].inningLog[inn].s++;
+    const totEl=document.getElementById(`pc-total-${team}`);
+    if(totEl) totEl.textContent=gs.pitchCount[team].total;
   }
   if(play.type==='score'){
     if(!gs.plays[team][pidx][inn]) gs.plays[team][pidx][inn]={sym:'R',bases:0,type:'advance'};
@@ -1625,7 +1654,7 @@ function autoAdvance(team,pidx,inn){
       nextTeam='v'; nextInn=inn+1;
       if(nextInn>INNINGS) return;
     }
-    nextPidx=findFirstEmptyBatter(nextTeam,nextInn);
+    nextPidx=gs.currentBatter[nextTeam];
     if(nextInn!==inn){
       // Cambiar a la nueva entrada en la nav
       const ib=document.getElementById(`ib${nextInn}`);
@@ -2484,9 +2513,9 @@ function unlockPitchButtons(team){
 }
 
 function updatePitchABDisplay(team){
-  const ab=gs.pitchAB[team];
+  const pc=gs.pitchCount[team];
   const el=document.getElementById(`pc-sbf-${team}`);
-  if(el) el.innerHTML=`S: ${ab.s}<br>B: ${ab.b}<br>F: ${ab.f}`;
+  if(el) el.innerHTML=`S: ${pc.strikes}<br>B: ${pc.balls}<br>F: ${pc.fouls}`;
 }
 
 function resetPitchAB(){
@@ -2577,7 +2606,7 @@ function updatePitchCounterUI(){
     const el=document.getElementById(`pc-total-${t}`);
     if(el) el.textContent=pc.total;
     const sb=document.getElementById(`pc-sbf-${t}`);
-    if(sb) sb.innerHTML=`S: ${gs.pitchAB[t].s}<br>B: ${gs.pitchAB[t].b}<br>F: ${gs.pitchAB[t].f}`;
+    if(sb) sb.innerHTML=`S: ${gs.pitchCount[t].strikes}<br>B: ${gs.pitchCount[t].balls}<br>F: ${gs.pitchCount[t].fouls}`;
     const pn=document.getElementById(`pc-name-${t}`);
     if(pn) pn.textContent=getCurrentPitcherName(t);
   });
