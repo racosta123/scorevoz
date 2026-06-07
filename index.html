@@ -1342,7 +1342,7 @@ function showRunnerModal(team,pidx,inn){
     const b=document.createElement('button');
     b.className=`run-btn ${cls}`; b.textContent=lbl;
     if(full) b.style.gridColumn='1/-1';
-    b.onclick=()=>{ applyRunnerMove(team,pidx,inn,action); closeModal(); returnToActiveBatter(); };
+    b.onclick=()=>{ applyRunnerMove(team,pidx,inn,action); closeModal(); checkRunnerOutAdvance(team,pidx,inn,action); };
     return b;
   };
   const sec=(txt)=>{
@@ -1418,6 +1418,22 @@ function applyRunnerMove(team,pidx,inn,action){
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
   updateScores();
+}
+
+// ─── REVISAR CAMBIO DE TURNO TRAS OUT DE CORREDOR ────────
+// Llama a autoAdvance si ya hay 3 outs; si no, regresa al bateador activo
+const RUNNER_OUT_ACTIONS=['cs','po','outAdv','out2','out3','outH','rd'];
+function checkRunnerOutAdvance(team,pidx,inn,action){
+  if(!RUNNER_OUT_ACTIONS.includes(action)){ returnToActiveBatter(); return; }
+  const outs=countOutsInInning(team,inn);
+  if(outs>=3){
+    gs.activeBatter=null;
+    document.getElementById('runner-mode-banner').style.display='none';
+    document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
+    autoAdvance(team,pidx,inn);
+  } else {
+    returnToActiveBatter();
+  }
 }
 
 // ─── REGRESO AL BATEADOR ACTIVO ──────────────────────────
@@ -1706,7 +1722,7 @@ function countOutsInInning(team,inn){
   let outs=0;
   gs.teams[team].players.forEach((_,i)=>{
     const pl=(gs.plays[team][i]||{})[inn];
-    if(pl && (pl.type==='out' || pl.csOut)) outs++;
+    if(pl && (pl.type==='out' || pl.csOut || pl.runnerOut)) outs++;
   });
   return outs;
 }
@@ -1916,7 +1932,7 @@ function confirmYes(){
       }
     }
     document.getElementById('vrs').textContent=`✓ ${a.sym||''}`;
-    returnToActiveBatter();
+    checkRunnerOutAdvance(a.team,a.pidx,a.inn,a.action);
   } else if(a.type==='sub'){
     applySubstitution(a.team,a.pidx,a.inName,a.inPos);
   }
