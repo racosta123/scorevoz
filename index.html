@@ -559,7 +559,13 @@ const PLAY_CATALOG = {
     { id:'KS',  label:'K ⚾ Ponche Swing',      sym:'KS',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche','ponche swing','strike out swing','abanicó','abaniq','chocolate','abanicar','whiff','abanico','morder el polvo','se lo comió'] },
     { id:'KL',  label:'KL Ponche Cantado',       sym:'KL',  bases:0, type:'out', ab:true,  color:'red',   voice:['ponche cantado','ponche mirando','ponche llamado','strike out looking','sin tirarle','sin mover','ponche viendo','parado','ponche parado','sin mover el bate','ponche sin tirarle','tercer strike cantado','se quedó parado','se quedo parado','le cantaron el strike','strike tres cantado','caught looking','watching','ponche sin swing','tres strikes','sin batear','strike three'] },
     { id:'KBF', label:'KBF Ponche Foul de Bunt', sym:'KBF', bases:0, type:'out', ab:true,  color:'red',   voice:['foul de bunt dos strikes','foul de toque dos strikes','foul de plancha dos strikes','bunt foul dos strikes','kbf','toque fallido dos strikes','plancha fallida dos strikes','foul bunt strike'] },
-    // Fly outs
+    // Fly outs — cuadro interior
+    { id:'F2',  label:'F2 Fly al Catcher',        sym:'F2',  bases:0, type:'out', ab:true,  color:'red',   voice:['elevado al catcher','fly al catcher','fly al receptor','elevado al receptor'] },
+    { id:'F3',  label:'F3 Fly a Primera',         sym:'F3',  bases:0, type:'out', ab:true,  color:'red',   voice:['elevado a primera','fly a primera','fly al inicialista','elevado al inicialista'] },
+    { id:'F4',  label:'F4 Fly a Segunda',         sym:'F4',  bases:0, type:'out', ab:true,  color:'red',   voice:['elevado a segunda','fly a segunda','fly al camarero','elevado al camarero'] },
+    { id:'F5',  label:'F5 Fly a Tercera',         sym:'F5',  bases:0, type:'out', ab:true,  color:'red',   voice:['elevado a tercera','fly a tercera','fly al antesalista','elevado al antesalista'] },
+    { id:'F6',  label:'F6 Fly al Short',          sym:'F6',  bases:0, type:'out', ab:true,  color:'red',   voice:['elevado al short','fly al short','fly al shortstop','elevado al shortstop','fly al campocorto','elevado al campocorto'] },
+    // Fly outs — jardín
     { id:'F7',  label:'F7 Fly Left Field',       sym:'F7',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly izquierda','elevado izquierda','fly left'] },
     { id:'F8',  label:'F8 Fly Center',           sym:'F8',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly center','elevado centro','fly central'] },
     { id:'F9',  label:'F9 Fly Right Field',      sym:'F9',  bases:0, type:'out', ab:true,  color:'red',   voice:['fly derecha','elevado derecha','fly right'] },
@@ -1312,7 +1318,7 @@ function showModal(team,pidx,inn){
   const sections=[
     {title:'PONCHES',    plays:PLAY_CATALOG.outs.filter(p=>['KS','KL'].includes(p.id))},
     {title:'GROUND OUTS',plays:PLAY_CATALOG.outs.filter(p=>p.id.startsWith('R'))},
-    {title:'FLY OUTS',   plays:PLAY_CATALOG.outs.filter(p=>['F7','F8','F9','P','L','FF','IF'].includes(p.id))},
+    {title:'FLY OUTS',   plays:PLAY_CATALOG.outs.filter(p=>['F2','F3','F4','F5','F6','F7','F8','F9','P','L','FF','IF'].includes(p.id))},
     {title:'DOBLE PLAY / OTROS OUTS', plays:PLAY_CATALOG.outs.filter(p=>['DP643','DP543','SH','SF','SQ','CS','OR','GDP'].includes(p.id))},
     {title:'HITS',       plays:PLAY_CATALOG.hits.filter(p=>['1B','2B','3B','HR','IHR','B','TX'].includes(p.id))},
     {title:'HITS POR ZONA', plays:PLAY_CATALOG.hits.filter(p=>['LS','RS','MI','LC','RC','LL','RL'].includes(p.id))},
@@ -1473,7 +1479,7 @@ function renderGameState(){
   const st=computeBaseState(team,inn,pidx);
   const outs=Math.min(countOutsInInning(team,inn),2);
   const bc=occ=>occ?'#ffb648':'#f0ead8';
-  const dot=i=>`<span style="width:9px;height:9px;border-radius:50%;display:inline-block;background:${i<outs?'#ff4d67':'#2a3a50'};flex-shrink:0"></span>`;
+  const dot=i=>`<span style="width:14px;height:14px;border-radius:50%;display:inline-block;flex-shrink:0;background:${i<outs?'#ff4d67':'#1e2d40'};box-shadow:${i<outs?'0 0 7px rgba(255,77,103,.6)':'none'}"></span>`;
 
   // Marcador R/H/E
   const gd=id=>{ const e=document.getElementById(id); return e?e.textContent:'0'; };
@@ -1484,10 +1490,13 @@ function renderGameState(){
   const lN=(gs.teams.l.name||'LOC').slice(0,5);
 
   el.style.display='flex';
+  el.style.flexDirection='row';
+  el.style.alignItems='center';
+  el.style.gap='10px';
   el.innerHTML=`
-    <!-- campo + outs -->
-    <div style="display:flex;align-items:center;gap:6px">
-      <svg width="46" height="42" viewBox="0 0 60 56">
+    <!-- LEFT: campo + outs -->
+    <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <svg width="62" height="58" viewBox="0 0 60 56">
         <rect x="2" y="2" width="56" height="52" rx="9" fill="#1f7a34"/>
         <polygon points="30,48 48,30 30,12 12,30" fill="#c0803f"/>
         <polygon points="30,40 40,30 30,20 20,30" fill="#2f8c40"/>
@@ -1497,36 +1506,36 @@ function renderGameState(){
         <polygon points="12,26 16,30 12,34 8,30" fill="${bc(!!st.third)}" stroke="#7a4a14" stroke-width="0.6"/>
         <polygon points="26,45 34,45 34,49 30,52 26,49" fill="#f5f0e2" stroke="#7a4a14" stroke-width="0.6"/>
       </svg>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
-        <div style="display:flex;gap:3px">${dot(0)}${dot(1)}</div>
-        <span style="font-size:.34rem;color:#5a6a80;font-family:'Oswald',sans-serif;letter-spacing:.07em">OUTS</span>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+        <div style="display:flex;gap:5px">${dot(0)}${dot(1)}</div>
+        <span style="font-size:.46rem;color:#6a7a90;font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.10em">OUTS</span>
       </div>
     </div>
-    <!-- marcador R/H/E -->
-    <table style="border-collapse:collapse;font-family:'Oswald',sans-serif;font-size:.45rem;line-height:1.65;letter-spacing:.03em">
+    <!-- RIGHT: marcador R/H/E -->
+    <table style="border-collapse:collapse;font-family:'Oswald',sans-serif;letter-spacing:.03em;flex-shrink:0">
       <thead>
         <tr>
           <td></td>
-          <td style="color:#5a6a80;padding:0 3px;text-align:center;font-size:.34rem">R</td>
-          <td style="color:#5a6a80;padding:0 3px;text-align:center;font-size:.34rem">H</td>
-          <td style="color:#5a6a80;padding:0 3px;text-align:center;font-size:.34rem">E</td>
+          <td style="color:#5a6a80;padding:0 6px;text-align:center;font-size:.46rem;font-weight:600;letter-spacing:.06em">R</td>
+          <td style="color:#5a6a80;padding:0 4px;text-align:center;font-size:.40rem;letter-spacing:.05em">H</td>
+          <td style="color:#5a6a80;padding:0 4px;text-align:center;font-size:.40rem;letter-spacing:.05em">E</td>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td style="color:#8fa3b7;padding-right:4px;white-space:nowrap">${vN}</td>
-          <td style="color:#00e599;font-weight:700;padding:0 3px;text-align:right">${vR}</td>
-          <td style="color:#ccc;padding:0 3px;text-align:right">${vH}</td>
-          <td style="color:#5a6a80;padding:0 3px;text-align:right">${vE}</td>
+          <td style="color:#00bfff;font-size:.52rem;font-weight:600;padding-right:6px;white-space:nowrap;letter-spacing:.04em">${vN}</td>
+          <td style="color:#00e599;font-weight:700;font-size:1.35rem;padding:0 6px;text-align:right;line-height:1.1">${vR}</td>
+          <td style="color:#d0d8e0;font-size:.58rem;font-weight:500;padding:0 4px;text-align:right">${vH}</td>
+          <td style="color:#6a7a90;font-size:.58rem;padding:0 4px;text-align:right">${vE}</td>
         </tr>
         <tr>
-          <td style="color:#8fa3b7;padding-right:4px;white-space:nowrap">${lN}</td>
-          <td style="color:#00e599;font-weight:700;padding:0 3px;text-align:right">${lR}</td>
-          <td style="color:#ccc;padding:0 3px;text-align:right">${lH}</td>
-          <td style="color:#5a6a80;padding:0 3px;text-align:right">${lE}</td>
+          <td style="color:#ffb648;font-size:.52rem;font-weight:600;padding-right:6px;white-space:nowrap;letter-spacing:.04em">${lN}</td>
+          <td style="color:#00e599;font-weight:700;font-size:1.35rem;padding:0 6px;text-align:right;line-height:1.1">${lR}</td>
+          <td style="color:#d0d8e0;font-size:.58rem;font-weight:500;padding:0 4px;text-align:right">${lH}</td>
+          <td style="color:#6a7a90;font-size:.58rem;padding:0 4px;text-align:right">${lE}</td>
         </tr>
         <tr>
-          <td colspan="4" style="color:#5a6a80;font-size:.34rem;letter-spacing:.06em;text-align:center;padding-top:1px">${arr} E${inn}</td>
+          <td colspan="4" style="color:#5a6a80;font-size:.40rem;letter-spacing:.07em;text-align:center;padding-top:3px">${arr} E${inn}</td>
         </tr>
       </tbody>
     </table>`;
@@ -2199,6 +2208,11 @@ function interpretVoice(text){
     const jar=/\b7\b|izquierda|left\b/.test(text)?'7'
              :/\b8\b|centr|center\b/.test(text)?'8'
              :/\b9\b|derecha|right\b/.test(text)?'9'
+             :/\bcatcher\b|\breceptor\b/.test(text)?'2'
+             :/\binicialista\b|\bprimera\b/.test(text)?'3'
+             :/\bcamarero\b|\bsegunda\b/.test(text)?'4'
+             :/\bantesalista\b|\btercera\b/.test(text)?'5'
+             :/\bshort\b|\bshortstop\b|\bcampocorto\b/.test(text)?'6'
              :(/\b([1-6])\b/.exec(text)||[])[1]||null;
     if(jar){
       const isSacri=/sacrificio|sacri\b/.test(text);
