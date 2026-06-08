@@ -3408,7 +3408,11 @@ function narratePlay(team,pidx,inn){
       parts.push(p.earned===false ? 'Anotó carrera sucia.' : 'Anotó carrera limpia.');
     } else if(p.runnerOut){
       const bn={2:'segunda',3:'tercera',4:'home'};
-      parts.push(`Fue puesto out en ${bn[p.runnerOutBase]||'bases'}.`);
+      const base=bn[p.runnerOutBase]||'bases';
+      if(p.dpRoute)
+        parts.push(`Fue puesto out en ${base} (${p.dpRoute}), en batazo para doble play.`);
+      else
+        parts.push(`Fue puesto out en ${base}.`);
     }
   }
   return parts.join(' ')||'Sin descripción disponible.';
