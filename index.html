@@ -424,7 +424,7 @@
       </table>
     </div>
     <div class="inning-nav" id="innav"></div>
-    <div id="outs-indicator" style="display:flex;align-items:center;gap:10px;padding:3px 16px;background:#081220;border-bottom:1px solid rgba(255,255,255,.07);font-family:'Oswald',sans-serif;font-size:0.72rem;letter-spacing:.08em;color:#7a8fa6;min-height:26px"><span style="opacity:.35">— outs —</span></div>
+    <div id="outs-indicator" style="background:#081220;border-bottom:1px solid rgba(255,255,255,.07)"><span style="display:block;padding:4px 16px;font-size:.65rem;font-family:'Oswald',sans-serif;color:rgba(255,255,255,.25);letter-spacing:1px">— SIN PARTIDO ACTIVO —</span></div>
     <div class="pitch-bar" id="pitch-bar">
       <div class="pitch-box">
         <div style="min-width:0"><div style="font-size:0.58rem;color:var(--text-dim);letter-spacing:1px;font-family:'Oswald'">VISITANTE</div><div class="pitch-pitcher-name" id="pc-name-v">—</div></div>
@@ -542,7 +542,8 @@ let gs = {
   },
   currentBatter:{ v:0, l:0 },
   playHistory:[],
-  activeBatter:null
+  activeBatter:null,
+  alBate:null
 };
 
 // ─── CATÁLOGO OFICIAL DE JUGADAS ───────────────────────────
@@ -1250,7 +1251,7 @@ function selectCell(team,pidx,inn,td){
     document.getElementById('runner-mode-banner').style.display='block';
     // Limpiar activeBatter si es de otro equipo; preservar si es del mismo
     if(gs.activeBatter && gs.activeBatter.team!==team) gs.activeBatter=null;
-    renderOutsIndicator();
+    renderGameState();
     return; // NO resetear pitchAB
   }
 
@@ -1275,10 +1276,11 @@ function selectCell(team,pidx,inn,td){
   selCell={team,pidx,inn,td};
   gs.selected=selCell;
   gs.activeBatter={team,pidx,inn,td};
+  gs.alBate={team,pidx,inn};
   const p=gs.teams[team].players[pidx];
   document.getElementById('selinfo').innerHTML=`<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
   document.getElementById('reg-btn').disabled=false;
-  renderOutsIndicator();
+  renderGameState();
 }
 
 function openModalForSelected(){
@@ -1431,7 +1433,7 @@ function applyRunnerMove(team,pidx,inn,action){
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
   updateScores();
-  renderOutsIndicator();
+  renderGameState();
 }
 
 // ─── REVISAR CAMBIO DE TURNO TRAS OUT DE CORREDOR ────────
@@ -1445,26 +1447,63 @@ function checkRunnerOutAdvance(team,pidx,inn,action){
     const _banner=document.getElementById('runner-mode-banner');
     if(_banner) _banner.style.display='none';
     document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
-    renderOutsIndicator();
+    renderGameState();
     autoAdvance(team,pidx,inn);
   } else {
     returnToActiveBatter();
   }
 }
 
-// ─── INDICADOR DE OUTS VISIBLE ───────────────────────────
-function renderOutsIndicator(){
+// ─── TIRA DE ESTADO EN VIVO ───────────────────────────────
+function renderGameState(){
   const el=document.getElementById('outs-indicator');
   if(!el) return;
-  const sel=gs.selected;
-  if(!sel){ el.innerHTML='<span style="opacity:.3">— outs —</span>'; return; }
-  const {team,inn}=sel;
-  const outs=Math.min(countOutsInInning(team,inn),3);
-  const dots=[0,1,2].map(i=>
-    `<span style="font-size:1.25rem;line-height:1;color:${i<outs?'#ff4455':'rgba(255,255,255,.18)'}">${i<outs?'⬤':'○'}</span>`
-  ).join('');
-  const tname=(gs.teams[team]&&gs.teams[team].name)||'—';
-  el.innerHTML=`<span>E${inn} · ${tname}</span><span style="display:flex;gap:6px;align-items:center">${dots}</span><span style="color:${outs>=3?'#ff4455':'#7a8fa6'}">${outs} OUT${outs!==1?'S':''}</span>`;
+  const ab=gs.alBate;
+  const idle='<span style="display:block;padding:4px 16px;font-size:.65rem;font-family:\'Oswald\',sans-serif;color:rgba(255,255,255,.25);letter-spacing:1px">— SIN PARTIDO ACTIVO —</span>';
+  if(!ab){ el.style.cssText='background:#081220;border-bottom:1px solid rgba(255,255,255,.07)'; el.innerHTML=idle; return; }
+  const {team,pidx,inn}=ab;
+  const players=gs.teams[team].players;
+  const p=players[pidx];
+  if(!p){ el.innerHTML=idle; return; }
+  const outs=Math.min(countOutsInInning(team,inn),2); // máx 2 puntos
+  const st=computeBaseState(team,inn,pidx);
+  const nextPidx=(pidx+1)%players.length;
+  const nextP=players[nextPidx];
+  const AMB='#ffb648', RED='#ff4455', DIM='rgba(255,255,255,.15)';
+  // Outs: 2 puntos (rojo=out, gris=vacío)
+  const outDots=[0,1].map(i=>`<span style="font-size:.9rem;line-height:1;color:${i<outs?RED:DIM}">${i<outs?'⬤':'○'}</span>`).join('');
+  // Diamante SVG mini
+  const bc=occ=>occ?AMB:DIM;
+  const bp=(cx,cy,occ)=>`<polygon points="${cx},${cy-4.5} ${cx+4.5},${cy} ${cx},${cy+4.5} ${cx-4.5},${cy}" fill="${bc(occ)}"/>`;
+  const dmnd=`<svg width="40" height="40" viewBox="0 0 44 44" style="flex-shrink:0;display:block">
+    <polyline points="22,38 38,22 22,6 6,22 22,38" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="1.2"/>
+    ${bp(38,22,!!st.first)}${bp(22,6,!!st.second)}${bp(6,22,!!st.third)}
+    <polygon points="22,34 25,38 22,42 19,38" fill="rgba(255,255,255,.06)" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
+  </svg>`;
+  // Ordinal y siguiente bateador
+  const ord=p.bat?`${p.bat}°`:'—';
+  const nextOrd=nextP&&nextP.bat?`${nextP.bat}°`:'—';
+  const posChip=p.pos&&p.pos!=='—'
+    ?`<span style="font-size:.5rem;color:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.18);padding:0 4px;border-radius:3px;font-family:'Oswald',sans-serif;flex-shrink:0">${p.pos}</span>`:'';
+  const nextLine=nextP
+    ?`<div style="font-size:.5rem;color:rgba(255,255,255,.28);font-family:'Oswald',sans-serif;letter-spacing:.05em;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">EN ESPERA: ${nextOrd} ${nextP.name}${nextP.pos&&nextP.pos!=='—'?' · '+nextP.pos:''}</div>`:'';
+  el.style.cssText='background:#081220;border-bottom:1px solid rgba(255,255,255,.07);display:block;padding:0';
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:5px 14px;min-height:54px;box-sizing:border-box">
+    <div style="flex:1;min-width:0;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;flex-wrap:nowrap">
+        <span style="background:${AMB};color:#071018;font-size:.52rem;font-weight:700;font-family:'Oswald',sans-serif;letter-spacing:.1em;padding:1px 5px;border-radius:3px;flex-shrink:0">AL BATE</span>
+        <span style="font-size:.62rem;color:${AMB};font-family:'Oswald',sans-serif;letter-spacing:.04em;flex-shrink:0">${ord}</span>
+        ${posChip}
+      </div>
+      <div style="font-family:'Oswald',sans-serif;font-size:1.05rem;font-weight:400;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.04em;line-height:1.15">${p.name}</div>
+      ${nextLine}
+    </div>
+    ${dmnd}
+    <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:28px">
+      <div style="display:flex;gap:5px">${outDots}</div>
+      <span style="font-size:.44rem;color:rgba(255,255,255,.22);font-family:'Oswald',sans-serif;letter-spacing:.08em">OUTS</span>
+    </div>
+  </div>`;
 }
 
 // ─── REGRESO AL BATEADOR ACTIVO ──────────────────────────
@@ -1477,7 +1516,7 @@ function returnToActiveBatter(){
     gs.selected=null; selCell=null;
     document.getElementById('selinfo').innerHTML=`<strong>— SIN SELECCIÓN —</strong><span>Toca una casilla</span>`;
     document.getElementById('reg-btn').disabled=true;
-    renderOutsIndicator();
+    renderGameState();
     return;
   }
   const {team,pidx,inn,td}=gs.activeBatter;
@@ -1488,7 +1527,7 @@ function returnToActiveBatter(){
   const p=gs.teams[team].players[pidx];
   document.getElementById('selinfo').innerHTML=
     `<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
-  renderOutsIndicator();
+  renderGameState();
 }
 
 // ─── JUGADA DE CORREDOR POR VOZ (en modo corredor) ────────
@@ -1755,7 +1794,7 @@ function applyPlay(team,pidx,inn,play){
   gs.activeBatter=null;
   document.getElementById('runner-mode-banner').style.display='none';
   document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
-  renderOutsIndicator();
+  renderGameState();
   showToast(runSummary?`✓ ${play.label} · ${runSummary}`:`✓ ${play.label}`);
   if(play.type!=='score' && play.type!=='clear'){
     gs.playHistory.push({team, pidx, inn});
@@ -2092,6 +2131,26 @@ function interpretRunnerVoice(text,team,pidx,inn){
 function interpretVoice(text){
   document.getElementById('vtr').textContent=`"${text}"`;
   if(/deshacer|undo|borra(r)?\s+últ/.test(text)){ undoLastPlay(); return; }
+  // ── ¿QUIÉN BATEA? ────────────────────────────────────────
+  if(/qui[eé]n batea|quien batea|al bate\??|who.?s batting/i.test(text)){
+    const ab=gs.alBate;
+    if(!ab){ showToast('⚠️ No hay bateador activo',true); return; }
+    const p=gs.teams[ab.team].players[ab.pidx];
+    if(!p) return;
+    const ordVoz=['primero','segundo','tercero','cuarto','quinto','sexto','séptimo','octavo','noveno'];
+    const ordS=p.bat>=1&&p.bat<=9?ordVoz[p.bat-1]:`número ${p.bat}`;
+    const posVoz={'P':'pitcher','C':'catcher','1B':'primera base','2B':'segunda base','3B':'tercera base','SS':'short','LF':'jardinero izquierdo','CF':'jardinero central','RF':'jardinero derecho','DH':'bateador designado'};
+    const posS=(posVoz[p.pos]||p.pos||'').replace('—','');
+    const msg=`Al bate, ${ordS}, ${p.name}${posS?', '+posS:''}.`;
+    showToast(`🎤 ${msg}`);
+    if(window.speechSynthesis){
+      const u=new SpeechSynthesisUtterance(msg);
+      u.lang=gs.lang||'es-MX';
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    }
+    return;
+  }
   if(!gs.selected){ showToast('⚠️ Selecciona una casilla primero',true); return; }
   const {team,pidx,inn}=gs.selected;
 
