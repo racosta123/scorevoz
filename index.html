@@ -55,7 +55,7 @@
   .btn-start:hover { background:#00cc7a; transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,229,153,.4); }
   /* ── GAME ───────────────────────────────────────────────── */
   #game-screen { display:none; padding:0; }
-  .game-content { padding-bottom:260px; }
+  .game-content { padding-bottom:220px; }
   /* ── LINE SCORE ─────────────────────────────────────────── */
   .line-score-bar { background:#081220; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.10); overflow-x:auto; }
   .ls-table { border-collapse:collapse; font-size:0.72rem; width:100%; }
@@ -183,12 +183,12 @@
   .confirm-no  { background:#ff4d67; color:#fff; }
   @media(max-width:768px){ .game-layout{grid-template-columns:1fr;} }
   @media(max-width:524px){
-    .game-content { padding-bottom:360px; }
+    .game-content { padding-bottom:300px; }
+    #game-state-inline { display:none !important; }
   }
-  /* ── BARRA DE ESTADO EN VIVO ────────────────────────────── */
-  #outs-indicator { position:fixed; bottom:72px; left:0; right:0; z-index:190; background:#0b1724; border-top:1px solid rgba(255,255,255,.10); box-shadow:0 -3px 20px rgba(0,0,0,.55); display:none; overflow:hidden; }
   /* ── PITCH COUNTER BAR ──────────────────────────────────── */
-  .pitch-bar { position:fixed; left:0; right:0; bottom:160px; z-index:150; background:#081220; padding:8px 16px; border-top:2px solid rgba(0,229,153,.20); box-shadow:0 -4px 24px rgba(0,0,0,.65); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  #outs-indicator { display:none; }
+  .pitch-bar { position:fixed; left:0; right:0; bottom:100px; z-index:150; background:#081220; padding:8px 16px; border-top:2px solid rgba(0,229,153,.20); box-shadow:0 -4px 24px rgba(0,0,0,.65); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .pitch-box { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:8px 14px; display:flex; align-items:center; gap:8px; flex:1; min-width:240px; }
   .pitch-pitcher-name { font-family:'Oswald',sans-serif; font-size:0.82rem; color:#00bfff; letter-spacing:1px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px; }
   .pitch-total { font-family:'Bebas Neue',sans-serif; font-size:2.6rem; color:#fff; line-height:1; min-width:44px; text-align:center; font-weight:900; }
@@ -497,6 +497,8 @@
     <div class="voice-transcript" id="vtr">Selecciona una casilla, luego mantén presionado el micrófono y habla...</div>
     <div class="voice-result" id="vrs"></div>
   </div>
+  <!-- Estado en vivo: campo + outs + marcador R/H/E -->
+  <div id="game-state-inline" style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:5px;flex-shrink:0;padding:0 12px;border-left:1px solid rgba(255,255,255,.08);border-right:1px solid rgba(255,255,255,.08);align-self:stretch"></div>
   <div style="display:flex;flex-direction:column;gap:5px;min-width:150px">
     <div class="selected-info" id="selinfo"><strong>— SIN SELECCIÓN —</strong><span>Toca una casilla</span></div>
     <div id="runner-mode-banner" style="display:none;background:#ffb648;color:#071018;font-size:0.7rem;font-weight:700;font-family:'Oswald',sans-serif;letter-spacing:.06em;padding:3px 8px;border-radius:5px;text-align:center">⚡ MODO CORREDOR · dicta la jugada</div>
@@ -1456,48 +1458,36 @@ function checkRunnerOutAdvance(team,pidx,inn,action){
   }
 }
 
-// ─── TIRA DE ESTADO EN VIVO (barra fija inferior) ────────
+// ─── ESTADO EN VIVO — integrado en voice panel ───────────
 function renderGameState(){
-  const el=document.getElementById('outs-indicator');
+  const el=document.getElementById('game-state-inline');
   if(!el) return;
   const ab=gs.alBate;
   if(!ab){ el.style.display='none'; return; }
-  el.style.display='block';
   const {team,pidx,inn}=ab;
   const players=gs.teams[team].players;
   const p=players[pidx];
   if(!p){ el.style.display='none'; return; }
 
-  // ── A: Estado de bases + outs ─────────────────────────
+  // Bases + outs
   const st=computeBaseState(team,inn,pidx);
   const outs=Math.min(countOutsInInning(team,inn),2);
   const bc=occ=>occ?'#ffb648':'#f0ead8';
-  const od=i=>`<span style="width:9px;height:9px;border-radius:50%;display:inline-block;background:${i<outs?'#ff4d67':'#2a3a50'}"></span>`;
+  const dot=i=>`<span style="width:9px;height:9px;border-radius:50%;display:inline-block;background:${i<outs?'#ff4d67':'#2a3a50'};flex-shrink:0"></span>`;
 
-  // ── B: Bateador en turno ──────────────────────────────
-  const ord=p.bat?`${p.bat}°`:'—';
-  const nPidx=(pidx+1)%players.length;
-  const nP=players[nPidx];
-  const nOrd=nP&&nP.bat?`${nP.bat}°`:'—';
-  const posChip=p.pos&&p.pos!=='—'
-    ?`<span style="font-size:.45rem;color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.15);padding:0 3px;border-radius:3px;flex-shrink:0">${p.pos}</span>`:'';
-  const nxtLine=nP
-    ?`<div style="font-size:.42rem;color:#7d8ba0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;letter-spacing:.04em">EN ESPERA · ${nOrd} ${nP.name}${nP.pos&&nP.pos!=='—'?' · '+nP.pos:''}</div>`:'';
-
-  // ── C: Marcador R/H/E + entrada + cuenta ─────────────
+  // Marcador R/H/E
   const gd=id=>{ const e=document.getElementById(id); return e?e.textContent:'0'; };
   const vR=gd('lsvR'),vH=gd('lsvH'),vE=gd('lsvE');
   const lR=gd('lslR'),lH=gd('lslH'),lE=gd('lslE');
-  const cnt=gs.pitchAB[team]||{b:0,s:0};
   const arr=team==='v'?'▲':'▼';
-  const vN=(gs.teams.v.name||'VIS').slice(0,7);
-  const lN=(gs.teams.l.name||'LOC').slice(0,7);
+  const vN=(gs.teams.v.name||'VIS').slice(0,5);
+  const lN=(gs.teams.l.name||'LOC').slice(0,5);
 
-  el.innerHTML=`<div style="display:flex;align-items:stretch;height:76px;font-family:'Oswald',sans-serif;box-sizing:border-box">
-
-    <!-- A: SITUACIÓN (campo + outs) -->
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0 8px 0 10px;border-right:1px solid rgba(255,255,255,.07);flex-shrink:0">
-      <svg width="54" height="50" viewBox="0 0 60 56">
+  el.style.display='flex';
+  el.innerHTML=`
+    <!-- campo + outs -->
+    <div style="display:flex;align-items:center;gap:6px">
+      <svg width="46" height="42" viewBox="0 0 60 56">
         <rect x="2" y="2" width="56" height="52" rx="9" fill="#1f7a34"/>
         <polygon points="30,48 48,30 30,12 12,30" fill="#c0803f"/>
         <polygon points="30,40 40,30 30,20 20,30" fill="#2f8c40"/>
@@ -1507,46 +1497,39 @@ function renderGameState(){
         <polygon points="12,26 16,30 12,34 8,30" fill="${bc(!!st.third)}" stroke="#7a4a14" stroke-width="0.6"/>
         <polygon points="26,45 34,45 34,49 30,52 26,49" fill="#f5f0e2" stroke="#7a4a14" stroke-width="0.6"/>
       </svg>
-      <div style="display:flex;gap:4px;align-items:center">${od(0)}${od(1)}<span style="font-size:.38rem;color:#7d8ba0;letter-spacing:.06em;margin-left:2px">OUT</span></div>
-    </div>
-
-    <!-- B: AL BATE -->
-    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 10px;min-width:0;border-right:1px solid rgba(255,255,255,.07);overflow:hidden">
-      <div style="display:flex;align-items:center;gap:4px;margin-bottom:1px;flex-wrap:nowrap">
-        <span style="background:#ffb648;color:#071018;font-size:.46rem;font-weight:700;letter-spacing:.1em;padding:1px 4px;border-radius:3px;flex-shrink:0">AL BATE</span>
-        <span style="font-size:.56rem;color:#ffb648;flex-shrink:0">${ord}</span>
-        ${posChip}
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+        <div style="display:flex;gap:3px">${dot(0)}${dot(1)}</div>
+        <span style="font-size:.34rem;color:#5a6a80;font-family:'Oswald',sans-serif;letter-spacing:.07em">OUTS</span>
       </div>
-      <div style="font-size:.97rem;color:#fff;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${p.name}</div>
-      ${nxtLine}
     </div>
-
-    <!-- C: MARCADOR -->
-    <div style="display:flex;flex-direction:column;justify-content:center;padding:0 10px;flex-shrink:0">
-      <table style="border-collapse:collapse;font-size:.5rem;line-height:1.55;letter-spacing:.04em">
+    <!-- marcador R/H/E -->
+    <table style="border-collapse:collapse;font-family:'Oswald',sans-serif;font-size:.45rem;line-height:1.65;letter-spacing:.03em">
+      <thead>
         <tr>
           <td></td>
-          <td style="color:#7d8ba0;padding:0 4px;text-align:center;font-size:.38rem">R</td>
-          <td style="color:#7d8ba0;padding:0 4px;text-align:center;font-size:.38rem">H</td>
-          <td style="color:#7d8ba0;padding:0 4px;text-align:center;font-size:.38rem">E</td>
+          <td style="color:#5a6a80;padding:0 3px;text-align:center;font-size:.34rem">R</td>
+          <td style="color:#5a6a80;padding:0 3px;text-align:center;font-size:.34rem">H</td>
+          <td style="color:#5a6a80;padding:0 3px;text-align:center;font-size:.34rem">E</td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="color:#8fa3b7;padding-right:4px;white-space:nowrap">${vN}</td>
+          <td style="color:#00e599;font-weight:700;padding:0 3px;text-align:right">${vR}</td>
+          <td style="color:#ccc;padding:0 3px;text-align:right">${vH}</td>
+          <td style="color:#5a6a80;padding:0 3px;text-align:right">${vE}</td>
         </tr>
         <tr>
-          <td style="color:#7d8ba0;padding-right:4px;white-space:nowrap">${vN}</td>
-          <td style="color:#00e599;font-weight:700;padding:0 4px;text-align:right">${vR}</td>
-          <td style="color:#fff;padding:0 4px;text-align:right">${vH}</td>
-          <td style="color:#7d8ba0;padding:0 4px;text-align:right">${vE}</td>
+          <td style="color:#8fa3b7;padding-right:4px;white-space:nowrap">${lN}</td>
+          <td style="color:#00e599;font-weight:700;padding:0 3px;text-align:right">${lR}</td>
+          <td style="color:#ccc;padding:0 3px;text-align:right">${lH}</td>
+          <td style="color:#5a6a80;padding:0 3px;text-align:right">${lE}</td>
         </tr>
         <tr>
-          <td style="color:#7d8ba0;padding-right:4px;white-space:nowrap">${lN}</td>
-          <td style="color:#00e599;font-weight:700;padding:0 4px;text-align:right">${lR}</td>
-          <td style="color:#fff;padding:0 4px;text-align:right">${lH}</td>
-          <td style="color:#7d8ba0;padding:0 4px;text-align:right">${lE}</td>
+          <td colspan="4" style="color:#5a6a80;font-size:.34rem;letter-spacing:.06em;text-align:center;padding-top:1px">${arr} E${inn}</td>
         </tr>
-      </table>
-      <div style="font-size:.42rem;color:#7d8ba0;letter-spacing:.06em;white-space:nowrap;margin-top:1px">${arr} E${inn} · ${cnt.b}-${cnt.s}</div>
-    </div>
-
-  </div>`;
+      </tbody>
+    </table>`;
 }
 
 // ─── REGRESO AL BATEADOR ACTIVO ──────────────────────────
