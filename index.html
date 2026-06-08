@@ -55,7 +55,7 @@
   .btn-start:hover { background:#00cc7a; transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,229,153,.4); }
   /* ── GAME ───────────────────────────────────────────────── */
   #game-screen { display:none; padding:0; }
-  .game-content { padding-bottom:220px; }
+  .game-content { padding-bottom:260px; }
   /* ── LINE SCORE ─────────────────────────────────────────── */
   .line-score-bar { background:#081220; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,.10); overflow-x:auto; }
   .ls-table { border-collapse:collapse; font-size:0.72rem; width:100%; }
@@ -183,10 +183,12 @@
   .confirm-no  { background:#ff4d67; color:#fff; }
   @media(max-width:768px){ .game-layout{grid-template-columns:1fr;} }
   @media(max-width:524px){
-    .game-content { padding-bottom:300px; }
+    .game-content { padding-bottom:360px; }
   }
+  /* ── BARRA DE ESTADO EN VIVO ────────────────────────────── */
+  #outs-indicator { position:fixed; bottom:72px; left:0; right:0; z-index:190; background:#0b1724; border-top:1px solid rgba(255,255,255,.10); box-shadow:0 -3px 20px rgba(0,0,0,.55); display:none; overflow:hidden; }
   /* ── PITCH COUNTER BAR ──────────────────────────────────── */
-  .pitch-bar { position:fixed; left:0; right:0; bottom:100px; z-index:150; background:#081220; padding:8px 16px; border-top:2px solid rgba(0,229,153,.20); box-shadow:0 -4px 24px rgba(0,0,0,.65); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .pitch-bar { position:fixed; left:0; right:0; bottom:160px; z-index:150; background:#081220; padding:8px 16px; border-top:2px solid rgba(0,229,153,.20); box-shadow:0 -4px 24px rgba(0,0,0,.65); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   .pitch-box { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:8px 14px; display:flex; align-items:center; gap:8px; flex:1; min-width:240px; }
   .pitch-pitcher-name { font-family:'Oswald',sans-serif; font-size:0.82rem; color:#00bfff; letter-spacing:1px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px; }
   .pitch-total { font-family:'Bebas Neue',sans-serif; font-size:2.6rem; color:#fff; line-height:1; min-width:44px; text-align:center; font-weight:900; }
@@ -1454,55 +1456,96 @@ function checkRunnerOutAdvance(team,pidx,inn,action){
   }
 }
 
-// ─── TIRA DE ESTADO EN VIVO ───────────────────────────────
+// ─── TIRA DE ESTADO EN VIVO (barra fija inferior) ────────
 function renderGameState(){
   const el=document.getElementById('outs-indicator');
   if(!el) return;
   const ab=gs.alBate;
-  const idle='<span style="display:block;padding:4px 16px;font-size:.65rem;font-family:\'Oswald\',sans-serif;color:rgba(255,255,255,.25);letter-spacing:1px">— SIN PARTIDO ACTIVO —</span>';
-  if(!ab){ el.style.cssText='background:#081220;border-bottom:1px solid rgba(255,255,255,.07)'; el.innerHTML=idle; return; }
+  if(!ab){ el.style.display='none'; return; }
+  el.style.display='block';
   const {team,pidx,inn}=ab;
   const players=gs.teams[team].players;
   const p=players[pidx];
-  if(!p){ el.innerHTML=idle; return; }
-  const outs=Math.min(countOutsInInning(team,inn),2); // máx 2 puntos
+  if(!p){ el.style.display='none'; return; }
+
+  // ── A: Estado de bases + outs ─────────────────────────
   const st=computeBaseState(team,inn,pidx);
-  const nextPidx=(pidx+1)%players.length;
-  const nextP=players[nextPidx];
-  const AMB='#ffb648', RED='#ff4455', DIM='rgba(255,255,255,.15)';
-  // Outs: 2 puntos (rojo=out, gris=vacío)
-  const outDots=[0,1].map(i=>`<span style="font-size:.9rem;line-height:1;color:${i<outs?RED:DIM}">${i<outs?'⬤':'○'}</span>`).join('');
-  // Diamante SVG mini
-  const bc=occ=>occ?AMB:DIM;
-  const bp=(cx,cy,occ)=>`<polygon points="${cx},${cy-4.5} ${cx+4.5},${cy} ${cx},${cy+4.5} ${cx-4.5},${cy}" fill="${bc(occ)}"/>`;
-  const dmnd=`<svg width="40" height="40" viewBox="0 0 44 44" style="flex-shrink:0;display:block">
-    <polyline points="22,38 38,22 22,6 6,22 22,38" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="1.2"/>
-    ${bp(38,22,!!st.first)}${bp(22,6,!!st.second)}${bp(6,22,!!st.third)}
-    <polygon points="22,34 25,38 22,42 19,38" fill="rgba(255,255,255,.06)" stroke="rgba(255,255,255,.12)" stroke-width="1"/>
-  </svg>`;
-  // Ordinal y siguiente bateador
+  const outs=Math.min(countOutsInInning(team,inn),2);
+  const bc=occ=>occ?'#ffb648':'#f0ead8';
+  const od=i=>`<span style="width:9px;height:9px;border-radius:50%;display:inline-block;background:${i<outs?'#ff4d67':'#2a3a50'}"></span>`;
+
+  // ── B: Bateador en turno ──────────────────────────────
   const ord=p.bat?`${p.bat}°`:'—';
-  const nextOrd=nextP&&nextP.bat?`${nextP.bat}°`:'—';
+  const nPidx=(pidx+1)%players.length;
+  const nP=players[nPidx];
+  const nOrd=nP&&nP.bat?`${nP.bat}°`:'—';
   const posChip=p.pos&&p.pos!=='—'
-    ?`<span style="font-size:.5rem;color:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.18);padding:0 4px;border-radius:3px;font-family:'Oswald',sans-serif;flex-shrink:0">${p.pos}</span>`:'';
-  const nextLine=nextP
-    ?`<div style="font-size:.5rem;color:rgba(255,255,255,.28);font-family:'Oswald',sans-serif;letter-spacing:.05em;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">EN ESPERA: ${nextOrd} ${nextP.name}${nextP.pos&&nextP.pos!=='—'?' · '+nextP.pos:''}</div>`:'';
-  el.style.cssText='background:#081220;border-bottom:1px solid rgba(255,255,255,.07);display:block;padding:0';
-  el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:5px 14px;min-height:54px;box-sizing:border-box">
-    <div style="flex:1;min-width:0;overflow:hidden">
-      <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;flex-wrap:nowrap">
-        <span style="background:${AMB};color:#071018;font-size:.52rem;font-weight:700;font-family:'Oswald',sans-serif;letter-spacing:.1em;padding:1px 5px;border-radius:3px;flex-shrink:0">AL BATE</span>
-        <span style="font-size:.62rem;color:${AMB};font-family:'Oswald',sans-serif;letter-spacing:.04em;flex-shrink:0">${ord}</span>
+    ?`<span style="font-size:.45rem;color:rgba(255,255,255,.4);border:1px solid rgba(255,255,255,.15);padding:0 3px;border-radius:3px;flex-shrink:0">${p.pos}</span>`:'';
+  const nxtLine=nP
+    ?`<div style="font-size:.42rem;color:#7d8ba0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;letter-spacing:.04em">EN ESPERA · ${nOrd} ${nP.name}${nP.pos&&nP.pos!=='—'?' · '+nP.pos:''}</div>`:'';
+
+  // ── C: Marcador R/H/E + entrada + cuenta ─────────────
+  const gd=id=>{ const e=document.getElementById(id); return e?e.textContent:'0'; };
+  const vR=gd('lsvR'),vH=gd('lsvH'),vE=gd('lsvE');
+  const lR=gd('lslR'),lH=gd('lslH'),lE=gd('lslE');
+  const cnt=gs.pitchAB[team]||{b:0,s:0};
+  const arr=team==='v'?'▲':'▼';
+  const vN=(gs.teams.v.name||'VIS').slice(0,7);
+  const lN=(gs.teams.l.name||'LOC').slice(0,7);
+
+  el.innerHTML=`<div style="display:flex;align-items:stretch;height:76px;font-family:'Oswald',sans-serif;box-sizing:border-box">
+
+    <!-- A: SITUACIÓN (campo + outs) -->
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0 8px 0 10px;border-right:1px solid rgba(255,255,255,.07);flex-shrink:0">
+      <svg width="54" height="50" viewBox="0 0 60 56">
+        <rect x="2" y="2" width="56" height="52" rx="9" fill="#1f7a34"/>
+        <polygon points="30,48 48,30 30,12 12,30" fill="#c0803f"/>
+        <polygon points="30,40 40,30 30,20 20,30" fill="#2f8c40"/>
+        <circle cx="30" cy="30" r="2.6" fill="#c0803f"/>
+        <polygon points="48,26 52,30 48,34 44,30" fill="${bc(!!st.first)}" stroke="#7a4a14" stroke-width="0.6"/>
+        <polygon points="30,8 34,12 30,16 26,12" fill="${bc(!!st.second)}" stroke="#7a4a14" stroke-width="0.6"/>
+        <polygon points="12,26 16,30 12,34 8,30" fill="${bc(!!st.third)}" stroke="#7a4a14" stroke-width="0.6"/>
+        <polygon points="26,45 34,45 34,49 30,52 26,49" fill="#f5f0e2" stroke="#7a4a14" stroke-width="0.6"/>
+      </svg>
+      <div style="display:flex;gap:4px;align-items:center">${od(0)}${od(1)}<span style="font-size:.38rem;color:#7d8ba0;letter-spacing:.06em;margin-left:2px">OUT</span></div>
+    </div>
+
+    <!-- B: AL BATE -->
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 10px;min-width:0;border-right:1px solid rgba(255,255,255,.07);overflow:hidden">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:1px;flex-wrap:nowrap">
+        <span style="background:#ffb648;color:#071018;font-size:.46rem;font-weight:700;letter-spacing:.1em;padding:1px 4px;border-radius:3px;flex-shrink:0">AL BATE</span>
+        <span style="font-size:.56rem;color:#ffb648;flex-shrink:0">${ord}</span>
         ${posChip}
       </div>
-      <div style="font-family:'Oswald',sans-serif;font-size:1.05rem;font-weight:400;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.04em;line-height:1.15">${p.name}</div>
-      ${nextLine}
+      <div style="font-size:.97rem;color:#fff;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2">${p.name}</div>
+      ${nxtLine}
     </div>
-    ${dmnd}
-    <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0;min-width:28px">
-      <div style="display:flex;gap:5px">${outDots}</div>
-      <span style="font-size:.44rem;color:rgba(255,255,255,.22);font-family:'Oswald',sans-serif;letter-spacing:.08em">OUTS</span>
+
+    <!-- C: MARCADOR -->
+    <div style="display:flex;flex-direction:column;justify-content:center;padding:0 10px;flex-shrink:0">
+      <table style="border-collapse:collapse;font-size:.5rem;line-height:1.55;letter-spacing:.04em">
+        <tr>
+          <td></td>
+          <td style="color:#7d8ba0;padding:0 4px;text-align:center;font-size:.38rem">R</td>
+          <td style="color:#7d8ba0;padding:0 4px;text-align:center;font-size:.38rem">H</td>
+          <td style="color:#7d8ba0;padding:0 4px;text-align:center;font-size:.38rem">E</td>
+        </tr>
+        <tr>
+          <td style="color:#7d8ba0;padding-right:4px;white-space:nowrap">${vN}</td>
+          <td style="color:#00e599;font-weight:700;padding:0 4px;text-align:right">${vR}</td>
+          <td style="color:#fff;padding:0 4px;text-align:right">${vH}</td>
+          <td style="color:#7d8ba0;padding:0 4px;text-align:right">${vE}</td>
+        </tr>
+        <tr>
+          <td style="color:#7d8ba0;padding-right:4px;white-space:nowrap">${lN}</td>
+          <td style="color:#00e599;font-weight:700;padding:0 4px;text-align:right">${lR}</td>
+          <td style="color:#fff;padding:0 4px;text-align:right">${lH}</td>
+          <td style="color:#7d8ba0;padding:0 4px;text-align:right">${lE}</td>
+        </tr>
+      </table>
+      <div style="font-size:.42rem;color:#7d8ba0;letter-spacing:.06em;white-space:nowrap;margin-top:1px">${arr} E${inn} · ${cnt.b}-${cnt.s}</div>
     </div>
+
   </div>`;
 }
 
