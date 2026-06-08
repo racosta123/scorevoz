@@ -1594,6 +1594,16 @@ function advanceRunners(team,pidx,inn,play){
       const rr=play._dpRunnerRoute||(parts.length>=2?`${parts[0]}-${parts[1]}`:null);
       if(rr) rpl.dpRoute=rr;
       refreshCell(team,runner.pidx,inn);
+      // Avanzar corredores en bases INFERIORES a la del forzado:
+      //   fp='2' (forzado venía de 3ª): el de 2ª → 3ª, el de 1ª → 2ª
+      //   fp='5' (forzado venía de 2ª): el de 1ª → 2ª
+      //   fp='4'/'6' (forzado venía de 1ª): nadie más avanza
+      if(fp==='2'){
+        if(st.second){ st.second.play.bases=3; refreshCell(team,st.second.pidx,inn); }
+        if(st.first){  st.first.play.bases=2;  refreshCell(team,st.first.pidx,inn);  }
+      } else if(fp==='5'){
+        if(st.first){ st.first.play.bases=2; refreshCell(team,st.first.pidx,inn); }
+      }
       return 'DP — '+nm(runner.pidx)+' out';
     }
     return '';
