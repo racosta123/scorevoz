@@ -1016,6 +1016,11 @@ function startGame(){
   document.getElementById('pitch-bar').style.display='flex';
   buildLineScore(); buildInningNav(); buildScoresheets(); updateScores();
   updatePitchCounterUI();
+  // Auto-seleccionar primer bateador del visitante (siempre abre al bate)
+  setTimeout(()=>{
+    const td=document.getElementById('c-v-0-1');
+    if(td) selectCell('v',0,1,td);
+  },150);
 }
 
 // ─── LINE SCORE ───────────────────────────────────────────
