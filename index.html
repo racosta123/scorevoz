@@ -90,6 +90,15 @@
   .ppos { font-size:0.58rem; color:#ffb648; }
   .stat-cell { font-size:0.68rem; color:#8fa3b7; min-width:26px; padding:3px; }
   .stat-avg { color:#00e599; font-weight:700; }
+  /* Encabezados de entrada (cambio 4) */
+  table.scoresheet th.inn-th { font-weight:500; color:#7d8ba0; letter-spacing:1px; }
+  /* Filas alternadas — striping suave (cambio 2) */
+  table.scoresheet tbody tr:nth-child(even) td { background:rgba(255,255,255,.018); }
+  /* Columna de la entrada en curso — ámbar (cambio 1; va DESPUÉS para ganar al striping) */
+  table.scoresheet th.cur-inn { color:#ffb648; border-bottom:2px solid #ffb648; background:rgba(255,182,72,.08); }
+  table.scoresheet td.dc.cur-inn { background:rgba(255,182,72,.05); }
+  /* Chip de orden al bat (cambio 3) */
+  .ord-chip { display:inline-block; width:18px; height:18px; line-height:18px; text-align:center; background:rgba(255,182,72,.16); color:#ffb648; border-radius:50%; font:500 10px 'Oswald',sans-serif; margin-right:6px; vertical-align:1px; flex-shrink:0; }
   /* ── DIAMOND CELL ───────────────────────────────────────── */
   .dc { width:54px; height:54px; cursor:pointer; position:relative; transition:background .15s; }
   .dc:hover { background:rgba(0,229,153,.06); }
@@ -1069,6 +1078,14 @@ function setInning(n){
   document.getElementById('inning-label').textContent=n;
   document.querySelectorAll('.inn-btn').forEach(b=>b.classList.remove('current'));
   const b=document.getElementById(`ib${n}`); if(b) b.classList.add('current');
+  // Resaltar columna de la entrada en curso (th + celdas) en ambos grids
+  ['v','l'].forEach(t=>{
+    document.querySelectorAll(`#s${t} .cur-inn`).forEach(el=>el.classList.remove('cur-inn'));
+    const th=document.getElementById(`th-${t}-inn-${n}`); if(th) th.classList.add('cur-inn');
+    gs.teams[t].players.forEach((_,idx)=>{
+      const c=document.getElementById(`c-${t}-${idx}-${n}`); if(c) c.classList.add('cur-inn');
+    });
+  });
   highlightInn();
   if(typeof updateBattingTeamButtons==='function') updateBattingTeamButtons();
 }
@@ -1090,7 +1107,7 @@ function addInnCol(team,n){
   const tbl=document.getElementById(`s${team}`);
   const hr=tbl.querySelector('thead tr');
   const ins=hr.children[hr.children.length-7];
-  const th=document.createElement('th'); th.textContent=n; th.style.minWidth='56px'; hr.insertBefore(th,ins);
+  const th=document.createElement('th'); th.textContent=n; th.id=`th-${team}-inn-${n}`; th.className='inn-th'; th.style.minWidth='56px'; hr.insertBefore(th,ins);
   gs.teams[team].players.forEach((_,idx)=>{
     const tr=document.getElementById(`row-${team}-${idx}`);
     const stat=tr.querySelector('.stat-cell');
@@ -1109,7 +1126,7 @@ function buildScoresheets(){
     const hr=document.createElement('tr');
     hr.innerHTML=`<th class="ph">JUGADOR</th>`;
     for(let i=1;i<=INNINGS;i++){
-      const th=document.createElement('th'); th.textContent=i; th.style.minWidth='56px'; hr.appendChild(th);
+      const th=document.createElement('th'); th.textContent=i; th.id=`th-${t}-inn-${i}`; th.className='inn-th'; th.style.minWidth='56px'; hr.appendChild(th);
     }
     ['AB','H','RBI','BB','K','AVG'].forEach(s=>{
       const th=document.createElement('th'); th.textContent=s; hr.appendChild(th);
@@ -3115,7 +3132,7 @@ function getPlayerCellInnerHTML(team,pidx){
   const btnHtml=canMore
     ?`<button class="sub-btn-new" id="cb-${team}-${pidx}" onclick="openSubModal('${team}',${pidx})" title="Cambio de jugador">⇄</button>`
     :`<button class="sub-btn-new" id="cb-${team}-${pidx}" disabled style="border-color:var(--green);color:var(--green)" title="Máx cambios alcanzados">✓</button>`;
-  return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:3px"><div style="flex:1;min-width:0">${entriesHTML}</div>${btnHtml}</div>`;
+  return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:3px"><span class="ord-chip">${pidx+1}</span><div style="flex:1;min-width:0">${entriesHTML}</div>${btnHtml}</div>`;
 }
 
 function rebuildPlayerCell(team,pidx){
