@@ -1642,6 +1642,35 @@ function computeBaseState(team,inn,excludePidx){
 // ─── AVANCE AUTOMÁTICO DE CORREDORES EN HITS ─────────────
 function advanceRunners(team,pidx,inn,play){
   const nm=i=>gs.teams[team].players[i].name;
+  // ── PISA Y CORRE (B): avanza el corredor nombrado UNA base ──
+  if(play._pcAdvance){
+    const st=computeBaseState(team,inn,pidx);
+    const from=play._pcAdvance.from;            // 2 = de 2ª; 1 = de 1ª
+    const runner = from===2 ? st.second : st.first;
+    if(runner){
+      const rpl=gs.plays[team][runner.pidx][inn];
+      rpl.bases=Math.min((rpl.bases||from)+1,3);
+      rpl.runNote='avanza en pisa y corre';
+      refreshCell(team,runner.pidx,inn);
+      return nm(runner.pidx)+' avanzó a '+['','1ª','2ª','3ª'][rpl.bases]+' (pisa y corre)';
+    }
+    return '';
+  }
+  // ── PISA Y CORRE (C): corredor de 3ª out en home → DOBLE PLAY ──
+  if(play._pcOutHome){
+    const st=computeBaseState(team,inn,pidx);
+    if(st.third){
+      const rpl=gs.plays[team][st.third.pidx][inn];
+      rpl.runnerOut=true;
+      rpl.runnerOutBase=4;                       // home
+      rpl.dpRoute=play._pcOutHome.route;         // "8-2" → celda muestra sym + ruta
+      rpl.pcTag=true;                            // marca para narración pisa y corre
+      // bases queda como estaba (alcanzó 3ª)
+      refreshCell(team,st.third.pidx,inn);
+      return 'DP — '+nm(st.third.pidx)+' out en home ('+play._pcOutHome.route+')';
+    }
+    return '';
+  }
   // ── SF: corredor de 3ª anota si había <2 outs antes ──────
   if(play.id==='SF'){
     const outs=countOutsInInning(team,inn); // ya incluye el out del bateador
@@ -1649,9 +1678,10 @@ function advanceRunners(team,pidx,inn,play){
     if(st.third && outs<3){
       const pl=gs.plays[team][st.third.pidx][inn];
       pl.bases=3; pl.scored=true; pl.earned=true;
+      if(play._pcTagUp) pl.runNote='anota en pisa y corre';
       refreshCell(team,st.third.pidx,inn);
       gs.plays[team][pidx][inn].rbi=(gs.plays[team][pidx][inn].rbi||0)+1;
-      return nm(st.third.pidx)+' anotó (SF)';
+      return nm(st.third.pidx)+(play._pcTagUp?' anotó (pisa y corre)':' anotó (SF)');
     }
     return '';
   }
@@ -1842,6 +1872,10 @@ function applyPlay(team,pidx,inn,play){
     const bases = play.bases===4?3:(play.bases||0);
     const scored = play.bases===4;
     gs.plays[team][pidx][inn]={ sym:play.sym, bases, scored, type:play.type, ab:play.ab, h:play.h||false };
+  }
+  // Pisa y corre (A): la celda del bateador muestra "F{n} SF" (sym base sigue 'SF')
+  if(play.flyPos && gs.plays[team][pidx][inn]){
+    gs.plays[team][pidx][inn].runNote=`F${play.flyPos} SF`;
   }
   const runSummary=advanceRunners(team,pidx,inn,play);
   refreshCell(team,pidx,inn);
@@ -2290,6 +2324,53 @@ function interpretVoice(text){
     // Si no hay posiciones → deja que el catálogo resuelva (DP643 / DP543)
   }
 
+  // ── PISA Y CORRE (tag-up) — familia con 3 finales ────────
+  // Estructura: "pisa y corre, {acción del corredor}, al {jardinero}"
+  if(!matched && /pisa y corre|tag.?up|espera y corre/.test(text)){
+    // Jardinero que atrapó el fly → define F{n} del bateador
+    const flyPos = /\b8\b|centr|center\b/.test(text)?'8'
+                 : /\b7\b|izquierd|left\b/.test(text)?'7'
+                 : /\b9\b|derech|right\b/.test(text)?'9'
+                 : /\bcatcher\b|receptor\b/.test(text)?'2'
+                 : /\binicialista\b/.test(text)?'3'
+                 : /\bcamarero\b/.test(text)?'4'
+                 : /\bantesalista\b/.test(text)?'5'
+                 : /\bshort\b|shortstop\b|campocorto\b/.test(text)?'6'
+                 : (/\b([3-9])\b/.exec(text)||[])[1]||null;
+    const findFly=fp=>PLAY_CATALOG.outs.find(p=>p.id===('F'+fp))||PLAY_CATALOG.outs.find(p=>p.id==='P');
+
+    if(/out.*home|home.*out|out.*plato|eliminado.*home/.test(text)){
+      // (C) OUT EN HOME → DOBLE PLAY
+      const pos=extractOutPositions(text);          // "del 8 al 2" → ['8','2']
+      const fp = pos.length>=1 ? pos[0] : flyPos;   // 1ª posición = jardinero
+      const useFp = fp||'8';
+      const route = pos.length>=2 ? pos.join('-') : `${useFp}-2`;
+      const fPlay=findFly(useFp);
+      matched={...fPlay, sym:`F${useFp}`, label:`F${useFp} · pisa y corre (out en home ${route})`,
+               type:'out', ab:true, _pcOutHome:{route}};
+    } else if(/anot/.test(text)){
+      // (A) ANOTA desde 3ª → SACRIFICIO FLY (sym base 'SF' para estadística)
+      const sfPlay=PLAY_CATALOG.outs.find(p=>p.id==='SF');
+      matched={...sfPlay, sym:'SF', ab:false, type:'out',
+               flyPos: flyPos?Number(flyPos):null,
+               label: flyPos?`F${flyPos} SF · pisa y corre (anota)`:'SF · pisa y corre (anota)',
+               _pcTagUp:true};
+    } else {
+      // (B) AVANZA sin anotar → fly out NORMAL + avance del corredor nombrado
+      const from = /de\s+segunda|segunda\s+a|2ª/.test(text)?2
+                 : /de\s+primera|primera\s+a|1ª/.test(text)?1 : null;
+      if(!from){
+        showToast('⚠️ Pisa y corre: di el origen, ej. "de segunda a tercera"',true);
+        document.getElementById('vrs').textContent='⚠️ Falta origen del corredor';
+        return;
+      }
+      const useFp = flyPos||'8';
+      const fPlay=findFly(useFp);
+      matched={...fPlay, sym:`F${useFp}`, label:`F${useFp} · pisa y corre (avanza)`,
+               type:'out', ab:true, _pcAdvance:{from}};
+    }
+  }
+
   // Busca en el catálogo completo por palabras clave de voz
   if(!matched){
     for(const play of ALL_PLAYS){
@@ -2346,8 +2427,9 @@ function interpretVoice(text){
   }
 
   // Extraer posiciones numéricas "N al M [al P]" y aplicarlas al símbolo del out
-  // (se omite para DP que ya tienen ruta calculada por extractDPPositions)
-  if(matched && matched.type==='out' && !matched._dpForcedPos){
+  // (se omite para DP y pisa-y-corre que ya tienen ruta/símbolo calculados)
+  if(matched && matched.type==='out' && !matched._dpForcedPos
+     && !matched._pcOutHome && !matched._pcAdvance && !matched._pcTagUp){
     const posNums=extractOutPositions(text);
     if(posNums.length>=2){
       const posSym=posNums.join('-');
@@ -3566,8 +3648,12 @@ function narratePlay(team,pidx,inn){
       const bnWas={1:'primera',2:'segunda',3:'tercera'};
       const baseWas=bnWas[p.bases]||'esa base';
       const rSym=p.runnerOutSym||'';
-      if(p.dpRoute)
-        parts.push(`Fue puesto out en ${base} (${p.dpRoute}), en batazo para doble play.`);
+      if(p.dpRoute){
+        if(p.pcTag)
+          parts.push(`Puesto out en home (${p.dpRoute}) tras pisa y corre, en doble play.`);
+        else
+          parts.push(`Fue puesto out en ${base} (${p.dpRoute}), en batazo para doble play.`);
+      }
       else if(rSym==='PO'||rSym.startsWith('PO '))
         parts.push(`Fue puesto out en ${baseWas} en reviré de pitcher.`);
       else if(rSym==='CS'||rSym.startsWith('CS ')){
