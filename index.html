@@ -280,6 +280,8 @@
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
   import { getFirestore, doc, setDoc }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  import { initializeAppCheck, ReCaptchaV3Provider }
+    from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js';
 
   const app = initializeApp({
     apiKey: "AIzaSyAAFVr5DTn0WDEM2Y5XxIG2E-nITmZjGBI",
@@ -288,6 +290,11 @@
     storageBucket: "scorevoz.firebasestorage.app",
     messagingSenderId: "844270636434",
     appId: "1:844270636434:web:a73f25fe7358ba20a5854b"
+  });
+
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider('6Le6fxwtAAAAALvARiKRDsQgw5DYlBDZVf-ZRnWS'),
+    isTokenAutoRefreshEnabled: true
   });
 
   const auth = getAuth(app);
