@@ -1626,7 +1626,7 @@ function startRunnerMic(team,pidx,inn){
   _runnerRecog.onresult=e=>{
     const txt=e.results[0][0].transcript.toLowerCase();
     const a=parseRunnerVoice(txt);
-    if(a){ applyRunnerMove(team,pidx,inn,a); closeModal(); }
+    if(a){ applyRunnerMove(team,pidx,inn,a); closeModal(); checkRunnerOutAdvance(team,pidx,inn,a); }
     else showToast('No reconocí: '+txt);
   };
   _runnerRecog.start();
