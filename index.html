@@ -1798,6 +1798,32 @@ function advanceRunners(team,pidx,inn,play){
     if(rbiCount>0) gs.plays[team][pidx][inn].rbi=(gs.plays[team][pidx][inn].rbi||0)+rbiCount;
     return moved.join(' · ');
   }
+  // ── Error: avance forzado igual que BB (solo forzados, no discrecionales) ──
+  if(play.type==='error'){
+    const st=computeBaseState(team,inn,pidx);
+    const moved=[];
+    let rbiCount=0;
+    const scoreE=r=>{
+      const pl=gs.plays[team][r.pidx][inn];
+      pl.bases=3; pl.scored=true;
+      refreshCell(team,r.pidx,inn);
+      rbiCount++; moved.push(nm(r.pidx)+' anotó');
+    };
+    const advE=(r,to)=>{
+      gs.plays[team][r.pidx][inn].bases=to;
+      refreshCell(team,r.pidx,inn);
+      moved.push(nm(r.pidx)+' →'+['','1ª','2ª','3ª'][to]);
+    };
+    if(st.first){
+      if(st.second){
+        if(st.third) scoreE(st.third);
+        advE(st.second,3);
+      }
+      advE(st.first,2);
+    }
+    if(rbiCount>0) gs.plays[team][pidx][inn].rbi=(gs.plays[team][pidx][inn].rbi||0)+rbiCount;
+    return moved.join(' · ');
+  }
   if(play.type!=='hit') return '';
   const b=play.bases===4?4:(play.bases||0);
   if(!b) return '';
@@ -2033,11 +2059,13 @@ function updateScores(){
       const el=document.getElementById(`ls${t==='v'?'v':'l'}${i+1}`);
       if(el) el.textContent=r;
     });
-    // Contar hits y errores
+    // Hits: equipo que batea (t). Errores: cometidos por la defensa de t = plays del oponente
+    const opp=t==='v'?'l':'v';
     gs.teams[t].players.forEach((_,idx)=>{
-      Object.values(gs.plays[t][idx]||{}).forEach(pl=>{
-        if(pl){ if(pl.h) hits++; if(pl.type==='error') errors++; }
-      });
+      Object.values(gs.plays[t][idx]||{}).forEach(pl=>{ if(pl&&pl.h) hits++; });
+    });
+    gs.teams[opp].players.forEach((_,idx)=>{
+      Object.values(gs.plays[opp][idx]||{}).forEach(pl=>{ if(pl&&pl.type==='error') errors++; });
     });
     document.getElementById(`sc${t}`).textContent=total;
     const r=document.getElementById(`ls${t==='v'?'v':'l'}R`); if(r) r.textContent=total;
