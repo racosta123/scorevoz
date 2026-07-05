@@ -2630,6 +2630,15 @@ function interpretVoice(text){
     }
   }
 
+  // Ponche dictado por voz (cualquier variante: tirándole o cantado): siempre pasa por
+  // el menú de clasificación, igual que cuando el conteo de pitcheos llega a 3 strikes —
+  // nunca se aplica un ponche directo sin preguntar tirándole/sin tirarle/corrido.
+  if(matched && (matched.id==='KS'||matched.id==='KL')){
+    document.getElementById('vrs').textContent=`? ${matched.sym}`;
+    showStrikeoutMenu(team);
+    return;
+  }
+
   if(matched){
     document.getElementById('vrs').textContent=`? ${matched.sym}`;
     const pname=gs.teams[team].players[pidx].name;
@@ -3230,17 +3239,16 @@ function showStrikeoutMenu(team){
   };
   mk('K ⚾ Ponche tirándole', 'out-btn',()=>{ closeModal(); applyPlay(team,pidx,inn,KS); });
   mk('KL Ponche sin tirarle','out-btn',()=>{ closeModal(); applyPlay(team,pidx,inn,KL); });
-  mk('K Ponche corrido',     '',       ()=>{
-    const outs=countOutsInInning(team,inn);
-    const st=computeBaseState(team,inn,pidx);
-    if(st.first && outs<2){
-      closeModal();
-      showToast('⚠️ 1ª ocupada · '+outs+' out(s) — Out automático por regla');
-      applyPlay(team,pidx,inn,{id:'KCR',sym:'K corrido',bases:0,type:'out',ab:true,h:false,label:'K corrido (out auto)'});
-    } else {
-      showKCorridoMenu(team,pidx,inn);
-    }
-  });
+
+  // Regla del dropped third strike: "corrido" solo se ofrece si 1ª está desocupada,
+  // o si ya hay 2 outs (sin importar si 1ª está ocupada). Si no, ni se muestra el botón
+  // — es ponche normal (out), sin necesidad de avisar con un out automático aparte.
+  const outs=countOutsInInning(team,inn);
+  const st=computeBaseState(team,inn,pidx);
+  const corridoPermitido = !st.first || outs>=2;
+  if(corridoPermitido){
+    mk('K Ponche corrido', '', ()=>{ showKCorridoMenu(team,pidx,inn); });
+  }
   setModalForceChoice(true); // ya hubo 3er strike: obliga a clasificar el ponche
   document.getElementById('modal').classList.add('show');
 }
