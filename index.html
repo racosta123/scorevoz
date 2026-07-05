@@ -92,6 +92,8 @@
   .stat-avg { color:#00e599; font-weight:700; }
   /* Encabezados de entrada (cambio 4) */
   table.scoresheet th.inn-th { font-weight:500; color:#7d8ba0; letter-spacing:1px; }
+  /* Columna extra por "le dieron la vuelta al orden" — mismo número de entrada, en rojo */
+  table.scoresheet th.inn-th-extra { color:var(--red); font-weight:700; }
   /* Filas alternadas — striping suave (cambio 2) */
   table.scoresheet tbody tr:nth-child(even) td { background:rgba(255,255,255,.018); }
   /* Columna de la entrada en curso — ámbar (cambio 1; va DESPUÉS para ganar al striping) */
@@ -527,7 +529,7 @@
   <div class="modal">
     <h3 id="mtitle">REGISTRAR JUGADA</h3>
     <div id="mbody"></div>
-    <button class="modal-close" onclick="closeModal()">✕ CANCELAR</button>
+    <button class="modal-close" id="modal-cancel-btn" onclick="closeModal()">✕ CANCELAR</button>
   </div>
 </div>
 
@@ -553,7 +555,7 @@ let gs = {
   pitcher:{ v:{name:'',batea:false}, l:{name:'',batea:false} },
   pitcherChanges:{ v:[], l:[] },
   pitchCount:{ v:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}}, l:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}} },
-  pitchAB:{ v:{s:0,b:0,f:0,history:[]}, l:{s:0,b:0,f:0,history:[]} },
+  pitchAB:{ v:{s:0,b:0,f:0,history:[],undoCount:0}, l:{s:0,b:0,f:0,history:[],undoCount:0} },
   selected:null,
   lang:'es-MX',
   lineups:{
@@ -1124,6 +1126,52 @@ function addInnCol(team,n){
   });
 }
 
+// ─── BATTING AROUND (le dieron la vuelta al orden) ────────
+// Inserta UNA columna extra en la hoja del equipo, justo después de la última columna
+// existente de la familia de `baseInn` (ej. después de "3", o después de "3b" si ya
+// existía). El encabezado repite el mismo número de entrada, en rojo (.inn-th-extra).
+// NO toca INNINGS ni la tabla resumen de arriba — solo la hoja de jugadores de `team`.
+function insertBatAroundCol(team,baseInn){
+  const letters='bcdefghijklmnopqrstuvwxyz';
+  let anchorKey=String(baseInn);
+  let newSuffix='b';
+  for(const L of letters){
+    const k=baseInn+L;
+    if(document.getElementById(`th-${team}-inn-${k}`)){ anchorKey=k; } else { newSuffix=L; break; }
+  }
+  const key=`${baseInn}${newSuffix}`;
+  const anchorTh=document.getElementById(`th-${team}-inn-${anchorKey}`);
+  if(!anchorTh) return anchorKey; // seguridad: no debería pasar
+  const th=document.createElement('th');
+  th.textContent=baseInn; th.id=`th-${team}-inn-${key}`; th.className='inn-th inn-th-extra'; th.style.minWidth='56px';
+  anchorTh.parentNode.insertBefore(th,anchorTh.nextSibling);
+
+  gs.teams[team].players.forEach((_,idx)=>{
+    const anchorTd=document.getElementById(`c-${team}-${idx}-${anchorKey}`);
+    if(!anchorTd) return;
+    const td=document.createElement('td'); td.className='dc'; td.id=`c-${team}-${idx}-${key}`;
+    td.innerHTML=drawDiamond(null);
+    td.onclick=()=>selectCell(team,idx,key,td);
+    td.ondblclick=()=>handleCellDblClick(team,idx,key);
+    anchorTd.parentNode.insertBefore(td,anchorTd.nextSibling);
+  });
+  return key;
+}
+// Devuelve (creando la columna si hace falta) la clave donde debe ir el PRÓXIMO turno
+// de este jugador dentro de la entrada base — la normal si aún no bateó, o la próxima
+// columna "b"/"c"/... libre si le está dando la vuelta al orden.
+function getOpenColumnForPlayer(team,pidx,baseInn){
+  const plays=gs.plays[team][pidx]||{};
+  if(!plays[baseInn]) return String(baseInn);
+  const letters='bcdefghijklmnopqrstuvwxyz';
+  for(const L of letters){
+    const key=baseInn+L;
+    if(!document.getElementById(`th-${team}-inn-${key}`)) insertBatAroundCol(team,baseInn);
+    if(!plays[key]) return key;
+  }
+  return `${baseInn}z`;
+}
+
 // ─── SCORESHEETS ──────────────────────────────────────────
 function buildScoresheets(){
   ['v','l'].forEach(t=>{
@@ -1294,8 +1342,8 @@ function selectCell(team,pidx,inn,td){
   document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
 
   // Reset S/B/F SIEMPRE en modo normal
-  gs.pitchAB['v']={s:0,b:0,f:0,history:[]};
-  gs.pitchAB['l']={s:0,b:0,f:0,history:[]};
+  gs.pitchAB['v']={s:0,b:0,f:0,history:[],undoCount:0};
+  gs.pitchAB['l']={s:0,b:0,f:0,history:[],undoCount:0};
   unlockPitchButtons('v');
   unlockPitchButtons('l');
   updatePitchABDisplay('v');
@@ -1366,8 +1414,16 @@ function showModal(team,pidx,inn){
   });
   document.getElementById('modal').classList.add('show');
 }
-function closeModal(){ document.getElementById('modal').classList.remove('show'); }
-document.getElementById('modal').addEventListener('click',e=>{ if(e.target===document.getElementById('modal')) closeModal(); });
+// Cuando true, el modal no se puede cerrar con clic afuera ni con "CANCELAR"
+// (obliga a elegir una opción) — usado por el menú de ponche.
+let modalForceChoice=false;
+function setModalForceChoice(force){
+  modalForceChoice=force;
+  const cancelBtn=document.getElementById('modal-cancel-btn');
+  if(cancelBtn) cancelBtn.style.display=force?'none':'';
+}
+function closeModal(){ setModalForceChoice(false); document.getElementById('modal').classList.remove('show'); }
+document.getElementById('modal').addEventListener('click',e=>{ if(e.target===document.getElementById('modal') && !modalForceChoice) closeModal(); });
 
 // ─── MODAL MOVIMIENTO DE CORREDOR ────────────────────────────
 function showRunnerModal(team,pidx,inn){
@@ -1426,9 +1482,12 @@ function showRunnerModal(team,pidx,inn){
   gOut.appendChild(mkBtn('✕ Out al avanzar',     'run-btn-out','outAdv', true));
 
   // ── OTROS ────────────────────────────────────────────────
-  body.appendChild(sec('OTROS'));
-  const gOtr=document.createElement('div'); gOtr.className='play-buttons'; body.appendChild(gOtr);
-  gOtr.appendChild(mkBtn('↩ Regresó','run-btn-back','back',true));
+  if(pl.scored||pl.bases>1){
+    body.appendChild(sec('OTROS'));
+    const gOtr=document.createElement('div'); gOtr.className='play-buttons'; body.appendChild(gOtr);
+    const backTo=pl.scored?pl.bases:pl.bases-1;
+    gOtr.appendChild(mkBtn(`↩ Regresó a ${bn[backTo]}`,'run-btn-back','back',true));
+  }
 
   if('webkitSpeechRecognition' in window||'SpeechRecognition' in window){
     const micBtn=document.createElement('button');
@@ -1466,7 +1525,27 @@ function applyRunnerMove(team,pidx,inn,action){
       showToast('Indiferencia defensiva — corredor avanzó'); break;
     case 'err':  pl.bases=Math.min(pl.bases+1,3); showToast('Avanzó por error'); break;
     case 'wp':   pl.bases=Math.min(pl.bases+1,3); showToast('Avanzó (WP/PB/Balk)'); break;
-    case 'back': showToast('Corredor regresó a su base'); return;
+    case 'back': {
+      // Regresa exactamente una base — si estaba anotado, anula la carrera (y el RBI
+      // que se le había acreditado automáticamente, si lo hubo). No inventa dónde
+      // "debería" estar: solo deshace el último paso que tenía registrado.
+      if(pl.scored){
+        pl.scored=false;
+        if(pl.rbiCreditPidx!=null && pl.rbiCreditInn!=null){
+          const creditPl=(gs.plays[team][pl.rbiCreditPidx]||{})[pl.rbiCreditInn];
+          if(creditPl && creditPl.rbi>0) creditPl.rbi--;
+          delete pl.rbiCreditPidx; delete pl.rbiCreditInn;
+        }
+        showToast('↩ Corredor regresó a '+['','1ª','2ª','3ª'][pl.bases]+' — carrera anulada');
+      } else if(pl.bases>1){
+        pl.bases--;
+        showToast('↩ Corredor regresó a '+['','1ª','2ª','3ª'][pl.bases]);
+      } else {
+        showToast('⚠️ Ya está en 1ª — no puede regresar más',true);
+        return;
+      }
+      break;
+    }
   }
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
@@ -1650,17 +1729,77 @@ function parseRunnerVoice(t){
 }
 
 // ─── ESTADO DE BASES (corredores vivos) ──────────────────
+// Si el jugador le dio la vuelta al orden esta entrada, puede tener más de una jugada
+// (ej. "3" y "3b") — se usa la MÁS RECIENTE de la entrada base para saber su estado actual.
 function computeBaseState(team,inn,excludePidx){
+  const baseInn=parseInt(inn);
   const st={first:null,second:null,third:null};
   gs.teams[team].players.forEach((_,i)=>{
     if(i===excludePidx) return;
-    const pl=(gs.plays[team][i]||{})[inn];
+    const plays=gs.plays[team][i]||{};
+    let key=null,order=-1;
+    Object.keys(plays).forEach(k=>{
+      if(parseInt(k)!==baseInn) return;
+      const o=keyOrder(k);
+      if(o>order){ order=o; key=k; }
+    });
+    if(key===null) return;
+    const pl=plays[key];
     if(!pl||pl.type==='out'||pl.type==='clear'||pl.scored||pl.runnerOut) return;
-    if(pl.bases===1) st.first ={pidx:i,play:pl};
-    if(pl.bases===2) st.second={pidx:i,play:pl};
-    if(pl.bases===3) st.third ={pidx:i,play:pl};
+    if(pl.bases===1) st.first ={pidx:i,play:pl,key};
+    if(pl.bases===2) st.second={pidx:i,play:pl,key};
+    if(pl.bases===3) st.third ={pidx:i,play:pl,key};
   });
   return st;
+}
+
+// ─── EMPUJE MÍNIMO EN CADENA (BB/golpe/error/K corrido) ──
+// El bateador ocupa `target` (1/2/3). Cualquier corredor que iba adelante del bateador
+// (estaba en una base <= target) queda "pasado" por él y DEBE terminar en una base > target
+// — si no hay espacio, anota. Un corredor que ya iba más adelante (base > target) solo se
+// mueve si el empuje de los de abajo lo alcanza (cadena), nunca si no hay colisión real.
+// Se respeta el orden relativo entre corredores y nunca se apila dos en una base.
+function forceAdvanceRunners(team,pidx,inn,target){
+  const nm=i=>gs.teams[team].players[i].name;
+  const st=computeBaseState(team,inn,pidx);
+  const occ={1:st.first,2:st.second,3:st.third}; // se actualiza a medida que se mueve gente
+  const moved=[];
+  let rbiCount=0;
+
+  const place=(r,to)=>{
+    const pl=r.play;
+    if(to>=4){
+      pl.bases=3; pl.scored=true;
+      pl.rbiCreditPidx=pidx; pl.rbiCreditInn=inn; // para poder restar el RBI si el anotador lo regresa
+      rbiCount++; moved.push(nm(r.pidx)+' anotó');
+    } else {
+      pl.bases=to;
+      occ[to]=r;
+      moved.push(nm(r.pidx)+' →'+['','1ª','2ª','3ª'][to]);
+    }
+    refreshCell(team,r.pidx,r.key);
+  };
+  // Libera `base` empujando a quien esté ahí una base más arriba (cadena recursiva),
+  // asegurando primero que ESE destino también esté libre.
+  const vacate=(base)=>{
+    if(base>3) return;
+    const r=occ[base];
+    if(!r) return;
+    occ[base]=null;
+    vacate(base+1);
+    place(r, base+1);
+  };
+
+  for(let b=target; b>=1; b--){
+    const r=occ[b];
+    if(!r) continue;
+    occ[b]=null;
+    vacate(target+1);
+    place(r, target+1);
+  }
+
+  if(rbiCount>0) gs.plays[team][pidx][inn].rbi=(gs.plays[team][pidx][inn].rbi||0)+rbiCount;
+  return moved.join(' · ');
 }
 
 // ─── AVANCE AUTOMÁTICO DE CORREDORES EN HITS ─────────────
@@ -1672,10 +1811,10 @@ function advanceRunners(team,pidx,inn,play){
     const from=play._pcAdvance.from;            // 2 = de 2ª; 1 = de 1ª
     const runner = from===2 ? st.second : st.first;
     if(runner){
-      const rpl=gs.plays[team][runner.pidx][inn];
+      const rpl=runner.play;
       rpl.bases=Math.min((rpl.bases||from)+1,3);
       rpl.runNote='avanza en pisa y corre';
-      refreshCell(team,runner.pidx,inn);
+      refreshCell(team,runner.pidx,runner.key);
       return nm(runner.pidx)+' avanzó a '+['','1ª','2ª','3ª'][rpl.bases]+' (pisa y corre)';
     }
     return '';
@@ -1684,13 +1823,13 @@ function advanceRunners(team,pidx,inn,play){
   if(play._pcOutHome){
     const st=computeBaseState(team,inn,pidx);
     if(st.third){
-      const rpl=gs.plays[team][st.third.pidx][inn];
+      const rpl=st.third.play;
       rpl.runnerOut=true;
       rpl.runnerOutBase=4;                       // home
       rpl.dpRoute=play._pcOutHome.route;         // "8-2" → celda muestra sym + ruta
       rpl.pcTag=true;                            // marca para narración pisa y corre
       // bases queda como estaba (alcanzó 3ª)
-      refreshCell(team,st.third.pidx,inn);
+      refreshCell(team,st.third.pidx,st.third.key);
       return 'DP — '+nm(st.third.pidx)+' out en home ('+play._pcOutHome.route+')';
     }
     return '';
@@ -1700,10 +1839,11 @@ function advanceRunners(team,pidx,inn,play){
     const outs=countOutsInInning(team,inn); // ya incluye el out del bateador
     const st=computeBaseState(team,inn,pidx);
     if(st.third && outs<3){
-      const pl=gs.plays[team][st.third.pidx][inn];
+      const pl=st.third.play;
       pl.bases=3; pl.scored=true; pl.earned=true;
+      pl.rbiCreditPidx=pidx; pl.rbiCreditInn=inn;
       if(play._pcTagUp) pl.runNote='anota en pisa y corre';
-      refreshCell(team,st.third.pidx,inn);
+      refreshCell(team,st.third.pidx,st.third.key);
       gs.plays[team][pidx][inn].rbi=(gs.plays[team][pidx][inn].rbi||0)+1;
       return nm(st.third.pidx)+(play._pcTagUp?' anotó (pisa y corre)':' anotó (SF)');
     }
@@ -1726,23 +1866,23 @@ function advanceRunners(team,pidx,inn,play){
     else if(fp==='2')           runner=st.third;
     if(!runner) runner=st.first||st.second||st.third; // fallback
     if(runner){
-      const rpl=gs.plays[team][runner.pidx][inn];
+      const rpl=runner.play;
       // Preservar hit: NO tocar sym, bases, type, h, ab
       rpl.runnerOut=true;
       rpl.runnerOutBase=(fp==='4'||fp==='6')?2:(fp==='5')?3:(fp==='2')?4:2;
       // Guardar ruta del corredor para mostrar en su celda (ej. "6-4", "5-5")
       const rr=play._dpRunnerRoute||(parts.length>=2?`${parts[0]}-${parts[1]}`:null);
       if(rr) rpl.dpRoute=rr;
-      refreshCell(team,runner.pidx,inn);
+      refreshCell(team,runner.pidx,runner.key);
       // Avanzar corredores en bases INFERIORES a la del forzado:
       //   fp='2' (forzado venía de 3ª): el de 2ª → 3ª, el de 1ª → 2ª
       //   fp='5' (forzado venía de 2ª): el de 1ª → 2ª
       //   fp='4'/'6' (forzado venía de 1ª): nadie más avanza
       if(fp==='2'){
-        if(st.second){ st.second.play.bases=3; refreshCell(team,st.second.pidx,inn); }
-        if(st.first){  st.first.play.bases=2;  refreshCell(team,st.first.pidx,inn);  }
+        if(st.second){ st.second.play.bases=3; refreshCell(team,st.second.pidx,st.second.key); }
+        if(st.first){  st.first.play.bases=2;  refreshCell(team,st.first.pidx,st.first.key);  }
       } else if(fp==='5'){
-        if(st.first){ st.first.play.bases=2; refreshCell(team,st.first.pidx,inn); }
+        if(st.first){ st.first.play.bases=2; refreshCell(team,st.first.pidx,st.first.key); }
       }
       return 'DP — '+nm(runner.pidx)+' out';
     }
@@ -1753,9 +1893,9 @@ function advanceRunners(team,pidx,inn,play){
     const st=computeBaseState(team,inn,pidx);
     const msgs=[];
     [st.first,st.second,st.third].filter(Boolean).forEach(r=>{
-      const rpl=gs.plays[team][r.pidx][inn];
+      const rpl=r.play;
       rpl.csOut=true; rpl.runnerOut=true;
-      refreshCell(team,r.pidx,inn);
+      refreshCell(team,r.pidx,r.key);
       msgs.push(nm(r.pidx)+' out');
     });
     return msgs.join(' · ');
@@ -1765,64 +1905,21 @@ function advanceRunners(team,pidx,inn,play){
     const st=computeBaseState(team,inn,pidx);
     const runner=st.first||st.second||st.third;
     if(runner){
-      const rpl=gs.plays[team][runner.pidx][inn];
+      const rpl=runner.play;
       rpl.csOut=true; rpl.runnerOut=true;
-      refreshCell(team,runner.pidx,inn);
+      refreshCell(team,runner.pidx,runner.key);
       return 'FC — '+nm(runner.pidx)+' out';
     }
     return '';
   }
-  // ── Bases por bola: avance forzado ──────────────────────
+  // ── Bases por bola / golpe (HBP/INT/OB): siempre envasan en 1ª ──────────
   if(play.type==='walk'){
-    const st=computeBaseState(team,inn,pidx);
-    const moved=[];
-    let rbiCount=0;
-    const scoreW=r=>{
-      const pl=gs.plays[team][r.pidx][inn];
-      pl.bases=3; pl.scored=true;
-      refreshCell(team,r.pidx,inn);
-      rbiCount++; moved.push(nm(r.pidx)+' anotó');
-    };
-    const advW=(r,to)=>{
-      gs.plays[team][r.pidx][inn].bases=to;
-      refreshCell(team,r.pidx,inn);
-      moved.push(nm(r.pidx)+' →'+['','1ª','2ª','3ª'][to]);
-    };
-    if(st.first){
-      if(st.second){
-        if(st.third) scoreW(st.third);
-        advW(st.second,3);
-      }
-      advW(st.first,2);
-    }
-    if(rbiCount>0) gs.plays[team][pidx][inn].rbi=(gs.plays[team][pidx][inn].rbi||0)+rbiCount;
-    return moved.join(' · ');
+    return forceAdvanceRunners(team,pidx,inn,1);
   }
-  // ── Error: avance forzado igual que BB (solo forzados, no discrecionales) ──
-  if(play.type==='error'){
-    const st=computeBaseState(team,inn,pidx);
-    const moved=[];
-    let rbiCount=0;
-    const scoreE=r=>{
-      const pl=gs.plays[team][r.pidx][inn];
-      pl.bases=3; pl.scored=true;
-      refreshCell(team,r.pidx,inn);
-      rbiCount++; moved.push(nm(r.pidx)+' anotó');
-    };
-    const advE=(r,to)=>{
-      gs.plays[team][r.pidx][inn].bases=to;
-      refreshCell(team,r.pidx,inn);
-      moved.push(nm(r.pidx)+' →'+['','1ª','2ª','3ª'][to]);
-    };
-    if(st.first){
-      if(st.second){
-        if(st.third) scoreE(st.third);
-        advE(st.second,3);
-      }
-      advE(st.first,2);
-    }
-    if(rbiCount>0) gs.plays[team][pidx][inn].rbi=(gs.plays[team][pidx][inn].rbi||0)+rbiCount;
-    return moved.join(' · ');
+  // ── Error / K corrido: el bateador ocupa `bases` (1ª por defecto, o la base
+  // dictada en el avance del error) — empuje mínimo en cadena desde ahí. ──
+  if(play.type==='error'||play.type==='reach'){
+    return forceAdvanceRunners(team,pidx,inn,play.bases||1);
   }
   if(play.type!=='hit') return '';
   const b=play.bases===4?4:(play.bases||0);
@@ -1833,16 +1930,17 @@ function advanceRunners(team,pidx,inn,play){
   let rbiCount=0;
 
   function score(r){
-    const pl=gs.plays[team][r.pidx][inn];
+    const pl=r.play;
     pl.bases=Math.max(pl.bases,3);
     pl.scored=true;
-    refreshCell(team,r.pidx,inn);
+    pl.rbiCreditPidx=pidx; pl.rbiCreditInn=inn;
+    refreshCell(team,r.pidx,r.key);
     rbiCount++;
     moved.push(nm(r.pidx)+' anotó');
   }
   function adv(r,to){
-    gs.plays[team][r.pidx][inn].bases=to;
-    refreshCell(team,r.pidx,inn);
+    r.play.bases=to;
+    refreshCell(team,r.pidx,r.key);
     moved.push(nm(r.pidx)+' →'+bNames[to]);
   }
 
@@ -1959,22 +2057,41 @@ function undoLastPlay(){
 }
 
 // ─── AVANCE AUTOMÁTICO (cambio 19) ────────────────────────
+// "Batting around": cuando le dan la vuelta al orden en una misma media entrada, la
+// jugada repetida se guarda con clave compuesta (ej. "3b") en vez de pisar "3". Estas
+// funciones deben seguir contando outs/corredores de corrido entre "3" y "3b", como si
+// fuera una sola entrada — por eso agrupan por número de entrada BASE (parseInt(inn)),
+// no por la clave exacta.
+function keyOrder(key){
+  const m=/^[0-9]+([a-z]?)$/.exec(String(key));
+  return (m && m[1]) ? (m[1].charCodeAt(0)-96) : 0; // "3"->0, "3b"->2, "3c"->3...
+}
 function countOutsInInning(team,inn){
+  const baseInn=parseInt(inn);
   let outs=0;
   gs.teams[team].players.forEach((_,i)=>{
-    const pl=(gs.plays[team][i]||{})[inn];
-    if(pl && (pl.type==='out' || pl.csOut || pl.runnerOut)) outs++;
+    const plays=gs.plays[team][i]||{};
+    Object.keys(plays).forEach(k=>{
+      if(parseInt(k)!==baseInn) return;
+      const pl=plays[k];
+      if(pl && (pl.type==='out' || pl.csOut || pl.runnerOut)) outs++;
+    });
   });
   return outs;
 }
 
+// Devuelve {pidx,key}: a quién le toca batear y en qué columna. Si todos ya tienen
+// llena su casilla de esta entrada (le dieron la vuelta al orden), resuelve/crea la
+// columna extra correspondiente para el siguiente en el orden — nunca sobrescribe.
 function findNextEmptyBatter(team,fromPidx,inn){
   const n=gs.teams[team].players.length;
+  const baseInn=parseInt(inn);
   for(let i=1;i<=n;i++){
     const idx=(fromPidx+i)%n;
-    if(!(gs.plays[team][idx]||{})[inn]) return idx;
+    if(!(gs.plays[team][idx]||{})[baseInn]) return {pidx:idx, key:String(baseInn)};
   }
-  return (fromPidx+1)%n; // todos llenos, avanzar igual
+  const idx=(fromPidx+1)%n; // todos llenos: le dieron la vuelta al orden
+  return {pidx:idx, key:getOpenColumnForPlayer(team,idx,baseInn)};
 }
 
 function findFirstEmptyBatter(team,inn){
@@ -1987,23 +2104,25 @@ function findFirstEmptyBatter(team,inn){
 
 function autoAdvance(team,pidx,inn){
   const outs=countOutsInInning(team,inn);
+  const baseInn=parseInt(inn);
   let nextTeam, nextInn, nextPidx;
   if(outs>=3){
     if(team==='v'){
-      nextTeam='l'; nextInn=inn;
+      nextTeam='l'; nextInn=baseInn;
     } else {
-      nextTeam='v'; nextInn=inn+1;
+      nextTeam='v'; nextInn=baseInn+1;
       if(nextInn>INNINGS) return;
     }
     nextPidx=gs.currentBatter[nextTeam];
-    if(nextInn!==inn){
+    if(nextInn!==baseInn){
       // Cambiar a la nueva entrada en la nav
       const ib=document.getElementById(`ib${nextInn}`);
       if(ib){ setInning(nextInn); ib.scrollIntoView({behavior:'smooth',inline:'nearest'}); }
     }
   } else {
-    nextTeam=team; nextInn=inn;
-    nextPidx=findNextEmptyBatter(team,pidx,inn);
+    nextTeam=team;
+    const found=findNextEmptyBatter(team,pidx,inn);
+    nextPidx=found.pidx; nextInn=found.key;
   }
   gs.currentBatter[nextTeam]=nextPidx;
   const nextTd=document.getElementById(`c-${nextTeam}-${nextPidx}-${nextInn}`);
@@ -2435,20 +2554,34 @@ function interpretVoice(text){
   }
 
   // Detección de error con posición específica
+  // El número de error (E3..E9) es SOLO el fildeador que falló (stat defensiva).
+  // El bateador se embasa en 1ª por defecto — salvo que se dicte un avance aparte
+  // ("...y el corredor avanzó hasta/a segunda/tercera"), que manda directo a esa base.
   if(!matched && text.includes('error')){
-    let sym='E?', bases=1;
-    if(text.includes('short')||text.includes('parador')||text.includes('ss')) sym='E6';
-    else if(text.includes('primera')||text.includes('first')||text.includes('1b')) sym='E3';
-    else if(text.includes('segunda')||text.includes('second')||text.includes('2b')) sym='E4';
-    else if(text.includes('tercera')||text.includes('third')||text.includes('3b')) sym='E5';
-    else if(text.includes('pitcher')||text.includes('lanzador')) sym='E1';
-    else if(text.includes('catcher')||text.includes('receptor')) sym='E2';
-    else if(text.includes('izquierda')||text.includes('left')) sym='E7';
-    else if(text.includes('centro')||text.includes('center')) sym='E8';
-    else if(text.includes('derecha')||text.includes('right')) sym='E9';
-    if(text.includes('segunda')||text.includes('second')) bases=2;
-    else if(text.includes('tercera')||text.includes('third')) bases=3;
-    matched={...PLAY_CATALOG.errors[0], sym, label:`Error ${sym}`, bases, type:'error', ab:true};
+    // Todo lo que va DESPUÉS de "corredor"/"avanz..." es la cláusula de avance del bateador;
+    // se separa de la cláusula del error para no confundir la base de avance con la posición del fildeador.
+    const advIdx=text.search(/corredor|avanz/);
+    const errText=advIdx>=0 ? text.slice(0,advIdx) : text;
+    let sym='E?';
+    if(errText.includes('short')||errText.includes('parador')||errText.includes('ss')) sym='E6';
+    else if(errText.includes('primera')||errText.includes('first')||errText.includes('1b')) sym='E3';
+    else if(errText.includes('segunda')||errText.includes('second')||errText.includes('2b')) sym='E4';
+    else if(errText.includes('tercera')||errText.includes('third')||errText.includes('3b')) sym='E5';
+    else if(errText.includes('pitcher')||errText.includes('lanzador')) sym='E1';
+    else if(errText.includes('catcher')||errText.includes('receptor')) sym='E2';
+    else if(errText.includes('izquierda')||errText.includes('left')) sym='E7';
+    else if(errText.includes('centro')||errText.includes('center')) sym='E8';
+    else if(errText.includes('derecha')||errText.includes('right')) sym='E9';
+
+    let bases=1;
+    if(advIdx>=0){
+      const advText=text.slice(advIdx);
+      if(/tercera|3ra|3b/.test(advText)) bases=3;
+      else if(/segunda|2da|2b/.test(advText)) bases=2;
+      else if(/primera|1ra|1b/.test(advText)) bases=1;
+    }
+    const label=bases>1?`Error ${sym} — bateador → ${['','1ª','2ª','3ª'][bases]}`:`Error ${sym}`;
+    matched={...PLAY_CATALOG.errors[0], sym, label, bases, type:'error', ab:true};
   }
 
   // Detección de ground out con posiciones
@@ -2987,6 +3120,7 @@ function updateBattingTeamButtons(){
 // ─── CONTADOR DE LANZAMIENTOS ──────────────────────────────
 function addPitch(team,type){
   const ab=gs.pitchAB[team];
+  ab.undoCount=0; // nuevo pitcheo registrado: vuelve a habilitar 3 pasos de deshacer
   const logInn=gs.currentInning||1;
   if(!gs.pitchCount[team].inningLog) gs.pitchCount[team].inningLog={};
   if(!gs.pitchCount[team].inningLog[logInn]) gs.pitchCount[team].inningLog[logInn]={s:0,b:0,f:0};
@@ -3020,6 +3154,8 @@ function addPitch(team,type){
 function undoPitch(team){
   const ab=gs.pitchAB[team];
   if(!ab.history.length){ showToast('No hay pitch para deshacer',true); return; }
+  if((ab.undoCount||0)>=3){ showToast('Máximo 3 pasos atrás',true); return; }
+  ab.undoCount=(ab.undoCount||0)+1;
   const last=ab.history.pop();
   gs.pitchCount[team].total=Math.max(0,gs.pitchCount[team].total-1);
   if(last==='fouls-strike'){
@@ -3057,8 +3193,8 @@ function updatePitchABDisplay(team){
 }
 
 function resetPitchAB(){
-  gs.pitchAB['v']={s:0,b:0,f:0,history:[]};
-  gs.pitchAB['l']={s:0,b:0,f:0,history:[]};
+  gs.pitchAB['v']={s:0,b:0,f:0,history:[],undoCount:0};
+  gs.pitchAB['l']={s:0,b:0,f:0,history:[],undoCount:0};
   unlockPitchButtons('v');
   unlockPitchButtons('l');
   updatePitchABDisplay('v');
@@ -3105,11 +3241,13 @@ function showStrikeoutMenu(team){
       showKCorridoMenu(team,pidx,inn);
     }
   });
+  setModalForceChoice(true); // ya hubo 3er strike: obliga a clasificar el ponche
   document.getElementById('modal').classList.add('show');
 }
 
 function showKCorridoMenu(team,pidx,inn){
   const pl=gs.teams[team].players[pidx];
+  setModalForceChoice(true);
   document.getElementById('mtitle').textContent=`PONCHE CORRIDO — ${pl.name} · E${inn}`;
   const body=document.getElementById('mbody'); body.innerHTML='';
   const back=document.createElement('button');
@@ -3660,8 +3798,9 @@ function toggleMode(){
 function refreshAllCells(){
   ['v','l'].forEach(team=>{
     Object.keys(gs.plays[team]||{}).forEach(pidx=>{
+      // inn puede ser clave compuesta ("3b" por batting around) — NO forzar a número
       Object.keys(gs.plays[team][pidx]||{}).forEach(inn=>{
-        refreshCell(team,+pidx,+inn);
+        refreshCell(team,+pidx,inn);
       });
     });
   });
@@ -3727,7 +3866,7 @@ function showNarrativeModal(team,pidx,inn){
   const body=document.getElementById('mbody');
   body.innerHTML=`<div class="narrative-panel">${narratePlay(team,pidx,inn)}</div>
   <div style="margin-top:10px;display:flex;gap:6px">
-    <button class="modal-close" style="flex:1" onclick="closeModal();selectCell('${team}',${pidx},${inn},document.getElementById('c-${team}-${pidx}-${inn}'))">✏️ EDITAR</button>
+    <button class="modal-close" style="flex:1" onclick="closeModal();selectCell('${team}',${pidx},'${inn}',document.getElementById('c-${team}-${pidx}-${inn}'))">✏️ EDITAR</button>
     <button class="modal-close" style="flex:1" onclick="closeModal()">CERRAR</button>
   </div>`;
   document.getElementById('modal').classList.add('show');
