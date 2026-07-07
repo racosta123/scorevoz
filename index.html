@@ -270,6 +270,26 @@
   .chat-mic-btn.recording { border-color:var(--red); background:rgba(255,77,103,.28); animation:pulse-red .7s infinite; }
   .chat-send-btn { width:38px; height:38px; border-radius:50%; border:none; background:var(--amber); color:#071018; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; transition:opacity .15s; padding:0; }
   .chat-send-btn:hover { opacity:.82; }
+  /* ── PESTAÑAS ASISTENTE / REGLAS MLB ───────────────────── */
+  .chat-tabs { display:flex; gap:6px; padding:0 12px; background:#081220; border-bottom:1px solid rgba(255,255,255,.08); flex-shrink:0; }
+  .chat-tab { flex:1; text-align:center; padding:9px 6px; font-family:'Oswald',sans-serif; font-size:0.7rem; letter-spacing:1px; color:var(--text-dim); background:transparent; border:none; border-bottom:2px solid transparent; cursor:pointer; transition:all .15s; }
+  .chat-tab.active { color:var(--amber); border-bottom-color:var(--amber); }
+  .chat-tab:hover:not(.active) { color:#fff; }
+  /* ── MÓDULO DE REGLAS MLB (Q&A) ─────────────────────────── */
+  #rules-panel { display:none; flex:1; min-height:0; flex-direction:column; }
+  .rules-search-row { padding:10px 14px 6px; flex-shrink:0; }
+  .rules-search-input { width:100%; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; color:#fff; font-family:'Inter',sans-serif; font-size:0.82rem; padding:9px 12px; outline:none; transition:border-color .2s; }
+  .rules-search-input:focus { border-color:var(--amber); }
+  .rules-search-input::placeholder { color:#3d5566; }
+  .rules-list { flex:1; overflow-y:auto; padding:6px 14px 14px; display:flex; flex-direction:column; gap:8px; }
+  .rule-item { background:rgba(255,182,72,.06); border:1px solid rgba(255,182,72,.15); border-radius:12px; overflow:hidden; }
+  .rule-q { width:100%; text-align:left; background:transparent; border:none; color:#fff; font-size:0.82rem; font-weight:600; padding:11px 13px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:8px; font-family:'Inter',sans-serif; }
+  .rule-q:hover { color:var(--amber); }
+  .rule-q .rule-caret { transition:transform .2s; color:var(--text-dim); flex-shrink:0; }
+  .rule-item.open .rule-q .rule-caret { transform:rotate(90deg); }
+  .rule-a { max-height:0; overflow:hidden; transition:max-height .25s ease; font-size:0.78rem; line-height:1.55; color:#c8dff0; padding:0 13px; }
+  .rule-item.open .rule-a { max-height:320px; padding:0 13px 12px; }
+  .rules-empty { text-align:center; color:var(--text-dim); font-size:0.78rem; padding:30px 10px; }
   /* ── UNDO BUTTON ────────────────────────────────────────── */
   .btn-undo-play { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); border-radius:10px; color:#8fa3b7; font-family:'Bebas Neue',sans-serif; font-size:0.95rem; letter-spacing:1px; padding:7px 14px; cursor:pointer; transition:all .15s; white-space:nowrap; align-self:center; }
   .btn-undo-play:hover { border-color:var(--amber); color:var(--amber); background:rgba(255,182,72,.08); }
@@ -495,14 +515,24 @@
     </div>
     <button class="chat-close" onclick="closeHelpChat()">✕</button>
   </div>
+  <div class="chat-tabs">
+    <button class="chat-tab active" id="tab-asistente" onclick="switchHelpTab('asistente')">💬 ASISTENTE</button>
+    <button class="chat-tab" id="tab-reglas" onclick="switchHelpTab('reglas')">📖 REGLAS MLB</button>
+  </div>
   <div class="chat-msgs" id="chat-msgs"></div>
-  <div class="chat-input-row">
+  <div class="chat-input-row" id="chat-input-row">
     <input class="chat-input" id="chat-input" placeholder="Ej: rodado al short, sacaron al corredor en home del 6 al 5 al 2" onkeydown="chatInputKey(event)">
     <button class="chat-mic-btn" id="chat-mic-btn"
       onmousedown="startChatMic(event)" onmouseup="stopChatMic(event)"
       ontouchstart="startChatMic(event)" ontouchend="stopChatMic(event)"
       ontouchcancel="stopChatMic(event)" title="Mantén para dictar">🎙</button>
     <button class="chat-send-btn" onclick="sendChatMsg()" title="Enviar">➤</button>
+  </div>
+  <div id="rules-panel">
+    <div class="rules-search-row">
+      <input class="rules-search-input" id="rules-search" placeholder="Buscar pregunta…" oninput="renderRulesFAQ()">
+    </div>
+    <div class="rules-list" id="rules-list"></div>
   </div>
 </div>
 
@@ -4337,6 +4367,7 @@ function searchKB(raw){
 let chatRec=null, chatRecording=false;
 
 function openHelpChat(){
+  switchHelpTab('asistente'); // el ícono ❓ siempre abre en la pestaña Asistente, como antes
   document.getElementById('chat-panel').classList.add('open');
   const msgs=document.getElementById('chat-msgs');
   if(!msgs.children.length){
@@ -4346,6 +4377,69 @@ function openHelpChat(){
 
 function closeHelpChat(){
   document.getElementById('chat-panel').classList.remove('open');
+}
+
+// ─── PESTAÑAS DEL PANEL: ASISTENTE (chat libre) vs REGLAS MLB (Q&A) ──
+function switchHelpTab(tab){
+  const isAsistente=tab==='asistente';
+  document.getElementById('tab-asistente').classList.toggle('active',isAsistente);
+  document.getElementById('tab-reglas').classList.toggle('active',!isAsistente);
+  document.getElementById('chat-msgs').style.display=isAsistente?'':'none';
+  document.getElementById('chat-input-row').style.display=isAsistente?'':'none';
+  document.getElementById('rules-panel').style.display=isAsistente?'none':'flex';
+  if(!isAsistente) renderRulesFAQ();
+}
+
+// ─── MÓDULO DE REGLAS MLB (Q&A) ────────────────────────────
+// Redactado en palabras propias, en español claro y breve — no copiado de ningún
+// rulebook. Para agregar más preguntas, solo sumar un {q,a} más a este array.
+const MLB_RULES_FAQ=[
+  {q:'¿Cuándo aplica el ponche corrido (tercer strike no atrapado)?',
+   a:'Cuando el catcher no atrapa el tercer strike, el bateador puede correr a primera. Pero solo se le permite intentarlo si primera base está vacía, o si ya hay 2 outs (sin importar si primera está ocupada). Si primera está ocupada y hay menos de 2 outs, el bateador queda out automáticamente por regla, sin importar qué pase con la pelota.'},
+  {q:'¿Cuándo un batazo es hit y cuándo es error?',
+   a:'Es hit cuando el bateador llega a base gracias a un batazo bien colocado que un fildeador normal, jugando con esfuerzo ordinario, no podría haber convertido en out. Es error cuando el fildeador tuvo una oportunidad razonable de sacar al bateador o a un corredor, pero falló por una mala jugada (tiro descontrolado, pelota que se le escapa, etc.). La duda siempre se resuelve a favor del bateador si el batazo fue realmente difícil de fildear.'},
+  {q:'¿Qué es una carrera limpia y qué es una carrera sucia?',
+   a:'Una carrera es limpia (earned run) cuando anota sin la ayuda de errores o pasados bolas de la defensa — es responsabilidad del pitcher. Es sucia (unearned run) cuando el corredor no habría anotado, o ni siquiera habría llegado a base, de no ser por un error defensivo o una jugada que debió haber sido out. Las carreras sucias no cuentan para la efectividad (ERA) del pitcher.'},
+  {q:'¿Qué es el infield fly y cuándo se canta?',
+   a:'Es una regla que protege a los corredores. Se canta cuando hay menos de 2 outs, corredores en 1ª y 2ª (o bases llenas), y el bateador conecta un elevado que un infielder puede atrapar con esfuerzo ordinario. El umpire declara out al bateador apenas se eleva la pelota, sin importar si finalmente se atrapa o no — así la defensa no puede dejarla caer a propósito para forzar un doble play.'},
+  {q:'¿Qué es una jugada forzada?',
+   a:'Es cuando un corredor está obligado a abandonar su base porque el bateador (o otro corredor detrás) ocupa el lugar que él tenía. En esa situación, el fildeador solo necesita tocar la base de adelante (no al corredor) para hacer el out. Por ejemplo, con un corredor en 1ª y el bateador conecta un rodado: el corredor está forzado a ir a 2ª, así que pisar 2ª antes de que llegue ya es out.'},
+  {q:'¿Qué significa "le dieron la vuelta al orden" (batting around)?',
+   a:'Pasa cuando, en la misma entrada (sin llegar a los 3 outs), batean los 9 jugadores del lineup y le vuelve a tocar turno al primero de ellos. En VozScore esto se refleja agregando una columna extra en la hoja de anotación, marcada con el mismo número de entrada en rojo, para que el segundo turno de ese jugador no se pierda ni pise el primero.'},
+];
+
+function normalizeRulesQuery(s){
+  return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+}
+
+function renderRulesFAQ(){
+  const list=document.getElementById('rules-list');
+  if(!list) return;
+  const q=normalizeRulesQuery(document.getElementById('rules-search')?.value);
+  list.innerHTML='';
+  const matches=[];
+  MLB_RULES_FAQ.forEach((item,idx)=>{
+    if(!q || normalizeRulesQuery(item.q).includes(q) || normalizeRulesQuery(item.a).includes(q)){
+      matches.push(idx);
+    }
+  });
+  if(!matches.length){
+    list.innerHTML='<div class="rules-empty">No hay preguntas que coincidan con tu búsqueda.</div>';
+    return;
+  }
+  matches.forEach(idx=>{
+    const item=MLB_RULES_FAQ[idx];
+    const div=document.createElement('div');
+    div.className='rule-item';
+    div.id=`rule-item-${idx}`;
+    div.innerHTML=`<button class="rule-q" onclick="toggleRuleItem(${idx})">${item.q}<span class="rule-caret">›</span></button><div class="rule-a">${item.a}</div>`;
+    list.appendChild(div);
+  });
+}
+
+function toggleRuleItem(idx){
+  const el=document.getElementById(`rule-item-${idx}`);
+  if(el) el.classList.toggle('open');
 }
 
 function chatAppendMsg(role,text){
