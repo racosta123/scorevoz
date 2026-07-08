@@ -285,6 +285,7 @@
   .rule-item { background:rgba(255,182,72,.06); border:1px solid rgba(255,182,72,.15); border-radius:12px; overflow:hidden; flex-shrink:0; }
   .rule-q { width:100%; text-align:left; background:transparent; border:none; color:#fff; font-size:0.82rem; font-weight:600; line-height:1.5; padding:14px 14px; cursor:pointer; display:flex; justify-content:space-between; align-items:flex-start; gap:10px; font-family:'Inter',sans-serif; }
   .rule-q:hover { color:var(--amber); }
+  .rule-q .rule-num { color:var(--amber); margin-right:4px; }
   .rule-q .rule-caret { transition:transform .2s; color:var(--text-dim); flex-shrink:0; margin-top:2px; }
   .rule-item.open .rule-q .rule-caret { transform:rotate(90deg); }
   .rule-a { max-height:0; overflow:hidden; transition:max-height .25s ease; font-size:0.78rem; line-height:1.5; color:#c8dff0; padding:0 14px; }
@@ -4478,6 +4479,38 @@ const MLB_RULES_FAQ=[
    a:'Putout (PO): se acredita al fildeador que ejecuta el out — atrapa el elevado, pisa la base en forzado, toca al corredor o recibe el tiro en primera. Asistencia (A): se acredita a cada fildeador que tocó o tiró la bola en la jugada antes del out (máximo una por jugada aunque la toque dos veces). Ejemplo 6-4-3: SS asistencia, 2B putout + asistencia, 1B putout. El cátcher recibe putout en los ponches.'},
   {q:'¿Cómo funcionan el replay y el reto ABS en 2026?',
    a:'Replay (video review): cada mánager tiene retos limitados para jugadas de safe/out, atrapadas, home runs y otras jugadas revisables; bolas y strikes NO son revisables por video tradicional. Nuevo en 2026: el sistema ABS (Automated Ball-Strike) de retos — pitcher, cátcher o bateador (nadie más) pueden retar el canto de bola/strike tocándose la gorra/casco inmediatamente; el sistema automático decide. Cada equipo inicia con 2 retos ABS y los conserva si acierta. Para el anotador: el resultado corregido es el que se anota.'},
+  {q:'¿Qué es el pitch clock (reloj de lanzamiento)?',
+   a:'El pitcher tiene 15 segundos para iniciar su movimiento sin corredores y 18 con corredores en base; el bateador debe estar listo en la caja a los 8 segundos. Violación del pitcher = BOLA automática; violación del bateador = STRIKE automático. El pitcher solo puede desengancharse (pisar afuera o tirar a base) 2 veces por turno; la tercera sin out es balk. Para el anotador: las bolas/strikes automáticos se anotan en el conteo normal.'},
+  {q:'¿Qué es un triple play?',
+   a:'Son TRES outs en una misma jugada continua, sin error de por medio. El más común: línea atrapada (1 out), corredor sorprendido fuera de segunda (2), y tiro a primera para sorprender al otro (3). Se anota con la secuencia completa de fildeadores (ej. 5-4-3). El triple play sin asistencia (un solo fildeador hace los 3 outs) es de las jugadas más raras del béisbol. Requiere obviamente cero outs y al menos dos corredores en base.'},
+  {q:'¿Cómo se decide la victoria, la derrota y el salvamento de los pitchers?',
+   a:'VICTORIA (W): al pitcher que estaba en el juego cuando su equipo tomó la ventaja definitiva (el abridor necesita mínimo 5 entradas). DERROTA (L): al pitcher responsable de la carrera con la que el rival tomó la ventaja definitiva. SALVAMENTO (SV): al relevista que termina el juego ganado sin ser el ganador y entra con ventaja de 3 o menos, o con el empate en base/plato/círculo, o lanza las últimas 3 entradas. HOLD (H): relevista intermedio que entra en situación de salvamento y la mantiene sin terminar el juego.'},
+  {q:'¿Qué es el checked swing (medio swing) y quién lo decide?',
+   a:'Es cuando el bateador inicia el swing pero intenta frenarlo. Si a juicio del umpire \'le tiró\' a la bola, es strike; si se contuvo, es bola (según el canto del lanzamiento). Si el umpire de home canta bola, el cátcher o el mánager pueden pedir APELACIÓN al umpire de base (1ª para derechos, 3ª para zurdos), cuya decisión es final. No hay criterio oficial de \'romper las muñecas\': es juicio del umpire. No es retable por video ni por ABS.'},
+  {q:'¿Qué es la jugada de la bola escondida (hidden ball trick)?',
+   a:'Es una jugada legal donde un infielder retiene la bola disimuladamente (el corredor cree que la tiene el pitcher) y toca al corredor cuando se despega de la base. Requisito clave: el pitcher NO puede estar en el montículo/placa sin la bola (sería balk). El out se anota como toque normal al fildeador que lo ejecuta (putout sin asistencia, o con asistencia si hubo tiro previo). Es rara pero completamente válida.'},
+  {q:'¿Cuándo es bola muerta y cuándo bola viva?',
+   a:'BOLA MUERTA (nadie avanza salvo lo que otorgue la regla): foul no atrapado, bateador golpeado, interferencia, bola fuera del terreno (tribunas, dugout), ground rule double, balk. BOLA VIVA (todo puede pasar): lanzamiento normal, hit, error, tiro malo que sigue en el terreno, corredor rebasado, apelaciones con bola viva. Regla clave del anotador: en bola muerta los avances son los que la regla otorga, no los que el corredor logre correr.'},
+  {q:'¿Qué pasa con un tiro que se mete al dugout o a las tribunas?',
+   a:'Es bola muerta y los corredores avanzan por regla: si el tiro malo es de un infielder en la PRIMERA jugada tras el batazo, cada corredor avanza DOS bases desde donde estaba al momento del LANZAMIENTO. Si es un tiro posterior (o de un outfielder), dos bases desde donde estaba cada corredor al momento del TIRO. Se anota error al que tiró si el avance no se habría dado sin el tiro malo.'},
+  {q:'¿Qué es un juego suspendido y qué pasa con las estadísticas?',
+   a:'Es un juego detenido (lluvia, luz, toque de queda) que se REANUDARÁ después desde el punto exacto donde quedó, con los mismos lineups y situación. Todas las estadísticas cuentan como de la fecha ORIGINAL del juego. Distinto del juego cancelado (se reprograma desde cero) y del juego oficial acortado (si ya se jugaron 5 entradas o 4.5 con el local ganando, el resultado cuenta como final).'},
+  {q:'¿Qué es una entrada inmaculada?',
+   a:'Es cuando un pitcher retira la entrada con exactamente 9 lanzamientos: tres ponches de tres strikes cada uno, sin bolas, sin fouls extra, sin contacto. Es una rareza estadística (más rara que un juego sin hit por entrada individual). Para el anotador es simplemente K-K-K, pero vale la pena registrarla en notas. No confundir con entrada perfecta (tres outs consecutivos por cualquier vía).'},
+  {q:'¿Qué pasa si una bola bateada golpea a un umpire?',
+   a:'Si una bola bateada en fair golpea a un UMPIRE antes de pasar a un infielder (sin haber sido tocada por nadie), es bola muerta: el bateador recibe sencillo (hit) y va a primera, y los demás corredores avanzan solo si son forzados. Si la bola ya había pasado a un infielder (o fue tocada por un fildeador) antes de golpear al umpire, la bola sigue viva y la jugada continúa normal, sin out ni base automática. Es distinto al caso de un corredor golpeado, que se rige por su propia regla.'},
+  {q:'¿La regla de no-reentrada aplica solo a emergentes o a todos los cambios?',
+   a:'Aplica a TODOS los cambios, no solo a bateadores o corredores emergentes: un jugador que sale del juego por cambio defensivo, cambio de pitcheo, o cualquier sustitución, queda fuera DEFINITIVAMENTE ese juego, sin importar la razón del cambio. Por eso los mánagers cuidan mucho quemar al cátcher titular o al DH desde temprano: si salen, no hay forma de recuperarlos. Para el anotador, cada sustitución (ofensiva, defensiva o de pitcheo) se registra en el lineup con la entrada exacta en que ocurrió.'},
+  {q:'¿Qué es la regla del pitcher de los tres bateadores?',
+   a:'Desde 2020, todo pitcher (abridor o relevista) debe enfrentar un MÍNIMO de 3 bateadores consecutivos o terminar la media entrada antes de poder ser cambiado, salvo lesión o enfermedad certificada por el umpire. Elimina el cambio de "especialista para un solo bateador". Para el anotador no cambia la mecánica: se registra el relevo con la entrada y el bateador donde entró, pero explica por qué ciertos cambios no están permitidos a media entrada.'},
+  {q:'¿Qué pasa si la bola se le queda atorada al fildeador o se va al guante a las gradas?',
+   a:'Si la bola queda alojada en el guante y el fildeador la controla, la atrapada es válida; puede incluso tirar el guante con la bola adentro a un compañero para completar la jugada. Si el guante CON la bola vuela fuera del terreno de juego (a las gradas o al dugout), es bola muerta y los corredores avanzan dos bases. Si la bola queda atorada en la barda, malla o lona del campo, es bola muerta: doble por regla para el bateador y dos bases para los corredores.'},
+  {q:'¿Puede un fildeador atrapar una bola inclinándose sobre las gradas o el dugout?',
+   a:'Sí, siempre que al menos un pie esté sobre el terreno de juego (o en el aire desde él) al momento de la atrapada, y no pise dentro del área fuera del campo. Si atrapa el foul inclinado sobre el dugout sin caerse dentro, es out válido; si cae dentro del dugout tras la atrapada, el out cuenta pero es bola muerta y los corredores avanzan una base. Si se mete a las gradas ANTES de atrapar, no hay out y es bola muerta (foul).'},
+  {q:'¿Qué es el squeeze play (toque suicida y de seguridad)?',
+   a:'Es la jugada donde el corredor de tercera intenta anotar con un toque de bola. SQUEEZE SUICIDA: el corredor arranca al plato con el lanzamiento, ANTES del contacto — si el bateador no logra tocar la bola, el corredor queda vendido. SQUEEZE DE SEGURIDAD: el corredor espera a ver el toque en el piso antes de arrancar. Para el anotador: si funciona, es toque de sacrificio (SH) con carrera (y RBI para el bateador); si el corredor es out en home, se anota la secuencia del out (típico 1-2 o 3-2).'},
+  {q:'¿Cuál es la diferencia entre ponche cantado y ponche abanicando (K vs backwards K)?',
+   a:'Ponche abanicando (K normal): el bateador hace swing completo al tercer strike y falla. Ponche cantado o mirando (K invertida, conocida como "backwards K" o Ꝅ): el bateador no le tira a un lanzamiento que el umpire canta strike. Ambos son ponches (K) para las estadísticas del pitcher — no hay diferencia en cuántos K\'s tiene, solo cambia cómo se anota visualmente en la hoja de anotación. La convención de usar la K invertida para el ponche mirando es una tradición del scorekeeping, no una regla oficial de MLB.'},
 ];
 
 function normalizeRulesQuery(s){
@@ -4504,7 +4537,7 @@ function renderRulesFAQ(){
     const div=document.createElement('div');
     div.className='rule-item';
     div.id=`rule-item-${idx}`;
-    div.innerHTML=`<button class="rule-q" onclick="toggleRuleItem(${idx})">${item.q}<span class="rule-caret">›</span></button><div class="rule-a">${item.a}</div>`;
+    div.innerHTML=`<button class="rule-q" onclick="toggleRuleItem(${idx})"><span class="rule-q-text"><span class="rule-num">${idx+1}.</span>${item.q}</span><span class="rule-caret">›</span></button><div class="rule-a">${item.a}</div>`;
     list.appendChild(div);
   });
 }
