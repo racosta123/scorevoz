@@ -4514,32 +4514,119 @@ const MLB_RULES_FAQ=[
 ];
 
 function normalizeRulesQuery(s){
-  return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+// ── Buscador inteligente por relevancia (todo local, sin backend/IA) ──
+const RULES_STOPWORDS=new Set(['que','qué','si','el','la','los','las','de','del','al','un','una','unos','unas','es','en','y','o','a','con','por','para','se','su','sus','lo','le','les','como','cuando','cuándo','cual','cuál','cuales','cuáles','hay','pasa','pasan','pasaria','esta','este','esto','estos','estas','hace','tiene','tienen','puede','pueden','debe','deben','sin','mas','más','muy','ya','no','ni','entre','sobre','desde','hasta','durante','me','mi','tu','eso','esa','ese','soy','fue','ser','estar','hacia','nada','algo','alguna','alguno','algunos','algunas','aqui','aquí','alli','allí','ahi','ahí','asi','así','todo','toda','todos','todas','mucho','mucha','muchos','muchas','poco','poca','tambien','también','porque','entonces','luego','despues','después','antes','mientras','aunque','sino','otro','otra','otros','otras','mismo','misma','cada','quien','quién','quienes','quiénes','donde','dónde','adonde','dentro','fuera','encima','debajo','arriba','abajo','bien','mal','vez','ver']);
+
+// Sinónimos/coloquialismos de béisbol mexicano → términos del banco de preguntas.
+const RULES_SYNONYMS={
+  'chocolate':'ponche','ponchado':'ponche','ponchao':'ponche','abanico':'ponche','abanicar':'ponche',
+  'pasaporte':'base por bolas','boleto':'base por bolas',
+  'cuadrangular':'home run','jonron':'home run','vuelacercas':'home run','cuadrangulazo':'home run',
+  'serpentinero':'pitcher','lanzador':'pitcher','picher':'pitcher','pichar':'pitcher',
+  'receptor':'catcher','mascota':'catcher',
+  'chocar':'rebasa','rebasar':'rebasa','rebase':'rebasa',
+  'robarse':'robo','ladron':'robo','robada':'robo',
+  'taquito':'toque sacrificio',
+  'ampayer':'umpire',
+  'inicialista':'primera base',
+  'intermedista':'segunda base',
+  'antesalista':'tercera base',
+  'paracorto':'shortstop campo corto',
+  'jardinero':'outfielder',
+  'cachar':'atrapar',
+  'tubey':'doble',
+  'triangular':'triple',
+  'emplayado':'out',
+  'bateo':'bateador'
+};
+
+function expandRulesSynonyms(normalized){
+  let expanded=normalized;
+  for(const key in RULES_SYNONYMS){
+    const re=new RegExp('\\b'+key.replace(/ /g,'\\s+')+'\\b');
+    if(re.test(normalized)) expanded+=' '+RULES_SYNONYMS[key];
+  }
+  return expanded;
+}
+
+function ruleWords(normalized){
+  return normalized.split(' ').filter(Boolean);
+}
+
+function stemRuleWord(w){
+  let s=w;
+  if(s.length>4 && /[aeiou]s$/.test(s)) s=s.slice(0,-1);
+  if(s.length>6 && s.endsWith('iendo')) s=s.slice(0,-5);
+  else if(s.length>6 && s.endsWith('ando')) s=s.slice(0,-4);
+  if(s.length>=5 && /(ar|er|ir)$/.test(s)) s=s.slice(0,-2);
+  if(s.length>=4 && /[aeoi]$/.test(s)) s=s.slice(0,-1);
+  return s.length>4 ? s.slice(0,4) : s;
+}
+
+function tokenizeRulesQuery(raw){
+  const expanded=expandRulesSynonyms(normalizeRulesQuery(raw));
+  return ruleWords(expanded).filter(w=>w.length>=2 && !RULES_STOPWORDS.has(w));
+}
+
+let RULES_SEARCH_INDEX=null;
+function buildRulesSearchIndex(){
+  RULES_SEARCH_INDEX=MLB_RULES_FAQ.map(item=>{
+    const qWords=ruleWords(normalizeRulesQuery(item.q));
+    const aWords=ruleWords(normalizeRulesQuery(item.a));
+    return{qWords,aWords,qStems:qWords.map(stemRuleWord),aStems:aWords.map(stemRuleWord)};
+  });
+}
+
+const RULES_MIN_SCORE=3;
+
+function scoreRuleItem(tokens,idx){
+  const d=RULES_SEARCH_INDEX[idx];
+  let score=0;
+  tokens.forEach(tok=>{
+    const stem=stemRuleWord(tok);
+    if(d.qWords.includes(tok)) score+=5;
+    else if(d.qStems.includes(stem)) score+=3;
+    if(d.aWords.includes(tok)) score+=2;
+    else if(d.aStems.includes(stem)) score+=1;
+  });
+  return score;
+}
+
+function appendRuleItem(list,item,idx){
+  const div=document.createElement('div');
+  div.className='rule-item';
+  div.id=`rule-item-${idx}`;
+  div.innerHTML=`<button class="rule-q" onclick="toggleRuleItem(${idx})"><span class="rule-q-text"><span class="rule-num">${idx+1}.</span>${item.q}</span><span class="rule-caret">›</span></button><div class="rule-a">${item.a}</div>`;
+  list.appendChild(div);
 }
 
 function renderRulesFAQ(){
   const list=document.getElementById('rules-list');
   if(!list) return;
-  const q=normalizeRulesQuery(document.getElementById('rules-search')?.value);
+  const raw=document.getElementById('rules-search')?.value||'';
   list.innerHTML='';
-  const matches=[];
-  MLB_RULES_FAQ.forEach((item,idx)=>{
-    if(!q || normalizeRulesQuery(item.q).includes(q) || normalizeRulesQuery(item.a).includes(q)){
-      matches.push(idx);
-    }
-  });
-  if(!matches.length){
-    list.innerHTML='<div class="rules-empty">No hay preguntas que coincidan con tu búsqueda.</div>';
+  if(!raw.trim()){
+    MLB_RULES_FAQ.forEach((item,idx)=>appendRuleItem(list,item,idx));
     return;
   }
-  matches.forEach(idx=>{
-    const item=MLB_RULES_FAQ[idx];
-    const div=document.createElement('div');
-    div.className='rule-item';
-    div.id=`rule-item-${idx}`;
-    div.innerHTML=`<button class="rule-q" onclick="toggleRuleItem(${idx})"><span class="rule-q-text"><span class="rule-num">${idx+1}.</span>${item.q}</span><span class="rule-caret">›</span></button><div class="rule-a">${item.a}</div>`;
-    list.appendChild(div);
-  });
+  if(!RULES_SEARCH_INDEX) buildRulesSearchIndex();
+  const tokens=tokenizeRulesQuery(raw);
+  if(!tokens.length){
+    list.innerHTML='<div class="rules-empty">No encontré una regla que coincida. Intenta con otras palabras.</div>';
+    return;
+  }
+  const scored=MLB_RULES_FAQ.map((item,idx)=>({idx,score:scoreRuleItem(tokens,idx)}))
+    .filter(r=>r.score>=RULES_MIN_SCORE)
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,5);
+  if(!scored.length){
+    list.innerHTML='<div class="rules-empty">No encontré una regla que coincida. Intenta con otras palabras.</div>';
+    return;
+  }
+  scored.forEach(r=>appendRuleItem(list,MLB_RULES_FAQ[r.idx],r.idx));
 }
 
 function toggleRuleItem(idx){
