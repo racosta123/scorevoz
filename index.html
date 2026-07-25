@@ -605,6 +605,7 @@ let gs = {
   },
   currentBatter:{ v:0, l:0 },
   playHistory:[],
+  seq:0, // contador global de orden de registro (applyPlay/applySubstitution) — ver getOccupants
   activeBatter:null,
   alBate:null
 };
@@ -1020,7 +1021,8 @@ function parseSubVoice(text,team,outPidx){
 
 function applySubstitution(team,outPidx,inName,inPos){
   const inn=gs.currentInning||1;
-  gs.subs[team].push({ inn, outPidx, inName, inPos });
+  gs.seq=(gs.seq||0)+1;
+  gs.subs[team].push({ inn, outPidx, inName, inPos, seq:gs.seq });
   rebuildPlayerCell(team,outPidx);
   showToast(`✓ E${inn}: entra ${inName}${inPos?' · '+inPos:''}`);
 }
@@ -1075,6 +1077,7 @@ function startGame(){
   });
   gs.currentBatter = { v:0, l:0 };
   gs.playHistory = [];
+  gs.seq = 0;
   document.getElementById('setup-screen').style.display='none';
   document.getElementById('game-screen').style.display='block';
   document.getElementById('vpanel').style.display='flex';
@@ -2032,6 +2035,11 @@ function applyPlay(team,pidx,inn,play){
     showToast('Jugada borrada');
     return;
   }
+  // Orden de registro (para getOccupants: distinguir jugada del saliente vs
+  // del entrante cuando coinciden en la misma entrada de una sustitución).
+  // Se estampa SOLO al crear el objeto de jugada — nunca se re-estampa cuando
+  // una jugada ya existente solo se muta después (score(), applyRunnerMove()).
+  gs.seq=(gs.seq||0)+1;
   // Pelota bateada: sumar 1 lanzamiento (strike) al pitcher antes de procesar la jugada
   if(isBattedBallPlay(play)){
     if(!gs.pitchCount[team].inningLog) gs.pitchCount[team].inningLog={};
@@ -2053,14 +2061,14 @@ function applyPlay(team,pidx,inn,play){
     if(typeof updatePitchABDisplay==='function') updatePitchABDisplay(team);
   }
   if(play.type==='score'){
-    if(!gs.plays[team][pidx][inn]) gs.plays[team][pidx][inn]={sym:'R',bases:0,type:'advance'};
+    if(!gs.plays[team][pidx][inn]) gs.plays[team][pidx][inn]={sym:'R',bases:0,type:'advance',seq:gs.seq};
     gs.plays[team][pidx][inn].scored=true;
   } else if(play.id==='SBH'){
-    gs.plays[team][pidx][inn]={ sym:'SBH', bases:3, scored:true, earned:true, type:'advance', ab:false, h:false };
+    gs.plays[team][pidx][inn]={ sym:'SBH', bases:3, scored:true, earned:true, type:'advance', ab:false, h:false, seq:gs.seq };
   } else {
     const bases = play.bases===4?3:(play.bases||0);
     const scored = play.bases===4;
-    gs.plays[team][pidx][inn]={ sym:play.sym, bases, scored, type:play.type, ab:play.ab, h:play.h||false };
+    gs.plays[team][pidx][inn]={ sym:play.sym, bases, scored, type:play.type, ab:play.ab, h:play.h||false, seq:gs.seq };
   }
   // Pisa y corre (A): la celda del bateador muestra "F{n} SF" (sym base sigue 'SF')
   if(play.flyPos && gs.plays[team][pidx][inn]){
@@ -2937,17 +2945,34 @@ function computeNumeritosData(){
   const getOccupants=(t,idx)=>{
     const original=gs.teams[t].players[idx];
     const subs=(gs.subs[t]||[]).filter(s=>s.outPidx===idx).sort((a,b)=>a.inn-b.inn);
-    const occ=[{name:original.name,pos:original.pos,from:1,to:subs.length>0?subs[0].inn-1:INNINGS,mask:null}];
+    // Por defecto, la entrada donde ocurre el cambio le pertenece ENTERA al
+    // SALIENTE (el cambio se registra después de su turno, no antes) — salvo
+    // el caso especial de abajo, donde el entrante hereda solo la anotación.
+    const occ=[{name:original.name,pos:original.pos,from:1,to:subs.length>0?subs[0].inn:INNINGS,mask:null}];
     subs.forEach((s,i)=>{
-      const to=i<subs.length-1?subs[i+1].inn-1:INNINGS;
-      occ.push({name:s.inName,pos:s.inPos||original.pos,from:s.inn,to,mask:null});
+      const to=i<subs.length-1?subs[i+1].inn:INNINGS;
+      occ.push({name:s.inName,pos:s.inPos||original.pos,from:s.inn+1,to,mask:null});
     });
+    // Único caso donde SÍ se comparte la entrada: el saliente bateó (ab) y la
+    // carrera se anotó DESPUÉS, en una jugada separada de otro bateador —
+    // salvo HR/IHR/SBH, que anotan atómicamente en la misma jugada y por lo
+    // tanto ya pertenecen enteros al saliente por el rango de arriba.
     subs.forEach((s,i)=>{
       const p=(gs.plays[t][idx]||{})[s.inn];
-      if(!p||!p.ab||!p.scored||NOSPLIT_SYM.has(p.sym)) return;
+      if(!p) return;
       const outgoing=occ[i], incoming=occ[i+1];
-      outgoing.to=s.inn; // incluye su propio turno al bate compartido con esta entrada
+      // Orden de registro: si la jugada se guardó DESPUÉS del cambio (seq mayor),
+      // es entera del entrante — nunca compartida con el saliente. Si no hay dato
+      // de orden (partido viejo) o la jugada es de antes, sigue la lógica ya
+      // validada de abajo (jugada del saliente, con o sin split por anotación).
+      if(p.seq!==undefined && s.seq!==undefined && p.seq>s.seq){
+        outgoing.to=s.inn-1;
+        incoming.from=s.inn;
+        return;
+      }
+      if(!p.ab||!p.scored||NOSPLIT_SYM.has(p.sym)) return;
       outgoing.mask={...(outgoing.mask||{}),[s.inn]:'battingOnly'};
+      incoming.from=s.inn; // retrocede su rango para poder leer la anotación vía mask
       incoming.mask={...(incoming.mask||{}),[s.inn]:'scoredOnly'};
     });
     return occ;
@@ -3415,7 +3440,7 @@ function showPlayerFicha(team,pidx){
       <button onclick="document.getElementById('jugador-content').innerHTML=buildPlayerListHTML()"
         style="background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-dim);font-size:.72rem;padding:4px 9px;cursor:pointer">‹ LISTA</button>
       <h3 style="margin:0;border:none;padding:0;flex:1">${curName}</h3>
-      <button onclick="downloadPlayerFichaPDF('${team}',${pidx})"
+      <button onclick="renderPlayerFichaFinal('${team}',${pidx})"
         style="background:rgba(255,182,72,.12);border:1px solid var(--amber);border-radius:8px;color:var(--amber);font-family:'Bebas Neue',sans-serif;font-size:.85rem;letter-spacing:1px;padding:5px 11px;cursor:pointer;white-space:nowrap">📄 PDF</button>
     </div>
     <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
@@ -5129,6 +5154,289 @@ async function downloadNumeritosPDF(){
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url; a.download=`numeritos-finales-${(gs.teams.v.name||'V').replace(/\s+/g,'_')}-vs-${(gs.teams.l.name||'L').replace(/\s+/g,'_')}.pdf`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),40000);
+    showToast('✅ PDF descargado');
+  }catch(e){ showToast('⚠️ Error al generar PDF',true); console.error(e); }
+}
+</script>
+
+<!-- ════════════════════════════════════════════════════════════════
+     FICHA DE JUGADOR — estilo Numeritos Finales (infografía individual)
+     Reemplaza el botón PDF de la ficha (antes downloadPlayerFichaPDF,
+     jsPDF a mano). showPlayerFicha()/downloadPlayerFichaPDF() se dejan
+     intactas sin usar, por si hay que revertir.
+     ════════════════════════════════════════════════════════════════ -->
+<div id="player-ficha-overlay" style="display:none;flex-direction:column;align-items:center;position:fixed;inset:0;z-index:9999;background:rgba(6,13,24,.85);overflow-y:auto;padding:24px 16px;">
+  <div style="width:680px;max-width:100%;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button id="pf-btn-img" class="n3-dl-btn" onclick="downloadPlayerFichaImage()" style="background:#0d9f6e;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:2px;padding:9px 16px;cursor:pointer">⬇️ DESCARGAR IMAGEN</button>
+      <button id="pf-btn-pdf" class="n3-dl-btn" onclick="downloadPlayerFichaFinalPDF()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:2px;padding:9px 16px;cursor:pointer">⬇️ DESCARGAR PDF</button>
+    </div>
+    <button onclick="document.getElementById('player-ficha-overlay').style.display='none'" style="background:#DC2626;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:2px;padding:9px 14px;cursor:pointer">✕ CERRAR</button>
+  </div>
+  <div id="player-ficha-final"></div>
+</div>
+
+<style>
+#player-ficha-final, #player-ficha-final *{margin:0;padding:0;box-sizing:border-box}
+#player-ficha-final{background:#e8eaf0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;justify-content:center;padding:20px;border-radius:10px}
+#player-ficha-final .pf-page{width:680px;background:linear-gradient(160deg,#0b2350 0%,#0a1c3f 50%,#081733 100%);padding:18px;border-radius:14px}
+#player-ficha-final .pf-card{background:#fff;border-radius:10px}
+#player-ficha-final .pf-mb{margin-bottom:12px}
+#player-ficha-final .pf-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px}
+#player-ficha-final .pf-logo{display:flex;align-items:center;gap:8px}
+#player-ficha-final .pf-logo-name{font-size:19px;font-weight:800;color:#12306b;letter-spacing:-.4px}
+#player-ficha-final .pf-head-mid{text-align:center;flex:1}
+#player-ficha-final .pf-head-sub{font-size:12px;font-weight:600;color:#3d5580;letter-spacing:.3px}
+#player-ficha-final .pf-head-title{font-size:23px;font-weight:800;color:#0f2b5e;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#player-ficha-final .pf-datebox{display:flex;align-items:center;gap:8px;background:#f1f4f9;border:1px solid #e2e7ef;border-radius:9px;padding:7px 12px}
+#player-ficha-final .pf-d1{font-size:11px;font-weight:700;color:#0f2b5e;line-height:1.3}
+#player-ficha-final .pf-d2{font-size:10px;color:#5a6c8c;line-height:1.3}
+
+#player-ficha-final .pf-hero{background:linear-gradient(135deg,#0d2049,#0a1730);border-radius:10px;padding:16px;display:flex;gap:16px;align-items:stretch}
+#player-ficha-final .pf-avatar{width:150px;border-radius:9px;flex:none;position:relative;overflow:hidden;background:linear-gradient(165deg,#14306c 0%,#0c1e42 55%,#081733 100%);border:1px solid #24407a;display:flex;align-items:flex-end;justify-content:center;min-height:190px}
+#player-ficha-final .pf-avatar img{position:relative;width:82%;max-height:85%;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(0,0,0,.45));margin-bottom:6px}
+#player-ficha-final .pf-team-tag{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:9px;font-weight:800;color:#9db6e0;letter-spacing:1.6px}
+#player-ficha-final .pf-right{flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0}
+#player-ficha-final .pf-name{font-size:24px;font-weight:800;color:#fff;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#player-ficha-final .pf-pos-row{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
+#player-ficha-final .pf-pill{display:inline-block;color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.8px;padding:4px 12px;border-radius:5px}
+#player-ficha-final .pf-batnum{font-size:11px;color:#8fa4c8;font-weight:700}
+#player-ficha-final .pf-subnote{display:flex;align-items:center;gap:6px;background:rgba(255,182,72,.14);border:1px solid #ffb648;border-radius:7px;color:#ffb648;font-size:12.5px;font-weight:700;padding:6px 11px;margin-top:8px;width:fit-content}
+#player-ficha-final .pf-quad{display:flex;margin-top:13px}
+#player-ficha-final .pf-quad div{flex:1;text-align:center;border-right:1px solid #22406f}
+#player-ficha-final .pf-quad div:last-child{border-right:none}
+#player-ficha-final .pf-quad .b{font-size:22px;font-weight:800;color:#fff;line-height:1}
+#player-ficha-final .pf-quad .t{font-size:9px;font-weight:700;color:#8fa4c8;letter-spacing:1px;margin-top:4px}
+#player-ficha-final .pf-six{display:flex;background:#132c58;border-radius:8px;margin-top:12px;padding:8px 0}
+#player-ficha-final .pf-six div{flex:1;text-align:center;border-right:1px solid #22406f}
+#player-ficha-final .pf-six div:last-child{border-right:none}
+#player-ficha-final .pf-six .t{font-size:8.5px;font-weight:700;color:#8fa4c8;letter-spacing:.9px}
+#player-ficha-final .pf-six .b{font-size:14px;font-weight:800;color:#fff;margin-top:3px}
+#player-ficha-final .pf-six .g{color:#34d399}
+
+#player-ficha-final .pf-sec-title{font-size:12px;font-weight:800;color:#123059;letter-spacing:.6px;padding:12px 4px 8px}
+#player-ficha-final .pf-line{display:flex;gap:5px;flex-wrap:wrap;padding:0 4px 4px}
+#player-ficha-final .pf-inn{flex:1;min-width:38px;background:#f4f7fc;border:1px solid #e3e8f0;border-radius:7px;text-align:center;padding:6px 2px}
+#player-ficha-final .pf-inn .n{font-size:7.5px;font-weight:700;color:#8a97ad;letter-spacing:.4px}
+#player-ficha-final .pf-inn .s{font-size:10.5px;font-weight:800;margin-top:2px}
+
+#player-ficha-final .pf-stat-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:0 4px 4px}
+#player-ficha-final .pf-stat{background:#fff;border:1px solid #e3e8f0;border-radius:8px;padding:8px 4px;text-align:center}
+#player-ficha-final .pf-stat .t{font-size:8.5px;font-weight:700;color:#8a97ad;letter-spacing:.5px}
+#player-ficha-final .pf-stat .v{font-size:15px;font-weight:800;color:#123059;margin-top:3px}
+
+#player-ficha-final .pf-rating{display:flex;align-items:center;justify-content:space-between;border-radius:10px;padding:11px 16px}
+#player-ficha-final .pf-rating .l1{font-size:10px;font-weight:700;color:#5a6c8c;letter-spacing:1px}
+#player-ficha-final .pf-rating .l2{font-size:9.5px;color:#8a97ad;margin-top:2px}
+#player-ficha-final .pf-rating .val{font-size:18px;font-weight:800;letter-spacing:1px}
+
+#player-ficha-final .pf-lw{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e3e8f0;border-radius:10px;padding:11px 16px}
+#player-ficha-final .pf-lw .l1{font-size:10px;font-weight:700;color:#123059;letter-spacing:1px}
+#player-ficha-final .pf-lw .l2{font-size:9.5px;color:#8a97ad;margin-top:2px}
+#player-ficha-final .pf-lw .val{font-size:22px;font-weight:800}
+
+#player-ficha-final .pf-foot{display:flex;align-items:center;justify-content:space-between;padding:12px 20px 2px;margin-top:10px}
+#player-ficha-final .pf-foot .f{font-size:9px;color:#8fa4c8;font-weight:600}
+#player-ficha-final .pf-foot .fc{display:flex;align-items:center;gap:7px}
+#player-ficha-final .pf-foot .fc span{font-size:16px;font-weight:800;color:#fff;letter-spacing:-.3px}
+</style>
+
+<script>
+function pfStat(label,val){
+  return `<div class="pf-stat"><div class="t">${label}</div><div class="v">${val}</div></div>`;
+}
+
+function pfBuildHTML(ctx){
+  const {teamName,teamColor,helmetSrc,curName,curPos,batNum,subInfo,s,lw,rating,lineHTML,today}=ctx;
+  const weekday=today.split(',')[0]?.trim()||today;
+  const dateOnly=today.includes(',')?today.split(',')[1].trim():today;
+  const lwColor=lw>0?'#34d399':lw<0?'#f87171':'#8fa4c8';
+  const ratingHTML=rating?`
+    <div class="pf-mb"><div class="pf-rating" style="background:${rating.bg};border:1px solid ${rating.bc}">
+      <div><div class="l1">CALIFICACIÓN OPS</div><div class="l2">OPS ${n3Fmt3(s.ops)}</div></div>
+      <div class="val" style="color:${rating.col}">${rating.lbl}</div>
+    </div></div>`:'';
+
+  return `
+  <div class="pf-page">
+    <div class="pf-card pf-header pf-mb">
+      <div class="pf-logo">
+        <div class="pf-logo-name"><span style="color:#12306b">VOZ</span><span style="color:#1fcf8f">SCORE</span></div>
+        ${N3_ICON_LOGO}
+      </div>
+      <div class="pf-head-mid">
+        <div class="pf-head-sub">FICHA INDIVIDUAL DE JUGADOR</div>
+        <div class="pf-head-title">${curName.toUpperCase()}</div>
+      </div>
+      <div class="pf-datebox">
+        ${N3_ICON_CAL}
+        <div><div class="pf-d1">${weekday}</div><div class="pf-d2">${dateOnly}</div></div>
+      </div>
+    </div>
+
+    <div class="pf-hero pf-mb">
+      <div class="pf-avatar">
+        <img src="${helmetSrc}" alt="">
+        <div class="pf-team-tag">${teamName.toUpperCase()}</div>
+      </div>
+      <div class="pf-right">
+        <div class="pf-name">${curName.toUpperCase()}</div>
+        <div class="pf-pos-row">
+          <span class="pf-pill" style="background:${teamColor}">${curPos}</span>
+          <span class="pf-batnum">#${batNum} · ${teamName.toUpperCase()}</span>
+        </div>
+        ${subInfo?`<div class="pf-subnote">🔁 ${subInfo}</div>`:''}
+        <div class="pf-quad">
+          <div><div class="b">${s.h}-${s.ab}</div><div class="t">H-AB</div></div>
+          <div><div class="b">${s.hr}</div><div class="t">HR</div></div>
+          <div><div class="b">${s.rbi}</div><div class="t">RBI</div></div>
+          <div><div class="b">${s.r}</div><div class="t">R</div></div>
+        </div>
+        <div class="pf-six">
+          <div><div class="t">AVG</div><div class="b">${n3Fmt3(s.avg)}</div></div>
+          <div><div class="t">OBP</div><div class="b">${n3Fmt3(s.obp)}</div></div>
+          <div><div class="t">SLG</div><div class="b">${n3Fmt3(s.slg)}</div></div>
+          <div><div class="t">OPS</div><div class="b">${n3Fmt3(s.ops)}</div></div>
+          <div><div class="t">RC</div><div class="b g">${s.rc.toFixed(2)}</div></div>
+          <div><div class="t">LW</div><div class="b g">${lw>=0?'+':''}${lw.toFixed(2)}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pf-card pf-mb">
+      <div class="pf-sec-title">LÍNEA DEL JUEGO</div>
+      <div class="pf-line">${lineHTML}</div>
+    </div>
+
+    <div class="pf-card pf-mb">
+      <div class="pf-sec-title">ESTADÍSTICAS</div>
+      <div class="pf-stat-grid">
+        ${pfStat('AB',s.ab)}${pfStat('H',s.h)}${pfStat('R',s.r)}${pfStat('RBI',s.rbi)}${pfStat('2B',s.d2)}${pfStat('3B',s.d3)}
+        ${pfStat('HR',s.hr)}${pfStat('BB',s.bb)}${pfStat('HBP',s.hbp)}${pfStat('K',s.k)}${pfStat('SB',s.sb)}${pfStat('TB',s.tb)}
+      </div>
+    </div>
+
+    ${ratingHTML}
+
+    <div class="pf-lw">
+      <div><div class="l1">⚡ LINEAR WEIGHTS</div><div class="l2">Valor estimado en carreras generadas</div></div>
+      <div class="val" style="color:${lwColor}">${lw>=0?'+':''}${lw.toFixed(2)}</div>
+    </div>
+
+    <div class="pf-foot">
+      <div class="f">Solo participación oficial en el partido.</div>
+      <div class="fc"><span><span style="color:#ffffff">VOZ</span><span style="color:#34e0a1">SCORE</span></span>${N3_ICON_FOOT}</div>
+    </div>
+  </div>`;
+}
+
+async function renderPlayerFichaFinal(team,pidx){
+  const N=computeNumeritosData();
+  const occs=N.getOccupants(team,pidx);
+  const occ=occs[occs.length-1]; // ocupante actual del slot (coincide con el nombre mostrado en la lista)
+  const s=N.getBat(team,pidx,occ.from,occ.to,occ.mask);
+  const lw=N.getLW(team,pidx,occ.from,occ.to,occ.mask);
+  const p=gs.teams[team].players[pidx];
+  const teamName=gs.teams[team].name;
+  const teamColor=team==='v'?'#1d4ed8':'#0d9f6e';
+  const helmetSrc=team==='v'?'img/casco-vis.webp':'img/casco-loc.webp';
+
+  const hasPA=s.ab+s.bb+s.hbp>0;
+  const rating=!hasPA?null:
+    s.ops>=1.0 ?{lbl:'EXCELENTE', col:'#0d9f6e',bg:'rgba(13,159,110,.08)', bc:'rgba(13,159,110,.35)'}:
+    s.ops>=0.8 ?{lbl:'MUY BUENO', col:'#1d4ed8',bg:'rgba(29,78,216,.08)', bc:'rgba(29,78,216,.3)'}:
+    s.ops>=0.65?{lbl:'PROMEDIO',  col:'#d99e0b',bg:'rgba(217,158,11,.08)',bc:'rgba(217,158,11,.3)'}:
+                {lbl:'DEFICIENTE',col:'#dc2626',bg:'rgba(220,38,38,.08)', bc:'rgba(220,38,38,.3)'};
+
+  // Línea del juego: todo el slot (todos los ocupantes) — cada entrada ya refleja
+  // su propio ocupante/jugada, no requiere separación por mask como las stats totales.
+  const plays=gs.plays[team][pidx]||{};
+  let lineHTML='';
+  for(let i=1;i<=INNINGS;i++){
+    const pl=plays[i];
+    let sym='—', col='#8a97ad';
+    if(pl){
+      sym=pl.sym||'?';
+      if(pl.type==='out') col='#dc2626';
+      else if(pl.type==='hit') col='#0d9f6e';
+      else if(pl.type==='walk') col='#1d4ed8';
+      else col='#d99e0b';
+    }
+    lineHTML+=`<div class="pf-inn"><div class="n">E${i}</div><div class="s" style="color:${col}">${sym}</div></div>`;
+  }
+
+  // Nota de sustitución: solo si el ocupante ACTUAL entró como sustituto
+  // (nombre pfSubInfo para no chocar con la variable global `subInfo` del
+  // dictado por voz de sustituciones — ver CAMBIOS DE JUGADORES ~línea 946)
+  let pfSubInfo=null;
+  if(occs.length>1){
+    const prevOcc=occs[occs.length-2];
+    pfSubInfo=`Entró en la entrada ${occ.from} en lugar de ${prevOcc.name}`;
+  }
+
+  const today=new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  const container=document.getElementById('player-ficha-final');
+  container.innerHTML=pfBuildHTML({teamName,teamColor,helmetSrc,curName:occ.name,curPos:occ.pos,batNum:p.bat,subInfo:pfSubInfo,s,lw,rating,lineHTML,today});
+  document.getElementById('player-ficha-overlay').style.display='flex';
+  await n3WaitImages(container);
+  pfPrepareDownloads(occ.name);
+}
+
+async function pfCapture(){
+  const target=document.querySelector('#player-ficha-final .pf-page');
+  return await html2canvas(target,{scale:2,useCORS:true,backgroundColor:null});
+}
+
+let pfCapturePromise=null;
+let pfFileBase='jugador';
+
+function pfPrepareDownloads(playerName){
+  pfFileBase=(playerName||'jugador').replace(/\s+/g,'_');
+  const imgBtn=document.getElementById('pf-btn-img');
+  const pdfBtn=document.getElementById('pf-btn-pdf');
+  if(imgBtn){ imgBtn.disabled=true; imgBtn.textContent='⏳ GENERANDO…'; }
+  if(pdfBtn){ pdfBtn.disabled=true; pdfBtn.textContent='⏳ GENERANDO…'; }
+
+  const myPromise=pfCapture();
+  pfCapturePromise=myPromise;
+
+  myPromise.then(()=>{
+    if(pfCapturePromise!==myPromise) return;
+    if(imgBtn){ imgBtn.disabled=false; imgBtn.textContent=N3_IMG_LABEL; }
+    if(pdfBtn){ pdfBtn.disabled=false; pdfBtn.textContent=N3_PDF_LABEL; }
+  }).catch(e=>{
+    console.error(e);
+    if(pfCapturePromise!==myPromise) return;
+    if(imgBtn){ imgBtn.disabled=false; imgBtn.textContent=N3_IMG_LABEL; }
+    if(pdfBtn){ pdfBtn.disabled=false; pdfBtn.textContent=N3_PDF_LABEL; }
+    showToast('⚠️ No se pudo preparar la descarga',true);
+  });
+}
+
+async function downloadPlayerFichaImage(){
+  try{
+    const canvas=await pfCapturePromise;
+    const url=canvas.toDataURL('image/png');
+    const a=document.createElement('a');
+    a.href=url; a.download=`ficha-${pfFileBase}.png`;
+    a.click();
+    showToast('✅ Imagen descargada');
+  }catch(e){ showToast('⚠️ Error al generar imagen',true); console.error(e); }
+}
+
+async function downloadPlayerFichaFinalPDF(){
+  try{
+    const canvas=await pfCapturePromise;
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'px',format:[canvas.width,canvas.height]});
+    doc.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,canvas.width,canvas.height);
+    const blob=doc.output('blob');
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`ficha-${pfFileBase}.pdf`;
     a.click();
     setTimeout(()=>URL.revokeObjectURL(url),40000);
     showToast('✅ PDF descargado');
