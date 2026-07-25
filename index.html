@@ -632,12 +632,12 @@ const PLAY_CATALOG = {
     { id:'L',   label:'L  Línea Atrapada',       sym:'L',   bases:0, type:'out', ab:true,  color:'red',   voice:['línea atrapada','linea atrapada','line drive out','linietazo atrapado','linietazo','línea out','linea out'] },
     { id:'FF',  label:'FF Foul Fly',             sym:'FF',  bases:0, type:'out', ab:true,  color:'red',   voice:['foul fly','fly foul','elevado de foul','foul elevado','fly de foul atrapado','elevado foul'] },
     // Ground outs
-    { id:'R63', label:'R63 Rodado SS→1B',        sym:'6-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado short','rolata short','rola short','ground out short'] },
-    { id:'R43', label:'R43 Rodado 2B→1B',        sym:'4-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado segunda','rolata segunda','rola segunda','rola por segunda'] },
-    { id:'R53', label:'R53 Rodado 3B→1B',        sym:'5-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado tercera','rolata tercera','rola tercera','rola por tercera'] },
-    { id:'R13', label:'R13 Rodado P→1B',         sym:'1-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado pitcher','rola pitcher','rola al pitcher'] },
-    { id:'R23', label:'R23 Rodado C→1B',         sym:'2-3', bases:0, type:'out', ab:true,  color:'red',   voice:['toque de bola','rodado catcher','rola al catcher','rola catcher'] },
-    { id:'R33', label:'R33 Rodado 1B no asist',  sym:'3',   bases:0, type:'out', ab:true,  color:'red',   voice:['rodado primera sin asistencia','foul line primera','rola primera','rola por primera','rodado primera'] },
+    { id:'R63', label:'R63 Rodado SS→1B',        sym:'6-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado short','rolata short','rola short','rola a short','ground out short','rola al 6','rola seis','rola a las paradas cortas','rola al campo corto','rola al torpedero'] },
+    { id:'R43', label:'R43 Rodado 2B→1B',        sym:'4-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado segunda','rolata segunda','rola segunda','rola a segunda','rola por segunda','rola al 4','rola cuatro','rola a la intermedia'] },
+    { id:'R53', label:'R53 Rodado 3B→1B',        sym:'5-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado tercera','rolata tercera','rola tercera','rola a tercera','rola por tercera','rola al 5','rola cinco','rola a la antesala'] },
+    { id:'R13', label:'R13 Rodado P→1B',         sym:'1-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado pitcher','rola pitcher','rola al pitcher','rola al 1','rola uno','rola al lanzador','rola al serpentinero'] },
+    { id:'R23', label:'R23 Rodado C→1B',         sym:'2-3', bases:0, type:'out', ab:true,  color:'red',   voice:['toque de bola','rodado catcher','rola al catcher','rola catcher','rola al 2','rola dos','rola al receptor'] },
+    { id:'R33', label:'R33 Rodado 1B no asist',  sym:'3',   bases:0, type:'out', ab:true,  color:'red',   voice:['rodado primera sin asistencia','foul line primera','rola primera','rola a primera','rola por primera','rodado primera','rola al 3','rola tres','rola a la inicial'] },
     // Doble play
     { id:'DP643',label:'DP 6-4-3 Doble Play',   sym:'6-4-3',bases:0, type:'out', ab:true,  color:'red',   voice:['doble play','double play','643','doble matanza','two y dos','dos y dos','doble play short','doble play ss'] },
     { id:'DP543',label:'DP 5-4-3 Doble Play',   sym:'5-4-3',bases:0, type:'out', ab:true,  color:'red',   voice:['doble play tercera','543','doble play tercera base'] },
@@ -2634,7 +2634,8 @@ function interpretVoice(text){
     else if(text.includes('pitcher')) sym='1-3';
     else if(text.includes('catcher')) sym='2-3';
     else if(text.includes('primera')||text.includes('first')) sym='3';
-    matched={...PLAY_CATALOG.outs[0],sym,label:`Rodado ${sym}`,bases:0,type:'out',ab:true};
+    const rodadoId={'6-3':'R63','4-3':'R43','5-3':'R53','1-3':'R13','2-3':'R23','3':'R33'}[sym];
+    matched={...PLAY_CATALOG.outs[0],id:rodadoId,sym,label:`Rodado ${sym}`,bases:0,type:'out',ab:true};
   }
 
   // Detección de outs en base específica con cadena de tiros ("out en home del 8 al 2")
