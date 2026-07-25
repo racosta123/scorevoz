@@ -30,7 +30,7 @@
   .logo span { color:#00e599; }
   .inning-display { background:#00e599; border:none; border-radius:10px; padding:4px 14px; font-family:'Bebas Neue',sans-serif; font-size:1.3rem; color:#071018; letter-spacing:2px; font-weight:900; }
   /* ── SETUP ──────────────────────────────────────────────── */
-  #setup-screen { max-width:720px; margin:48px auto; padding:0 20px; }
+  #setup-screen { max-width:1400px; margin:48px auto; padding:0 20px; }
   .setup-title { font-family:'Oswald',sans-serif; font-size:1.6rem; color:#fff; margin-bottom:6px; letter-spacing:3px; }
   .setup-sub { color:#8fa3b7; font-size:0.75rem; margin-bottom:32px; }
   .team-setup { background:linear-gradient(180deg,#0c1928,#081220); border:1px solid rgba(255,255,255,.10); border-radius:34px; box-shadow:0 20px 60px rgba(0,0,0,.6); padding:28px; margin-bottom:20px; }
@@ -53,6 +53,15 @@
   .dh-label { font-size:0.58rem; color:#ffb648; text-align:center; letter-spacing:1px; }
   .btn-start { width:100%; margin-top:28px; background:#00e599; color:#071018; border:none; border-radius:16px; font-family:'Bebas Neue',sans-serif; font-size:1.5rem; letter-spacing:5px; padding:16px; cursor:pointer; transition:all .2s; box-shadow:0 4px 24px rgba(0,229,153,.35); }
   .btn-start:hover { background:#00cc7a; transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,229,153,.4); }
+  /* ── SETUP: 2 columnas en escritorio (≥1024px) ─────────────
+     <1024px conserva el flujo de una sola columna (vista de campo/celular) sin tocar. */
+  @media(min-width:1024px){
+    #setup-screen { display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start; }
+    #setup-screen .setup-title,
+    #setup-screen .setup-sub,
+    #setup-screen .btn-start { grid-column:1 / -1; }
+    #setup-screen .team-setup { margin-bottom:0; }
+  }
   /* ── GAME ───────────────────────────────────────────────── */
   #game-screen { display:none; padding:0; }
   .game-content { padding-bottom:220px; }
