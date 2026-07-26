@@ -2096,6 +2096,21 @@ function applyPlay(team,pidx,inn,play){
 function undoLastPlay(){
   if(!gs.playHistory.length){ showToast('⚠️ No hay jugadas para deshacer',true); return; }
   const {team,pidx,inn}=gs.playHistory.pop();
+  // Revertir corredores que ESTA jugada empujó a anotar (mismo rbiCreditPidx/
+  // rbiCreditInn que ya usa el regreso manual de corredor) — sin esto, la
+  // carrera se queda "fantasma" en el marcador aunque el hit que la produjo
+  // ya no exista. computeBaseState solo mira la MISMA entrada, así que el
+  // corredor acreditado siempre vive en gs.plays[team][i][inn].
+  gs.teams[team].players.forEach((_,i)=>{
+    if(i===pidx) return;
+    const rp=(gs.plays[team][i]||{})[inn];
+    if(rp && rp.rbiCreditPidx===pidx && rp.rbiCreditInn===inn){
+      rp.scored=false;
+      delete rp.rbiCreditPidx;
+      delete rp.rbiCreditInn;
+      refreshCell(team,i,inn);
+    }
+  });
   delete gs.plays[team][pidx][inn];
   const n=gs.teams[team].players.length||9;
   gs.currentBatter[team]=(gs.currentBatter[team]-1+n)%n;
