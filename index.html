@@ -115,6 +115,7 @@
   .dc:hover { background:rgba(0,229,153,.06); }
   .dc.active { background:rgba(0,229,153,.12); outline:2px solid #00e599; outline-offset:-2px; }
   .dc.runner-sel { outline:2px solid #ffb648; outline-offset:-2px; background:rgba(255,182,72,.1); }
+  .dc.dc-locked { opacity:.32; pointer-events:none; cursor:not-allowed; }
   .dc svg { width:100%; height:100%; }
   .play-lbl { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:0.58rem; font-weight:700; white-space:nowrap; pointer-events:none; text-shadow:0 0 4px rgba(0,0,0,.9); }
   .play-lbl.out-lbl  { color:#ff4d67; }
@@ -1092,7 +1093,7 @@ function startGame(){
   // Auto-seleccionar primer bateador del visitante (siempre abre al bate)
   setTimeout(()=>{
     const td=document.getElementById('c-v-0-1');
-    if(td) selectCell('v',0,1,td);
+    if(td) selectCell('v',0,1,td,true);
   },150);
 }
 
@@ -1357,9 +1358,38 @@ function drawDiamond(play){
   return s;
 }
 
+// ─── BLOQUEO POR CELDA ACTIVA (Fase 1 del flujo de partido) ──────
+// Tres tipos de celda:
+//  - ACTIVA (gs.activeBatter): marcable directo, resaltada.
+//  - PASADA (ya tiene jugada registrada): visible/clara (NUNCA se grisea, el
+//    anotador necesita poder leerla), pero modificarla pide confirmación
+//    explícita en vez de bloquearse del todo — filtro anti-toque-accidental.
+//  - FUTURA (sin jugada, no es la activa): griseada y bloqueada, igual que antes.
+// No aplica a corredores vivos en base: esos se gestionan aparte (un solo
+// clic → showRunnerModal/applyRunnerMove) y deben quedar SIEMPRE libres,
+// sin importar si su bateador ya no es el activo.
+function isActiveBatterCell(team,pidx,inn){
+  const ab=gs.activeBatter;
+  if(!ab) return false; // sin bateador activo definido: no se sabe qué celda permitir, se corta con aviso
+  return ab.team===team && ab.pidx===pidx && String(ab.inn)===String(inn);
+}
+function refreshActiveBatterLock(){
+  document.querySelectorAll('.dc').forEach(td=>{
+    const m=/^c-(v|l)-(\d+)-(.+)$/.exec(td.id);
+    if(!m) return;
+    const [,t,idxStr,inn]=m;
+    const idx=+idxStr;
+    const pl=(gs.plays[t]?.[idx]||{})[inn];
+    const isLiveRunner=pl&&pl.type!=='out'&&pl.type!=='clear'&&!pl.scored&&!pl.runnerOut;
+    // Solo se grisea/bloquea si es FUTURA: sin jugada, no activa, no corredor vivo.
+    // Las pasadas (con jugada) se dejan siempre visibles y clickeables.
+    td.classList.toggle('dc-locked', !pl && !isLiveRunner && !isActiveBatterCell(t,idx,inn));
+  });
+}
+
 // ─── SELECCIÓN DE CELDA ───────────────────────────────────
 let selCell=null;
-function selectCell(team,pidx,inn,td){
+function selectCell(team,pidx,inn,td,trusted){
   const existingPl=gs.plays[team]?.[pidx]?.[inn];
   const isLiveRunner=existingPl &&
     existingPl.type!=='out' && existingPl.type!=='clear' &&
@@ -1382,6 +1412,20 @@ function selectCell(team,pidx,inn,td){
   }
 
   // ── MODO NORMAL (bateador) ──
+  // Clic sencillo sobre una jugada YA registrada que NO es la del bateador
+  // activo: NO reasigna el foco (gs.activeBatter/gs.selected) ni resetea el
+  // conteo de pitcheos — evita que la voz o el bloqueo de botones S/B/F del
+  // equipo equivocado se desalineen solo por leer una jugada pasada. Para
+  // modificarla se usa doble clic (pide confirmación). En modo PRO, la vista
+  // narrativa ya existente cumple este mismo propósito, así que se respeta.
+  const isProNarrative=appMode==='pro' && existingPl && existingPl.type!=='clear';
+  if(!trusted && existingPl && !isProNarrative && !isActiveBatterCell(team,pidx,inn)){
+    const p=gs.teams[team].players[pidx];
+    document.getElementById('selinfo').innerHTML=
+      `<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn} · ya registrada (doble clic para modificar)</span>`;
+    return;
+  }
+
   document.getElementById('runner-mode-banner').style.display='none';
   document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
 
@@ -1403,10 +1447,24 @@ function selectCell(team,pidx,inn,td){
   gs.selected=selCell;
   gs.activeBatter={team,pidx,inn,td};
   gs.alBate={team,pidx,inn};
+  refreshActiveBatterLock();
   const p=gs.teams[team].players[pidx];
   document.getElementById('selinfo').innerHTML=`<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
   document.getElementById('reg-btn').disabled=false;
   renderGameState();
+}
+
+// Filtro anti-toque-accidental: modificar una jugada YA registrada (pasada)
+// pide confirmación explícita en vez de bloquearse del todo. Las celdas
+// futuras (sin jugada, no activas) siguen bloqueadas sin más.
+function canOpenMarkModal(team,pidx,inn,pl){
+  if(isActiveBatterCell(team,pidx,inn)) return true;
+  if(pl){
+    const p=gs.teams[team].players[pidx];
+    return confirm(`¿Seguro que quieres modificar la jugada de ${p.name} (E${inn})? Ya está registrada.`);
+  }
+  showToast('🔒 Todavía no llegamos a esa entrada/turno — no se puede marcar',true);
+  return false;
 }
 
 function openModalForSelected(){
@@ -1414,15 +1472,17 @@ function openModalForSelected(){
   const {team,pidx,inn}=gs.selected;
   const pl=gs.plays[team]?.[pidx]?.[inn];
   const isLiveRunner=pl&&pl.type!=='out'&&pl.type!=='clear'&&!pl.scored&&!pl.runnerOut;
-  if(isLiveRunner) showRunnerModal(team,pidx,inn);
-  else showModal(team,pidx,inn);
+  if(isLiveRunner){ showRunnerModal(team,pidx,inn); return; }
+  if(!canOpenMarkModal(team,pidx,inn,pl)) return;
+  showModal(team,pidx,inn);
 }
 
 function handleCellDblClick(team,pidx,inn){
   const pl=gs.plays[team]?.[pidx]?.[inn];
   const isLiveRunner=pl&&pl.type!=='out'&&pl.type!=='clear'&&!pl.scored&&!pl.runnerOut;
-  if(isLiveRunner) showRunnerModal(team,pidx,inn);
-  else showModal(team,pidx,inn);
+  if(isLiveRunner){ showRunnerModal(team,pidx,inn); return; }
+  if(!canOpenMarkModal(team,pidx,inn,pl)) return;
+  showModal(team,pidx,inn);
 }
 
 // ─── MODAL ───────────────────────────────────────────────
@@ -2027,6 +2087,18 @@ function isBattedBallPlay(play){
 
 // ─── APLICAR JUGADA ───────────────────────────────────────
 function applyPlay(team,pidx,inn,play){
+  // Candado autoritativo (Fase 1 — bloqueo por celda activa): applyPlay es el
+  // único embudo por el que pasan TODAS las formas de marcar un turno al bate
+  // (clic manual y voz) — nunca se usa para acciones de corredor (esas van
+  // por applyRunnerMove), así que este candado no interfiere con corredores vivos.
+  // Se permite escribir en la celda activa (turno nuevo) o en una celda que YA
+  // tiene jugada (corrección de una pasada, ya confirmada aguas arriba por
+  // canOpenMarkModal) — nunca en una celda futura vacía.
+  const hasExistingPlay=!!(gs.plays[team]?.[pidx]||{})[inn];
+  if(!isActiveBatterCell(team,pidx,inn) && !hasExistingPlay){
+    showToast('🔒 Todavía no llegamos a esa entrada/turno — no se puede marcar',true);
+    return;
+  }
   if(play.type==='clear'){
     delete gs.plays[team][pidx][inn];
     refreshCell(team,pidx,inn);
@@ -2117,6 +2189,12 @@ function undoLastPlay(){
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
   updateScores();
+  // Retroceder la celda activa a la jugada recién deshecha (Fase 1 — bloqueo
+  // por celda activa) — sin esto, el candado dejaría marcable la celda del
+  // bateador SIGUIENTE en vez de la que se acaba de deshacer, rompiendo el
+  // flujo de corrección.
+  const undoneTd=document.getElementById(`c-${team}-${pidx}-${inn}`);
+  if(undoneTd) selectCell(team,pidx,inn,undoneTd,true);
   showToast('↩ Jugada deshecha');
 }
 
@@ -2192,7 +2270,7 @@ function autoAdvance(team,pidx,inn){
   const nextTd=document.getElementById(`c-${nextTeam}-${nextPidx}-${nextInn}`);
   if(!nextTd) return;
   setTimeout(()=>{
-    selectCell(nextTeam,nextPidx,nextInn,nextTd);
+    selectCell(nextTeam,nextPidx,nextInn,nextTd,true);
     nextTd.scrollIntoView({behavior:'smooth',block:'nearest'});
   },250);
 }
