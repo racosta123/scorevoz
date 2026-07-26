@@ -3001,7 +3001,7 @@ function computeNumeritosData(){
       gs.teams[bt].players.forEach((_,pidx)=>{
         for(let inn=st.from;inn<=st.to;inn++){
           const p=(gs.plays[bt][pidx]||{})[inn];
-          if(!p) return;
+          if(!p) continue;
           if(p.h) h++; if(p.scored) r++;
           if(p.sym==='BB'||p.sym==='BBI') bb++;
           if(p.sym==='KS'||p.sym==='KL'||p.sym==='KC'||p.sym==='KC 2-3'||p.sym==='K corrido') k++;
@@ -3112,6 +3112,47 @@ function computeNumeritosData(){
 
   return{vn,ln,totalV,totalL,today,getBat,getLW,getPitchStints,hasParticipation,getOccupants,
     participants,top3RC,top3LW,destacado,scoreEvolution,teamSummary};
+}
+
+// ─── REPORTE DE PITCHEO (aditiva — no toca ninguna función existente) ────
+// Combina getPitchStints (IP/H/R/ER/BB/K/HR calculados al vuelo desde el
+// bateo del rival) con el desglose de lanzamientos S/B/F, que vive partido
+// en dos lugares según el pitcher:
+//   - Pitchers que YA SALIERON: gs.pitcherChanges[t][i].pitches — capturado
+//     en el momento exacto del cambio (ver applyCambioPitcher).
+//   - Pitcher ACTUALMENTE activo (el último stint, sin cambio posterior):
+//     gs.pitchCount[t] — conteo en vivo.
+// El índice de gs.pitcherChanges[t] (ordenado por entrada) se alinea con los
+// stints DESFASADO POR UNO: changes[i].outName es siempre quien terminó el
+// stint[i] (verificado con datos reales del motor), así que stints[i] para
+// i < changes.length usa changes[i].pitches, y el último stint (i ===
+// changes.length) usa gs.pitchCount[t]. Ningún conteo se cuelga del pitcher
+// equivocado con esta regla.
+function buildPitcherReport(team){
+  const N=computeNumeritosData();
+  const stints=N.getPitchStints(team);
+  const changes=[...(gs.pitcherChanges[team]||[])].sort((a,b)=>a.inn-b.inn);
+  const liveCount=gs.pitchCount[team]||{total:0,strikes:0,balls:0,fouls:0};
+
+  return stints.map((st,i)=>{
+    const src=i<changes.length ? changes[i].pitches : liveCount;
+    const pitcheos={
+      total: src?.total||0,
+      strikes: src?.strikes||0,
+      balls: src?.balls||0,
+      fouls: src?.fouls||0
+    };
+    const era = st.ip>0 ? (st.er*9/st.ip).toFixed(2) : '0.00';
+    const whip = st.ip>0 ? ((st.h+st.bb)/st.ip).toFixed(2) : '0.00';
+    return {
+      nombre: st.name,
+      entradaEntro: st.from,
+      ip: st.ip, h: st.h, r: st.r, er: st.er, bb: st.bb, k: st.k, hr: st.hr,
+      era, whip,
+      pitcheos,
+      limiteConfigurado: null
+    };
+  });
 }
 
 // ─── EQUIPO AL BAT ────────────────────────────────────────
