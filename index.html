@@ -2815,6 +2815,15 @@ function openCambioPitcher(){
     tGrid.appendChild(b);
   });
   body.appendChild(tGrid);
+  // Acceso al reporte de pitcher — NO usa #mbody/pitCambioTeam en absoluto,
+  // abre su propio overlay aparte, así que nunca pisa el formulario de
+  // cambio de pitcher que el usuario pueda tener a medio llenar.
+  const reportBtn=document.createElement('button');
+  reportBtn.className='play-btn';
+  reportBtn.style.cssText='width:100%;margin-top:10px;border-color:var(--cyan);color:var(--cyan)';
+  reportBtn.textContent='📄 VER REPORTE DE PITCHER';
+  reportBtn.onclick=()=>openPitcherReportSelector();
+  body.appendChild(reportBtn);
   const fieldsDiv=document.createElement('div'); fieldsDiv.id='pit-cambio-fields'; body.appendChild(fieldsDiv);
   document.getElementById('modal').classList.add('show');
 }
@@ -5571,6 +5580,275 @@ async function downloadPlayerFichaFinalPDF(){
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url; a.download=`ficha-${pfFileBase}.pdf`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),40000);
+    showToast('✅ PDF descargado');
+  }catch(e){ showToast('⚠️ Error al generar PDF',true); console.error(e); }
+}
+</script>
+
+<!-- ════════════════════════════════════════════════════════════════
+     REPORTE DE PITCHER — clona el patrón de la ficha de jugador
+     (overlay aislado, mismo look infografía, misma descarga confiable).
+     Aditivo: no toca renderPlayerFichaFinal, buildPitcherReport, ni la
+     lógica de cambio de pitcher (openCambioPitcher/applyCambioPitcher).
+     ════════════════════════════════════════════════════════════════ -->
+<div id="pitcher-select-overlay" style="display:none;align-items:center;justify-content:center;position:fixed;inset:0;z-index:10000;background:rgba(6,13,24,.85);padding:16px;">
+  <div style="background:#0c1928;border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:20px;width:360px;max-width:100%;max-height:85vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:2px;color:#fff;">📄 REPORTE DE PITCHER</div>
+      <button onclick="closePitcherSelectOverlay()" style="background:#DC2626;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:.8rem;">✕</button>
+    </div>
+    <div id="pitcher-select-body"></div>
+  </div>
+</div>
+
+<div id="pitcher-ficha-overlay" style="display:none;flex-direction:column;align-items:center;position:fixed;inset:0;z-index:9999;background:rgba(6,13,24,.85);overflow-y:auto;padding:24px 16px;">
+  <div style="width:680px;max-width:100%;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button id="ptf-btn-img" class="n3-dl-btn" onclick="downloadPitcherFichaImage()" style="background:#0d9f6e;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:2px;padding:9px 16px;cursor:pointer">⬇️ DESCARGAR IMAGEN</button>
+      <button id="ptf-btn-pdf" class="n3-dl-btn" onclick="downloadPitcherFichaPDF()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:2px;padding:9px 16px;cursor:pointer">⬇️ DESCARGAR PDF</button>
+    </div>
+    <button onclick="document.getElementById('pitcher-ficha-overlay').style.display='none'" style="background:#DC2626;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:2px;padding:9px 14px;cursor:pointer">✕ CERRAR</button>
+  </div>
+  <div id="pitcher-ficha-final"></div>
+</div>
+
+<style>
+#pitcher-ficha-final, #pitcher-ficha-final *{margin:0;padding:0;box-sizing:border-box}
+#pitcher-ficha-final{background:#e8eaf0;font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;justify-content:center;padding:20px;border-radius:10px}
+#pitcher-ficha-final .ptf-page{width:680px;background:linear-gradient(160deg,#0b2350 0%,#0a1c3f 50%,#081733 100%);padding:18px;border-radius:14px}
+#pitcher-ficha-final .ptf-card{background:#fff;border-radius:10px}
+#pitcher-ficha-final .ptf-mb{margin-bottom:12px}
+#pitcher-ficha-final .ptf-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px}
+#pitcher-ficha-final .ptf-logo{display:flex;align-items:center;gap:8px}
+#pitcher-ficha-final .ptf-logo-name{font-size:19px;font-weight:800;color:#12306b;letter-spacing:-.4px}
+#pitcher-ficha-final .ptf-head-mid{text-align:center;flex:1}
+#pitcher-ficha-final .ptf-head-sub{font-size:12px;font-weight:600;color:#3d5580;letter-spacing:.3px}
+#pitcher-ficha-final .ptf-head-title{font-size:23px;font-weight:800;color:#0f2b5e;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pitcher-ficha-final .ptf-datebox{display:flex;align-items:center;gap:8px;background:#f1f4f9;border:1px solid #e2e7ef;border-radius:9px;padding:7px 12px}
+#pitcher-ficha-final .ptf-d1{font-size:11px;font-weight:700;color:#0f2b5e;line-height:1.3}
+#pitcher-ficha-final .ptf-d2{font-size:10px;color:#5a6c8c;line-height:1.3}
+
+#pitcher-ficha-final .ptf-hero{background:linear-gradient(135deg,#0d2049,#0a1730);border-radius:10px;padding:16px;display:flex;gap:16px;align-items:stretch}
+#pitcher-ficha-final .ptf-avatar{width:150px;border-radius:9px;flex:none;position:relative;overflow:hidden;background:linear-gradient(165deg,#14306c 0%,#0c1e42 55%,#081733 100%);border:1px solid #24407a;display:flex;align-items:flex-end;justify-content:center;min-height:190px}
+#pitcher-ficha-final .ptf-avatar img{position:relative;width:82%;max-height:85%;object-fit:contain;filter:drop-shadow(0 10px 18px rgba(0,0,0,.45));margin-bottom:6px}
+#pitcher-ficha-final .ptf-team-tag{position:absolute;left:0;right:0;bottom:8px;text-align:center;font-size:9px;font-weight:800;color:#9db6e0;letter-spacing:1.6px}
+#pitcher-ficha-final .ptf-right{flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0}
+#pitcher-ficha-final .ptf-name{font-size:24px;font-weight:800;color:#fff;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pitcher-ficha-final .ptf-pos-row{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
+#pitcher-ficha-final .ptf-pill{display:inline-block;color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.8px;padding:4px 12px;border-radius:5px}
+#pitcher-ficha-final .ptf-batnum{font-size:11px;color:#8fa4c8;font-weight:700}
+
+#pitcher-ficha-final .ptf-star6{display:flex;background:#132c58;border-radius:8px;margin-top:12px;padding:10px 0}
+#pitcher-ficha-final .ptf-star6 div{flex:1;text-align:center;border-right:1px solid #22406f}
+#pitcher-ficha-final .ptf-star6 div:last-child{border-right:none}
+#pitcher-ficha-final .ptf-star6 .t{font-size:9.5px;font-weight:700;color:#8fa4c8;letter-spacing:1px}
+#pitcher-ficha-final .ptf-star6 .b{font-size:24px;font-weight:800;color:#fff;margin-top:4px}
+#pitcher-ficha-final .ptf-star6 .g{color:#34d399}
+
+#pitcher-ficha-final .ptf-sec-title{font-size:12px;font-weight:800;color:#123059;letter-spacing:.6px;padding:12px 4px 8px}
+#pitcher-ficha-final .ptf-stat-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;padding:0 4px 4px}
+#pitcher-ficha-final .ptf-stat{background:#fff;border:1px solid #e3e8f0;border-radius:8px;padding:8px 4px;text-align:center}
+#pitcher-ficha-final .ptf-stat .t{font-size:8.5px;font-weight:700;color:#8a97ad;letter-spacing:.5px}
+#pitcher-ficha-final .ptf-stat .v{font-size:15px;font-weight:800;color:#123059;margin-top:3px}
+
+#pitcher-ficha-final .ptf-pitch-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 4px 4px}
+#pitcher-ficha-final .ptf-pitchcard{background:#fff;border:1px solid #e3e8f0;border-radius:8px;padding:10px 4px;text-align:center}
+#pitcher-ficha-final .ptf-pitchcard .t{font-size:8.5px;font-weight:700;color:#8a97ad;letter-spacing:.5px}
+#pitcher-ficha-final .ptf-pitchcard .v{font-size:18px;font-weight:800;color:#123059;margin-top:4px}
+
+#pitcher-ficha-final .ptf-limit{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e3e8f0;border-radius:10px;padding:11px 16px}
+#pitcher-ficha-final .ptf-limit .l1{font-size:10px;font-weight:700;color:#123059;letter-spacing:1px}
+#pitcher-ficha-final .ptf-limit .l2{font-size:9.5px;color:#8a97ad;margin-top:2px}
+#pitcher-ficha-final .ptf-limit .val{font-size:14px;font-weight:800;color:#8a97ad}
+
+#pitcher-ficha-final .ptf-foot{display:flex;align-items:center;justify-content:space-between;padding:12px 20px 2px;margin-top:10px}
+#pitcher-ficha-final .ptf-foot .f{font-size:9px;color:#8fa4c8;font-weight:600}
+#pitcher-ficha-final .ptf-foot .fc{display:flex;align-items:center;gap:7px}
+#pitcher-ficha-final .ptf-foot .fc span{font-size:16px;font-weight:800;color:#fff;letter-spacing:-.3px}
+</style>
+
+<script>
+// ─── SELECTOR: equipo → pitcher (overlay propio, no toca #modal) ────
+function openPitcherReportSelector(){
+  document.getElementById('pitcher-select-overlay').style.display='flex';
+  renderPitcherTeamChoice();
+}
+function closePitcherSelectOverlay(){
+  document.getElementById('pitcher-select-overlay').style.display='none';
+}
+function renderPitcherTeamChoice(){
+  const body=document.getElementById('pitcher-select-body');
+  body.innerHTML=`
+    <div style="font-size:.72rem;color:var(--text-dim);letter-spacing:1px;margin-bottom:10px">¿QUÉ EQUIPO?</div>
+    <div style="display:flex;gap:8px">
+      <button class="play-btn" style="flex:1;border-color:var(--blue);color:var(--blue)" onclick="renderPitcherListChoice('v')">${gs.teams.v.name||'VISITANTE'}</button>
+      <button class="play-btn" style="flex:1;border-color:var(--amber);color:var(--amber)" onclick="renderPitcherListChoice('l')">${gs.teams.l.name||'LOCAL'}</button>
+    </div>`;
+}
+function renderPitcherListChoice(team){
+  const body=document.getElementById('pitcher-select-body');
+  const report=buildPitcherReport(team);
+  const backBtn=`<button onclick="renderPitcherTeamChoice()" style="background:transparent;border:1px solid rgba(255,255,255,.15);border-radius:6px;color:var(--text-dim);font-size:.7rem;padding:4px 9px;cursor:pointer;margin-bottom:10px">‹ VOLVER</button>`;
+  if(!report.length){
+    body.innerHTML=`${backBtn}<div style="text-align:center;color:var(--text-dim);font-size:.8rem;padding:20px 0">Aún no hay pitchers registrados</div>`;
+    return;
+  }
+  const rows=report.map((p,idx)=>
+    `<button class="play-btn" style="width:100%;text-align:left;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center" onclick="openPitcherReportFromSelector('${team}',${idx})">
+      <span>${p.nombre}</span>
+      <span style="font-size:.68rem;color:var(--text-dim)">Entró E${p.entradaEntro}</span>
+    </button>`
+  ).join('');
+  body.innerHTML=backBtn+rows;
+}
+function openPitcherReportFromSelector(team,idx){
+  closePitcherSelectOverlay();
+  renderPitcherFichaFinal(team,idx);
+}
+
+// ─── FICHA DEL PITCHER — mismo patrón que pfBuildHTML/renderPlayerFichaFinal ──
+function ptfStat(label,val){
+  return `<div class="ptf-stat"><div class="t">${label}</div><div class="v">${val}</div></div>`;
+}
+function ptfPitchCard(label,val){
+  return `<div class="ptf-pitchcard"><div class="t">${label}</div><div class="v">${val}</div></div>`;
+}
+function ptfBuildHTML(ctx){
+  const {teamName,teamColor,helmetSrc,pitcherName,entradaEntro,stats,today}=ctx;
+  const weekday=today.split(',')[0]?.trim()||today;
+  const dateOnly=today.includes(',')?today.split(',')[1].trim():today;
+  return `
+  <div class="ptf-page">
+    <div class="ptf-card ptf-header ptf-mb">
+      <div class="ptf-logo">
+        <div class="ptf-logo-name"><span style="color:#12306b">VOZ</span><span style="color:#1fcf8f">SCORE</span></div>
+        ${N3_ICON_LOGO}
+      </div>
+      <div class="ptf-head-mid">
+        <div class="ptf-head-sub">REPORTE DE PITCHER</div>
+        <div class="ptf-head-title">${pitcherName.toUpperCase()}</div>
+      </div>
+      <div class="ptf-datebox">
+        ${N3_ICON_CAL}
+        <div><div class="ptf-d1">${weekday}</div><div class="ptf-d2">${dateOnly}</div></div>
+      </div>
+    </div>
+
+    <div class="ptf-hero ptf-mb">
+      <div class="ptf-avatar">
+        <img src="${helmetSrc}" alt="">
+        <div class="ptf-team-tag">${teamName.toUpperCase()}</div>
+      </div>
+      <div class="ptf-right">
+        <div class="ptf-name">${pitcherName.toUpperCase()}</div>
+        <div class="ptf-pos-row">
+          <span class="ptf-pill" style="background:${teamColor}">P</span>
+          <span class="ptf-batnum">Entró en la entrada: ${entradaEntro} · ${teamName.toUpperCase()}</span>
+        </div>
+        <div class="ptf-star6">
+          <div><div class="t">ERA</div><div class="b g">${stats.era}</div></div>
+          <div><div class="t">WHIP</div><div class="b g">${stats.whip}</div></div>
+          <div><div class="t">IP</div><div class="b">${stats.ip}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ptf-card ptf-mb">
+      <div class="ptf-sec-title">ESTADÍSTICAS DE PITCHEO</div>
+      <div class="ptf-stat-grid">
+        ${ptfStat('IP',stats.ip)}${ptfStat('H',stats.h)}${ptfStat('R',stats.r)}${ptfStat('ER',stats.er)}${ptfStat('BB',stats.bb)}${ptfStat('K',stats.k)}${ptfStat('HR',stats.hr)}
+      </div>
+    </div>
+
+    <div class="ptf-card ptf-mb">
+      <div class="ptf-sec-title">DESGLOSE DE LANZAMIENTOS</div>
+      <div class="ptf-pitch-grid">
+        ${ptfPitchCard('TOTAL',stats.pitcheos.total)}${ptfPitchCard('STRIKES',stats.pitcheos.strikes)}${ptfPitchCard('BOLAS',stats.pitcheos.balls)}${ptfPitchCard('FOULS',stats.pitcheos.fouls)}
+      </div>
+    </div>
+
+    <div class="ptf-limit">
+      <div><div class="l1">🎯 PITCHEOS RESTANTES</div><div class="l2">Según límite configurado por el anotador</div></div>
+      <div class="val">Límite: no configurado</div>
+    </div>
+
+    <div class="ptf-foot">
+      <div class="f">ERA = ER×9/IP &nbsp;·&nbsp; WHIP = (H+BB)/IP</div>
+      <div class="fc"><span><span style="color:#ffffff">VOZ</span><span style="color:#34e0a1">SCORE</span></span>${N3_ICON_FOOT}</div>
+    </div>
+  </div>`;
+}
+
+async function renderPitcherFichaFinal(team,idx){
+  const report=buildPitcherReport(team);
+  const stats=report[idx];
+  if(!stats){ showToast('⚠️ No se encontró ese pitcher',true); return; }
+  const teamName=gs.teams[team].name;
+  const teamColor=team==='v'?'#1d4ed8':'#0d9f6e';
+  const helmetSrc=team==='v'?'img/casco-vis.webp':'img/casco-loc.webp';
+  const today=new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  const container=document.getElementById('pitcher-ficha-final');
+  container.innerHTML=ptfBuildHTML({teamName,teamColor,helmetSrc,pitcherName:stats.nombre,entradaEntro:stats.entradaEntro,stats,today});
+  document.getElementById('pitcher-ficha-overlay').style.display='flex';
+  await n3WaitImages(container);
+  ptfPrepareDownloads(stats.nombre);
+}
+
+async function ptfCapture(){
+  const target=document.querySelector('#pitcher-ficha-final .ptf-page');
+  return await html2canvas(target,{scale:2,useCORS:true,backgroundColor:null});
+}
+
+let ptfCapturePromise=null;
+let ptfFileBase='pitcher';
+
+function ptfPrepareDownloads(pitcherName){
+  ptfFileBase=(pitcherName||'pitcher').replace(/\s+/g,'_');
+  const imgBtn=document.getElementById('ptf-btn-img');
+  const pdfBtn=document.getElementById('ptf-btn-pdf');
+  if(imgBtn){ imgBtn.disabled=true; imgBtn.textContent='⏳ GENERANDO…'; }
+  if(pdfBtn){ pdfBtn.disabled=true; pdfBtn.textContent='⏳ GENERANDO…'; }
+
+  const myPromise=ptfCapture();
+  ptfCapturePromise=myPromise;
+
+  myPromise.then(()=>{
+    if(ptfCapturePromise!==myPromise) return;
+    if(imgBtn){ imgBtn.disabled=false; imgBtn.textContent=N3_IMG_LABEL; }
+    if(pdfBtn){ pdfBtn.disabled=false; pdfBtn.textContent=N3_PDF_LABEL; }
+  }).catch(e=>{
+    console.error(e);
+    if(ptfCapturePromise!==myPromise) return;
+    if(imgBtn){ imgBtn.disabled=false; imgBtn.textContent=N3_IMG_LABEL; }
+    if(pdfBtn){ pdfBtn.disabled=false; pdfBtn.textContent=N3_PDF_LABEL; }
+    showToast('⚠️ No se pudo preparar la descarga',true);
+  });
+}
+
+async function downloadPitcherFichaImage(){
+  try{
+    const canvas=await ptfCapturePromise;
+    const url=canvas.toDataURL('image/png');
+    const a=document.createElement('a');
+    a.href=url; a.download=`reporte-pitcher-${ptfFileBase}.png`;
+    a.click();
+    showToast('✅ Imagen descargada');
+  }catch(e){ showToast('⚠️ Error al generar imagen',true); console.error(e); }
+}
+
+async function downloadPitcherFichaPDF(){
+  try{
+    const canvas=await ptfCapturePromise;
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'portrait',unit:'px',format:[canvas.width,canvas.height]});
+    doc.addImage(canvas.toDataURL('image/jpeg',0.92),'JPEG',0,0,canvas.width,canvas.height);
+    const blob=doc.output('blob');
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=`reporte-pitcher-${ptfFileBase}.pdf`;
     a.click();
     setTimeout(()=>URL.revokeObjectURL(url),40000);
     showToast('✅ PDF descargado');
