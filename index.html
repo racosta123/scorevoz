@@ -1667,7 +1667,18 @@ function applyRunnerMove(team,pidx,inn,action){
       pl.bases=Math.min(pl.bases+1,3); pl.runNote='indiferencia';
       showToast('Indiferencia defensiva — corredor avanzó'); break;
     case 'err':  pl.bases=Math.min(pl.bases+1,3); showToast('Avanzó por error'); break;
-    case 'wp':   pl.bases=Math.min(pl.bases+1,3); showToast('Avanzó (WP/PB/Balk)'); break;
+    case 'wp':
+      if(pl.bases>=3){
+        // Corredor en 3ª: anota por WP/PB/Balk. Antes Math.min(...,3) lo dejaba
+        // clavado en 3ª y el botón "→ Home" fallaba en silencio.
+        pl.scored=true;
+        pl.scoreNote='WP/PB';        // registra el motivo SIN pisar el sym del hit
+        showToast('✓ Anotó (WP/PB/Balk)');
+      } else {
+        pl.bases=pl.bases+1;         // 1ª→2ª o 2ª→3ª (nunca vuela a home)
+        showToast('Avanzó (WP/PB/Balk)');
+      }
+      break;
     case 'back': {
       // Regresa exactamente una base — si estaba anotado, anula la carrera (y el RBI
       // que se le había acreditado automáticamente, si lo hubo). No inventa dónde
