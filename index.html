@@ -500,19 +500,19 @@
         <div style="min-width:0"><div style="font-size:0.58rem;color:var(--text-dim);letter-spacing:1px;font-family:'Oswald'">VISITANTE</div><div class="pitch-pitcher-name" id="pc-name-v">—</div></div>
         <div class="pitch-total" id="pc-total-v">0</div>
         <div class="pitch-sbf" id="pc-sbf-v">S: 0<br>B: 0<br>F: 0</div>
-        <button class="btn-pc btn-pc-s" id="pc-btn-s-v" onclick="addPitch('v','strikes')">S</button>
-        <button class="btn-pc btn-pc-b" id="pc-btn-b-v" onclick="addPitch('v','balls')">B</button>
-        <button class="btn-pc btn-pc-f" id="pc-btn-f-v" onclick="addPitch('v','fouls')">F</button>
-        <button class="btn-pc btn-pc-undo" id="pc-btn-undo-v" onclick="undoPitch('v')" title="Deshacer último pitch">←</button>
+        <button class="btn-pc btn-pc-s" id="pc-btn-s-v" onclick="pitchBtn('strikes')">S</button>
+        <button class="btn-pc btn-pc-b" id="pc-btn-b-v" onclick="pitchBtn('balls')">B</button>
+        <button class="btn-pc btn-pc-f" id="pc-btn-f-v" onclick="pitchBtn('fouls')">F</button>
+        <button class="btn-pc btn-pc-undo" id="pc-btn-undo-v" onclick="undoPitchBtn()" title="Deshacer último pitch">←</button>
       </div>
       <div class="pitch-box">
         <div style="min-width:0"><div style="font-size:0.58rem;color:var(--text-dim);letter-spacing:1px;font-family:'Oswald'">LOCAL</div><div class="pitch-pitcher-name" id="pc-name-l">—</div></div>
         <div class="pitch-total" id="pc-total-l">0</div>
         <div class="pitch-sbf" id="pc-sbf-l">S: 0<br>B: 0<br>F: 0</div>
-        <button class="btn-pc btn-pc-s" id="pc-btn-s-l" onclick="addPitch('l','strikes')">S</button>
-        <button class="btn-pc btn-pc-b" id="pc-btn-b-l" onclick="addPitch('l','balls')">B</button>
-        <button class="btn-pc btn-pc-f" id="pc-btn-f-l" onclick="addPitch('l','fouls')">F</button>
-        <button class="btn-pc btn-pc-undo" id="pc-btn-undo-l" onclick="undoPitch('l')" title="Deshacer último pitch">←</button>
+        <button class="btn-pc btn-pc-s" id="pc-btn-s-l" onclick="pitchBtn('strikes')">S</button>
+        <button class="btn-pc btn-pc-b" id="pc-btn-b-l" onclick="pitchBtn('balls')">B</button>
+        <button class="btn-pc btn-pc-f" id="pc-btn-f-l" onclick="pitchBtn('fouls')">F</button>
+        <button class="btn-pc btn-pc-undo" id="pc-btn-undo-l" onclick="undoPitchBtn()" title="Deshacer último pitch">←</button>
       </div>
       <button class="btn-undo-play" onclick="undoLastPlay()" title="Deshacer última jugada registrada">↩ DESHACER</button>
     </div>
@@ -578,7 +578,15 @@
   <!-- Estado en vivo: campo + outs + marcador R/H/E -->
   <div id="game-state-inline" style="display:none;flex-direction:column;align-items:center;justify-content:center;gap:5px;flex-shrink:0;padding:0 12px;border-left:1px solid rgba(255,255,255,.08);border-right:1px solid rgba(255,255,255,.08);align-self:stretch"></div>
   <div style="display:flex;flex-direction:column;gap:5px;min-width:150px">
-    <div class="selected-info" id="selinfo"><strong>— SIN SELECCIÓN —</strong><span>Toca una casilla</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="selected-info" id="selinfo" style="flex:1"><strong>— SIN SELECCIÓN —</strong><span>Toca una casilla</span></div>
+      <!-- Cuenta del bateador del turno actual (bolas-strikes). Hermano de #selinfo
+           para que los innerHTML que reescriben #selinfo no lo borren. -->
+      <span id="batter-count" title="Cuenta del bateador · bolas-strikes" style="display:none;flex-shrink:0;text-align:center;background:#0c1928;border:1px solid rgba(255,255,255,.22);border-radius:8px;padding:2px 10px">
+        <span style="font-size:.45rem;letter-spacing:1px;color:var(--text-dim);font-family:'Oswald',sans-serif;display:block">CUENTA</span>
+        <span id="batter-count-val" style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;line-height:1;color:#fff">0-0</span>
+      </span>
+    </div>
     <div id="runner-mode-banner" style="display:none;background:#ffb648;color:#071018;font-size:0.7rem;font-weight:700;font-family:'Oswald',sans-serif;letter-spacing:.06em;padding:3px 8px;border-radius:5px;text-align:center">⚡ MODO CORREDOR · dicta la jugada</div>
     <button id="reg-btn" class="btn-register" onclick="openModalForSelected()" disabled>+ REGISTRAR JUGADA</button>
   </div>
@@ -1433,6 +1441,7 @@ function selectCell(team,pidx,inn,td,trusted){
     // Limpiar activeBatter si es de otro equipo; preservar si es del mismo
     if(gs.activeBatter && gs.activeBatter.team!==team) gs.activeBatter=null;
     renderGameState();
+    updateBatterCountBadge();
     return; // NO resetear pitchAB
   }
 
@@ -1461,7 +1470,11 @@ function selectCell(team,pidx,inn,td,trusted){
   unlockPitchButtons('l');
   updatePitchABDisplay('v');
   updatePitchABDisplay('l');
-  lockPitchButtons(team==='v'?'l':'v');
+  // Los botones S/B/F viven junto al pitcher que lanza (panel del equipo CONTRARIO
+  // al bateador). Se apaga el panel del bateador y queda activo el del pitcher.
+  // Los botones enrutan a addPitch(gs.activeBatter.team) vía pitchBtn, así que el
+  // ponche/base siguen cayendo sobre el bateador correcto.
+  lockPitchButtons(team);
 
   if(appMode==='pro' && existingPl && existingPl.type!=='clear'){
     showNarrativeModal(team,pidx,inn); return;
@@ -1477,6 +1490,7 @@ function selectCell(team,pidx,inn,td,trusted){
   document.getElementById('selinfo').innerHTML=`<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
   document.getElementById('reg-btn').disabled=false;
   renderGameState();
+  updateBatterCountBadge(); // bateador nuevo → gs.pitchAB ya reseteado arriba → muestra 0-0
 }
 
 // Filtro anti-toque-accidental: modificar una jugada YA registrada (pasada)
@@ -1796,6 +1810,7 @@ function returnToActiveBatter(){
     document.getElementById('selinfo').innerHTML=`<strong>— SIN SELECCIÓN —</strong><span>Toca una casilla</span>`;
     document.getElementById('reg-btn').disabled=true;
     renderGameState();
+    updateBatterCountBadge(); // sin bateador → se oculta
     return;
   }
   const {team,pidx,inn,td}=gs.activeBatter;
@@ -1807,6 +1822,7 @@ function returnToActiveBatter(){
   document.getElementById('selinfo').innerHTML=
     `<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn}</span>`;
   renderGameState();
+  updateBatterCountBadge();
 }
 
 // ─── JUGADA DE CORREDOR POR VOZ (en modo corredor) ────────
@@ -2144,8 +2160,7 @@ function applyPlay(team,pidx,inn,play){
     gs.pitchCount[team].total++;
     gs.pitchCount[team].strikes++;
     gs.pitchCount[team].inningLog[inn].s++;
-    const totEl=document.getElementById(`pc-total-${team}`);
-    if(totEl) totEl.textContent=gs.pitchCount[team].total;
+    updatePitchCounterUI();
   }
   // BG (golpe/HBP): sumar 1 lanzamiento contado como BOLA
   if(play.id==='BG'){
@@ -2154,8 +2169,7 @@ function applyPlay(team,pidx,inn,play){
     gs.pitchCount[team].total++;
     gs.pitchCount[team].balls++;
     gs.pitchCount[team].inningLog[inn].b++;
-    const totEl=document.getElementById(`pc-total-${team}`); if(totEl) totEl.textContent=gs.pitchCount[team].total;
-    if(typeof updatePitchABDisplay==='function') updatePitchABDisplay(team);
+    updatePitchCounterUI();
   }
   if(play.type==='score'){
     if(!gs.plays[team][pidx][inn]) gs.plays[team][pidx][inn]={sym:'R',bases:0,type:'advance',seq:gs.seq};
@@ -3219,20 +3233,31 @@ function buildPitcherReport(team){
 }
 
 // ─── EQUIPO AL BAT ────────────────────────────────────────
-function battingTeam(){ return (gs.currentInning||1)%2===1?'v':'l'; }
+// Verdad real de quién batea (gs.activeBatter), no la paridad de la entrada
+// (que no distingue alta de baja). Fallback a la paridad solo si aún no hay
+// bateador activo. Único consumidor: updateBattingTeamButtons.
+function battingTeam(){ return gs.activeBatter?gs.activeBatter.team:((gs.currentInning||1)%2===1?'v':'l'); }
 
 function updateBattingTeamButtons(){
-  const batter=battingTeam(), fielder=batter==='v'?'l':'v';
+  // Los botones activos van en el panel del PITCHER (contrario al bateador),
+  // junto a su nombre y su conteo. El panel del bateador queda gris.
+  const batter=battingTeam(), pitcher=batter==='v'?'l':'v';
   ['s','b','f'].forEach(t=>{
-    const bEl=document.getElementById(`pc-btn-${t}-${fielder}`);
+    const bEl=document.getElementById(`pc-btn-${t}-${batter}`);
     if(bEl) bEl.disabled=true;
-    const aEl=document.getElementById(`pc-btn-${t}-${batter}`);
+    const aEl=document.getElementById(`pc-btn-${t}-${pitcher}`);
     if(aEl){
-      const ab=gs.pitchAB[batter];
+      const ab=gs.pitchAB[batter]; // el turno al bate lo lleva el bateador
       aEl.disabled=(ab.s>=3||ab.b>=4);
     }
   });
 }
+
+// Los botones S/B/F y deshacer del HUD enrutan SIEMPRE al bateador real, sin
+// importar en qué panel físico estén (viven en el panel del pitcher). Así el
+// conteo y el ponche/base automáticos siguen ligados al bateador correcto.
+function pitchBtn(type){ if(!gs.activeBatter) return; addPitch(gs.activeBatter.team, type); }
+function undoPitchBtn(){ if(!gs.activeBatter) return; undoPitch(gs.activeBatter.team); }
 
 // ─── CONTADOR DE LANZAMIENTOS ──────────────────────────────
 function addPitch(team,type){
@@ -3261,11 +3286,13 @@ function addPitch(team,type){
     gs.pitchCount[team].inningLog[logInn].b++;
     ab.b++; ab.history.push('balls');
   }
-  const el=document.getElementById(`pc-total-${team}`);
-  if(el) el.textContent=gs.pitchCount[team].total;
-  if(ab.s>=3){ lockPitchButtons(team); showStrikeoutMenu(team); }
-  else if(ab.b>=4){ lockPitchButtons(team); autoWalk(team); }
-  updatePitchABDisplay(team);
+  updatePitchCounterUI();
+  // Fin del turno: bloquear el panel ACTIVO (el del pitcher = contrario al
+  // bateador `team`) hasta que se resuelva el ponche/base. showStrikeoutMenu y
+  // autoWalk reciben `team` = bateador, así que caen sobre el bateador correcto.
+  const pitcherPanel=team==='v'?'l':'v';
+  if(ab.s>=3){ lockPitchButtons(pitcherPanel); showStrikeoutMenu(team); }
+  else if(ab.b>=4){ lockPitchButtons(pitcherPanel); autoWalk(team); }
 }
 
 function undoPitch(team){
@@ -3288,11 +3315,11 @@ function undoPitch(team){
     ab.b=Math.max(0,ab.b-1);
     gs.pitchCount[team].balls=Math.max(0,gs.pitchCount[team].balls-1);
   }
-  const el=document.getElementById(`pc-total-${team}`);
-  if(el) el.textContent=gs.pitchCount[team].total;
-  if(ab.s<3&&ab.b<4) unlockPitchButtons(team);
+  updatePitchCounterUI();
+  // Reabrir el panel ACTIVO (el del pitcher = contrario al bateador `team`).
+  // updateBattingTeamButtons() reafirma el estado correcto justo después.
+  if(ab.s<3&&ab.b<4) unlockPitchButtons(team==='v'?'l':'v');
   updateBattingTeamButtons();
-  updatePitchABDisplay(team);
 }
 
 function lockPitchButtons(team){
@@ -3304,7 +3331,9 @@ function unlockPitchButtons(team){
 }
 
 function updatePitchABDisplay(team){
-  const pc=gs.pitchCount[team];
+  // gs.pitchCount se acumula bajo el equipo que BATEA — el desglose del pitcher
+  // propio de `team` vive en gs.pitchCount[contrario] (igual que updatePitchCounterUI).
+  const pc=gs.pitchCount[team==='v'?'l':'v'];
   const el=document.getElementById(`pc-sbf-${team}`);
   if(el) el.innerHTML=`S: ${pc.strikes}<br>B: ${pc.balls}<br>F: ${pc.fouls}`;
 }
@@ -3405,6 +3434,23 @@ function updatePitchCounterUI(){
     const pn=document.getElementById(`pc-name-${t}`);
     if(pn) pn.textContent=getCurrentPitcherName(t);
   });
+  updateBatterCountBadge();
+}
+
+// Mostrador de la cuenta del bateador del turno actual (bolas-strikes, ej "2-1").
+// Solo LEE gs.pitchAB[gs.activeBatter.team] (dato existente y confiable); no toca
+// la lógica del turno, el ponche/base ni el candado. Sin bateador activo, se oculta.
+function updateBatterCountBadge(){
+  const box=document.getElementById('batter-count');
+  const val=document.getElementById('batter-count-val');
+  if(!box||!val) return;
+  if(gs.activeBatter && gs.pitchAB[gs.activeBatter.team]){
+    const ab=gs.pitchAB[gs.activeBatter.team];
+    val.textContent=`${ab.b}-${ab.s}`;
+    box.style.display='';
+  } else {
+    box.style.display='none';
+  }
 }
 
 // ─── HISTORIAL Y SUBMENÚ DE CAMBIO DE JUGADOR ─────────────
