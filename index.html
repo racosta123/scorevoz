@@ -2858,7 +2858,9 @@ function renderCambioPitFields(){
   const changes=gs.pitcherChanges[pitCambioTeam];
   const curName=changes.length?changes[changes.length-1].inName:gs.pitcher[pitCambioTeam].name;
   const inn=gs.currentInning||1;
-  const pc=gs.pitchCount[pitCambioTeam];
+  // gs.pitchCount se acumula bajo el equipo que BATEA, no el que lanza — el que
+  // lanza por pitCambioTeam es el equipo contrario al que está bateando ahora.
+  const pc=gs.pitchCount[pitCambioTeam==='v'?'l':'v'];
   const log=pc.inningLog||{};
   const innKeys=Object.keys(log).sort((a,b)=>+a-+b);
   let innHTML='';
@@ -2946,14 +2948,18 @@ function applyCambioPitcher(inn){
   const inName=toTitleCase(inp.value.trim());
   const changes=gs.pitcherChanges[pitCambioTeam];
   const outName=changes.length?changes[changes.length-1].inName:gs.pitcher[pitCambioTeam].name;
-  const pc=gs.pitchCount[pitCambioTeam];
+  // gs.pitchCount se acumula bajo el equipo que BATEA (contrario a pitCambioTeam,
+  // que es el equipo cuyo PITCHER cambia) — leer y resetear del lado correcto,
+  // si no la instantánea sale en cero y el conteo del entrante nunca arranca limpio.
+  const battingSide=pitCambioTeam==='v'?'l':'v';
+  const pc=gs.pitchCount[battingSide];
   // Posición del pitcher que ENTRA en buildPitcherReport/getPitchStints:
   // stints[0]=abridor, stints[1]=changes[0], stints[2]=changes[1]... por eso
   // es "número de cambios que ya había antes de este" + 1 (se calcula ANTES
   // de hacer el push de abajo, con el mismo `changes.length` de la línea de outName).
   const newIdx=changes.length+1;
   gs.pitcherChanges[pitCambioTeam].push({inn,inName,outName,pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},inningLog:{...pc.inningLog}});
-  gs.pitchCount[pitCambioTeam]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
+  gs.pitchCount[battingSide]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
   const limitSel=document.getElementById('pit-cambio-limit');
   if(!gs.pitcherLimits[pitCambioTeam]) gs.pitcherLimits[pitCambioTeam]={};
   if(limitSel && limitSel.value!==''){
@@ -3181,13 +3187,15 @@ function computeNumeritosData(){
 // stints DESFASADO POR UNO: changes[i].outName es siempre quien terminó el
 // stint[i] (verificado con datos reales del motor), así que stints[i] para
 // i < changes.length usa changes[i].pitches, y el último stint (i ===
-// changes.length) usa gs.pitchCount[t]. Ningún conteo se cuelga del pitcher
-// equivocado con esta regla.
+// changes.length) usa el conteo en vivo del pitcher activo.
 function buildPitcherReport(team){
   const N=computeNumeritosData();
   const stints=N.getPitchStints(team);
   const changes=[...(gs.pitcherChanges[team]||[])].sort((a,b)=>a.inn-b.inn);
-  const liveCount=gs.pitchCount[team]||{total:0,strikes:0,balls:0,fouls:0};
+  // gs.pitchCount se acumula bajo el equipo que BATEA — el pitcher activo de
+  // `team` está lanzando contra el equipo contrario, así que su conteo en
+  // vivo vive en gs.pitchCount[contrario], no en gs.pitchCount[team].
+  const liveCount=gs.pitchCount[team==='v'?'l':'v']||{total:0,strikes:0,balls:0,fouls:0};
 
   return stints.map((st,i)=>{
     const src=i<changes.length ? changes[i].pitches : liveCount;
@@ -3386,11 +3394,14 @@ function getCurrentPitcherName(team){
 
 function updatePitchCounterUI(){
   ['v','l'].forEach(t=>{
-    const pc=gs.pitchCount[t];
+    // El panel "t" debe mostrar al pitcher PROPIO de t (getCurrentPitcherName(t)
+    // ya lee su plantilla correcta) junto a SU conteo en vivo — que se acumula
+    // bajo el equipo contrario (el que batea contra él), no bajo t.
+    const pc=gs.pitchCount[t==='v'?'l':'v'];
     const el=document.getElementById(`pc-total-${t}`);
     if(el) el.textContent=pc.total;
     const sb=document.getElementById(`pc-sbf-${t}`);
-    if(sb) sb.innerHTML=`S: ${gs.pitchCount[t].strikes}<br>B: ${gs.pitchCount[t].balls}<br>F: ${gs.pitchCount[t].fouls}`;
+    if(sb) sb.innerHTML=`S: ${pc.strikes}<br>B: ${pc.balls}<br>F: ${pc.fouls}`;
     const pn=document.getElementById(`pc-name-${t}`);
     if(pn) pn.textContent=getCurrentPitcherName(t);
   });
