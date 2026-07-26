@@ -430,6 +430,15 @@
       <div class="pitcher-section-label">⚾ PITCHER ABRIDOR</div>
       <div class="pitcher-row-wrap">
         <input class="player-input" id="pit-v" placeholder="Nombre del pitcher abridor" maxlength="25" style="flex:1">
+        <select id="pit-v-limit" title="Límite de lanzamientos" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.7rem;padding:6px 4px;flex-shrink:0">
+          <option value="">Sin límite</option>
+          <option value="50">50</option>
+          <option value="65">65</option>
+          <option value="75">75</option>
+          <option value="85">85</option>
+          <option value="95">95</option>
+          <option value="105">105</option>
+        </select>
         <button class="pitcher-batea-toggle" id="pitbt-v" onclick="togglePitcherBatea('v',this)" title="Pitcher que también batea (tipo Ohtani)">¿BATEA?</button>
         <button class="setup-mic-row" id="pitmb-v"
           onmousedown="pitcherPttStart('v',event)" onmouseup="pitcherPttEnd(event)"
@@ -452,6 +461,15 @@
       <div class="pitcher-section-label">⚾ PITCHER ABRIDOR</div>
       <div class="pitcher-row-wrap">
         <input class="player-input" id="pit-l" placeholder="Nombre del pitcher abridor" maxlength="25" style="flex:1">
+        <select id="pit-l-limit" title="Límite de lanzamientos" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.7rem;padding:6px 4px;flex-shrink:0">
+          <option value="">Sin límite</option>
+          <option value="50">50</option>
+          <option value="65">65</option>
+          <option value="75">75</option>
+          <option value="85">85</option>
+          <option value="95">95</option>
+          <option value="105">105</option>
+        </select>
         <button class="pitcher-batea-toggle" id="pitbt-l" onclick="togglePitcherBatea('l',this)" title="Pitcher que también batea (tipo Ohtani)">¿BATEA?</button>
         <button class="setup-mic-row" id="pitmb-l"
           onmousedown="pitcherPttStart('l',event)" onmouseup="pitcherPttEnd(event)"
@@ -596,6 +614,7 @@ let gs = {
   subs:{ v:[], l:[] },
   pitcher:{ v:{name:'',batea:false}, l:{name:'',batea:false} },
   pitcherChanges:{ v:[], l:[] },
+  pitcherLimits:{ v:{}, l:{} }, // { [idx]: numero } — limite de lanzamientos por POSICION de pitcher (indice de buildPitcherReport/getPitchStints), nunca por nombre
   pitchCount:{ v:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}}, l:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}} },
   pitchAB:{ v:{s:0,b:0,f:0,history:[],undoCount:0}, l:{s:0,b:0,f:0,history:[],undoCount:0} },
   selected:null,
@@ -1070,6 +1089,12 @@ function startGame(){
     const pitBatea=document.getElementById(`pitbt-${t}`).classList.contains('active');
     gs.pitcher[t]={name:pitName||'PITCHER',batea:pitBatea};
     gs.pitcherChanges[t]=[];
+    gs.pitcherLimits[t]={};
+    // Límite del abridor = posición 0, misma indexación que buildPitcherReport/getPitchStints
+    const pitLimitSel=document.getElementById(`pit-${t}-limit`);
+    if(pitLimitSel && pitLimitSel.value!==''){
+      gs.pitcherLimits[t][0]=parseInt(pitLimitSel.value,10);
+    }
     if(pitBatea&&pitName){
       const idx=pl.length;
       pl.push({name:pitName,pos:'P',bat:idx+1});
@@ -2864,6 +2889,15 @@ function renderCambioPitFields(){
     ${histHTML}
     <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
       <input class="player-input" id="pit-cambio-input" placeholder="Nombre del relevista" maxlength="25" style="flex:1">
+      <select id="pit-cambio-limit" title="Límite de lanzamientos" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.7rem;padding:6px 4px;flex-shrink:0">
+        <option value="">Sin límite</option>
+        <option value="50">50</option>
+        <option value="65">65</option>
+        <option value="75">75</option>
+        <option value="85">85</option>
+        <option value="95">95</option>
+        <option value="105">105</option>
+      </select>
       <button class="setup-mic-row" id="pit-cambio-mic"
         onmousedown="pitCambioMicStart(event)" onmouseup="pitCambioMicEnd(event)"
         ontouchstart="pitCambioMicStart(event)" ontouchend="pitCambioMicEnd(event)"
@@ -2913,8 +2947,20 @@ function applyCambioPitcher(inn){
   const changes=gs.pitcherChanges[pitCambioTeam];
   const outName=changes.length?changes[changes.length-1].inName:gs.pitcher[pitCambioTeam].name;
   const pc=gs.pitchCount[pitCambioTeam];
+  // Posición del pitcher que ENTRA en buildPitcherReport/getPitchStints:
+  // stints[0]=abridor, stints[1]=changes[0], stints[2]=changes[1]... por eso
+  // es "número de cambios que ya había antes de este" + 1 (se calcula ANTES
+  // de hacer el push de abajo, con el mismo `changes.length` de la línea de outName).
+  const newIdx=changes.length+1;
   gs.pitcherChanges[pitCambioTeam].push({inn,inName,outName,pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},inningLog:{...pc.inningLog}});
   gs.pitchCount[pitCambioTeam]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
+  const limitSel=document.getElementById('pit-cambio-limit');
+  if(!gs.pitcherLimits[pitCambioTeam]) gs.pitcherLimits[pitCambioTeam]={};
+  if(limitSel && limitSel.value!==''){
+    gs.pitcherLimits[pitCambioTeam][newIdx]=parseInt(limitSel.value,10);
+  } else {
+    delete gs.pitcherLimits[pitCambioTeam][newIdx];
+  }
   updatePitchCounterUI();
   closeModal();
   showToast(`✓ E${inn}: sale ${outName} (${pc.total} lanz) — entra ${inName}`);
@@ -5716,9 +5762,16 @@ function ptfPitchCard(label,val){
   return `<div class="ptf-pitchcard"><div class="t">${label}</div><div class="v">${val}</div></div>`;
 }
 function ptfBuildHTML(ctx){
-  const {teamName,teamColor,helmetSrc,pitcherName,entradaEntro,stats,today}=ctx;
+  const {teamName,teamColor,helmetSrc,pitcherName,entradaEntro,stats,today,limit}=ctx;
   const weekday=today.split(',')[0]?.trim()||today;
   const dateOnly=today.includes(',')?today.split(',')[1].trim():today;
+  const limitHTML = (limit===undefined||limit===null)
+    ? `<div class="val">Límite: no configurado</div>`
+    : (()=>{
+        const restantes=Math.max(0,limit-stats.pitcheos.total);
+        const overLimit=stats.pitcheos.total>=limit;
+        return `<div class="val" style="color:${overLimit?'#dc2626':'#123059'}">Límite: ${limit} · Restantes: ${restantes}${overLimit?' ⚠️':''}</div>`;
+      })();
   return `
   <div class="ptf-page">
     <div class="ptf-card ptf-header ptf-mb">
@@ -5771,7 +5824,7 @@ function ptfBuildHTML(ctx){
 
     <div class="ptf-limit">
       <div><div class="l1">🎯 PITCHEOS RESTANTES</div><div class="l2">Según límite configurado por el anotador</div></div>
-      <div class="val">Límite: no configurado</div>
+      ${limitHTML}
     </div>
 
     <div class="ptf-foot">
@@ -5789,9 +5842,10 @@ async function renderPitcherFichaFinal(team,idx){
   const teamColor=team==='v'?'#1d4ed8':'#0d9f6e';
   const helmetSrc=team==='v'?'img/casco-vis.webp':'img/casco-loc.webp';
   const today=new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const limit=gs.pitcherLimits[team]?.[idx];
 
   const container=document.getElementById('pitcher-ficha-final');
-  container.innerHTML=ptfBuildHTML({teamName,teamColor,helmetSrc,pitcherName:stats.nombre,entradaEntro:stats.entradaEntro,stats,today});
+  container.innerHTML=ptfBuildHTML({teamName,teamColor,helmetSrc,pitcherName:stats.nombre,entradaEntro:stats.entradaEntro,stats,today,limit});
   document.getElementById('pitcher-ficha-overlay').style.display='flex';
   await n3WaitImages(container);
   ptfPrepareDownloads(stats.nombre);
