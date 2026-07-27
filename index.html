@@ -666,7 +666,7 @@ const PLAY_CATALOG = {
     { id:'R53', label:'R53 Rodado 3B→1B',        sym:'5-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado tercera','rolata tercera','rola tercera','rola a tercera','rola por tercera','rola al 5','rola cinco','rola a la antesala'] },
     { id:'R13', label:'R13 Rodado P→1B',         sym:'1-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado pitcher','rola pitcher','rola al pitcher','rola al 1','rola uno','rola al lanzador','rola al serpentinero'] },
     { id:'R23', label:'R23 Rodado C→1B',         sym:'2-3', bases:0, type:'out', ab:true,  color:'red',   voice:['toque de bola','rodado catcher','rola al catcher','rola catcher','rola al 2','rola dos','rola al receptor'] },
-    { id:'R33', label:'R33 Rodado 1B no asist',  sym:'3',   bases:0, type:'out', ab:true,  color:'red',   voice:['rodado primera sin asistencia','foul line primera','rola primera','rola a primera','rola por primera','rodado primera','rola al 3','rola tres','rola a la inicial'] },
+    { id:'R33', label:'R33 Rodado 1B no asist',  sym:'3-3', bases:0, type:'out', ab:true,  color:'red',   voice:['rodado primera sin asistencia','foul line primera','rola primera','rola a primera','rola por primera','rodado primera','rola al 3','rola tres','rola a la inicial'] },
     // Doble play
     { id:'DP643',label:'DP 6-4-3 Doble Play',   sym:'6-4-3',bases:0, type:'out', ab:true,  color:'red',   voice:['doble play','double play','643','doble matanza','two y dos','dos y dos','doble play short','doble play ss'] },
     { id:'DP543',label:'DP 5-4-3 Doble Play',   sym:'5-4-3',bases:0, type:'out', ab:true,  color:'red',   voice:['doble play tercera','543','doble play tercera base'] },
@@ -1389,6 +1389,9 @@ function drawDiamond(play){
     // DP: mostrar hit original + ruta del corredor (ej. "1B" arriba, "6-4" abajo)
     if(p.runnerOut && p.dpRoute)
       dispLbl=`<span style="display:block;line-height:1">${p.sym}</span><span style="display:block;font-size:.48rem;opacity:.8;letter-spacing:.4px">${p.dpRoute}</span>`;
+    // FORZADO (#10): corredor out forzado → sym de embasada arriba + ruta (6-4/6-5) abajo
+    else if(p.runnerOut && p.forceRoute)
+      dispLbl=`<span style="display:block;line-height:1">${p.sym}</span><span style="display:block;font-size:.48rem;opacity:.8;letter-spacing:.4px">${p.forceRoute}</span>`;
     // FASE A — corredor que ANOTÓ (no out; HR/IHR se dejan como sym, ya es evidente):
     // el centro muestra "anotó" + productor (RBI #N, leído de rbiCreditPidx si existe;
     // sin productor si anotó por WP/PB u otra vía). Su sym de embasada se conserva en
@@ -2070,6 +2073,22 @@ function advanceRunners(team,pidx,inn,play){
     });
     return msgs.join(' · ');
   }
+  // ── FORZADO (#10): out al corredor forzado EN LA BASE DICTADA, con ruta ──
+  // Va antes del FC genérico. El bateador ya quedó safe en 1ª por applyPlay.
+  if(play._forcedBase){
+    const st=computeBaseState(team,inn,pidx);
+    const runner = play._forcedBase===2?st.first : play._forcedBase===3?st.second : st.third;
+    if(runner){
+      const rpl=runner.play;
+      rpl.runnerOut=true;
+      rpl.runnerOutBase=play._forcedBase;
+      if(play._forceRoute) rpl.forceRoute=play._forceRoute; // ruta 6-4/6-5 para dibujar
+      refreshCell(team,runner.pidx,runner.key);
+      const bn={2:'2ª',3:'3ª',4:'home'};
+      return 'Forzado — '+nm(runner.pidx)+' out en '+bn[play._forcedBase];
+    }
+    return '';
+  }
   // ── FC: corredor de adelante queda out ────────────────────
   if(play.id==='FC'){
     const st=computeBaseState(team,inn,pidx);
@@ -2644,8 +2663,54 @@ function interpretVoice(text){
 
   let matched=null;
 
+  // ── FORZADO con Fielder's Choice (#10) ────────────────────────────────
+  // "rola [pos] forzado [en base]" o "bola ocupada": saca OUT al corredor
+  // forzado en la base dictada (o la más adelantada forzada disponible) con su
+  // ruta (ej. 6-4), y embasa al BATEADOR en 1ª como FC (ab, sin hit). Debe ir
+  // ANTES del detector de ground-out para no caer en el 6-3 genérico.
+  if(/forzad|bola ocupada/.test(text)){
+    const st=computeBaseState(team,inn,pidx);
+    // Fuerza en cadena: 1ª siempre forzada por el bateador; 2ª solo si 1ª ocupada;
+    // 3ª solo si 1ª y 2ª ocupadas. Base más adelantada forzada disponible:
+    const forcedAvail = (st.first&&st.second&&st.third) ? 4
+                      : (st.first&&st.second) ? 3
+                      : st.first ? 2 : null;
+    // Base dictada (si la hay); si no, la más adelantada forzada.
+    const forcedBase = /\bhome\b|plato/.test(text) ? 4
+                     : /tercera|3ra|3ª/.test(text) ? 3
+                     : /segunda|2da|2ª/.test(text) ? 2
+                     : forcedAvail;
+    const runnerAtForce = forcedBase===2?st.first : forcedBase===3?st.second : forcedBase===4?st.third : null;
+    const chainOk = forcedBase===2 ? !!st.first
+                  : forcedBase===3 ? !!(st.first&&st.second)
+                  : forcedBase===4 ? !!(st.first&&st.second&&st.third) : false;
+    if(!forcedBase || !runnerAtForce || !chainOk){
+      document.getElementById('vrs').textContent='⚠️ Sin corredor forzado';
+      showToast('⚠️ No hay corredor forzado en esa base — corrige la jugada',true);
+      return; // no graba nada
+    }
+    // Fildeador: separar la cláusula de base ("en segunda/tercera/home") para que
+    // no contamine la detección de posición (ej. "forzado en segunda" ≠ 2B fildeó).
+    const baseIdx=text.search(/\ben\s+(segunda|tercera|home|el plato|2ª|3ª)/);
+    const fText=baseIdx>=0 ? text.slice(0,baseIdx) : text;
+    const fp = /\bshort\b|shortstop|campocorto|paradas/.test(fText)?'6'
+             : /segunda|camarero/.test(fText)?'4'
+             : /tercera|antesalista/.test(fText)?'5'
+             : /pitcher|lanzador/.test(fText)?'1'
+             : /catcher|receptor/.test(fText)?'2'
+             : /primera|inicialista/.test(fText)?'3'
+             : (/\b([1-9])\b/.exec(fText)||[])[1] || '6'; // sin fildeador dictado → SS por defecto
+    const cover={2:'4',3:'5',4:'2'}[forcedBase];
+    const route=`${fp}-${cover}`;
+    const baseLbl={2:'2ª',3:'3ª',4:'home'}[forcedBase];
+    const fcBase=PLAY_CATALOG.advances.find(p=>p.id==='FC');
+    matched={...fcBase, sym:'FC', type:'advance', ab:true, h:false, bases:1,
+             label:`FC — forzado en ${baseLbl} (${route})`,
+             _forcedBase:forcedBase, _forceRoute:route};
+  }
+
   // Foul fly con fildeador específico — ANTES del fly regular para evitar falso match
-  if(/foul/.test(text)&&/\bfly\b|elevado/.test(text)){
+  if(!matched && /foul/.test(text)&&/\bfly\b|elevado/.test(text)){
     const m=/\b([2-9])\b/.exec(text);
     const ffPlay=PLAY_CATALOG.outs.find(p=>p.id==='FF');
     if(ffPlay) matched=m?{...ffPlay,sym:`FF${m[1]}`,label:`FF${m[1]} Foul Fly al ${m[1]}`}:ffPlay;
@@ -2798,8 +2863,8 @@ function interpretVoice(text){
     else if(text.includes('tercera')||text.includes('third')) sym='5-3';
     else if(text.includes('pitcher')) sym='1-3';
     else if(text.includes('catcher')) sym='2-3';
-    else if(text.includes('primera')||text.includes('first')) sym='3';
-    const rodadoId={'6-3':'R63','4-3':'R43','5-3':'R53','1-3':'R13','2-3':'R23','3':'R33'}[sym];
+    else if(text.includes('primera')||text.includes('first')) sym='3-3';
+    const rodadoId={'6-3':'R63','4-3':'R43','5-3':'R53','1-3':'R13','2-3':'R23','3-3':'R33'}[sym];
     matched={...PLAY_CATALOG.outs[0],id:rodadoId,sym,label:`Rodado ${sym}`,bases:0,type:'out',ab:true};
   }
 
@@ -4035,6 +4100,8 @@ function narratePlay(team,pidx,inn){
         else
           parts.push(`Fue puesto out en ${base} (${p.dpRoute}), en batazo para doble play.`);
       }
+      else if(p.forceRoute)
+        parts.push(`Forzado out en ${base} (${p.forceRoute}).`);
       else if(rSym==='PO'||rSym.startsWith('PO '))
         parts.push(`Fue puesto out en ${baseWas} en reviré de pitcher.`);
       else if(rSym==='CS'||rSym.startsWith('CS ')){
