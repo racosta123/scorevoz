@@ -1600,7 +1600,7 @@ function closeModal(){ setModalForceChoice(false); document.getElementById('moda
 document.getElementById('modal').addEventListener('click',e=>{ if(e.target===document.getElementById('modal') && !modalForceChoice) closeModal(); });
 
 // ─── MODAL MOVIMIENTO DE CORREDOR ────────────────────────────
-function showRunnerModal(team,pidx,inn){
+function showRunnerModal(team,pidx,inn,seqMode){
   const p=gs.teams[team].players[pidx];
   const pl=gs.plays[team][pidx][inn];
   const bn={1:'1ª base',2:'2ª base',3:'3ª base'};
@@ -1621,7 +1621,14 @@ function showRunnerModal(team,pidx,inn){
     const b=document.createElement('button');
     b.className=`run-btn ${cls}`; b.textContent=lbl;
     if(full) b.style.gridColumn='1/-1';
-    b.onclick=()=>{ applyRunnerMove(team,pidx,inn,action); closeModal(); checkRunnerOutAdvance(team,pidx,inn,action); };
+    b.onclick=()=>{
+      applyRunnerMove(team,pidx,inn,action);
+      closeModal();
+      // En modo secuencia (rodado normal), pasa al siguiente corredor de la cola;
+      // en modo normal (clic directo), usa el flujo de siempre.
+      if(seqMode) _seqAdvance();
+      else checkRunnerOutAdvance(team,pidx,inn,action);
+    };
     return b;
   };
   const sec=(txt)=>{
@@ -1633,10 +1640,12 @@ function showRunnerModal(team,pidx,inn){
   // ── AVANZAR ──────────────────────────────────────────────
   body.appendChild(sec('AVANZAR'));
   const gAdv=document.createElement('div'); gAdv.className='play-buttons'; body.appendChild(gAdv);
+  gAdv.appendChild(mkBtn(`▶ Avanzó a ${nbN}`,          'run-btn-adv', 'advn',   false));
   gAdv.appendChild(mkBtn(`⚡ Robó ${nbN} (SB)`,        'run-btn-adv', 'rob',    false));
   gAdv.appendChild(mkBtn(`⚠ Error → ${nbN}`,           'run-btn-adv', 'err',    false));
   gAdv.appendChild(mkBtn(`🌀 WP / PB / Balk → ${nbN}`, 'run-btn-adv', 'wp',     false));
   if(pl.bases<3) gAdv.appendChild(mkBtn('▶▶ Avanzó a 3ª','run-btn-adv','to3',  false));
+  gAdv.appendChild(mkBtn('⏸ Se quedó (sin avance)',    'run-btn-back','stay',   true));
 
   // ── ANOTAR ───────────────────────────────────────────────
   body.appendChild(sec('ANOTAR'));
@@ -1675,6 +1684,32 @@ function showRunnerModal(team,pidx,inn){
   }
 
   document.getElementById('modal').classList.add('show');
+  // En modo secuencia el usuario DEBE elegir algo por cada corredor (no se cierra
+  // clicando afuera) — así la cola no se queda a medias. Siempre hay "Se quedó".
+  if(seqMode) setModalForceChoice(true);
+}
+
+// ─── SECUENCIADOR DE CORREDORES (rodado normal, Opción 1) ──────────────────
+// Tras un rodado normal con corredores, se abre showRunnerModal para cada uno
+// (3ª→2ª→1ª). Al resolver uno se abre el siguiente; al terminar (o llegar a 3
+// outs) se corre onDone (autoAdvance del bateador). Reusa showRunnerModal/applyRunnerMove.
+let _runnerSeq=null;
+function startRunnerSequence(team,inn,queue,onDone){
+  _runnerSeq={team,inn,queue,idx:0,onDone};
+  _seqStep();
+}
+function _seqStep(){
+  if(!_runnerSeq) return;
+  if(countOutsInInning(_runnerSeq.team,_runnerSeq.inn)>=3 || _runnerSeq.idx>=_runnerSeq.queue.length){
+    const cb=_runnerSeq.onDone; _runnerSeq=null; if(cb) cb(); return;
+  }
+  const r=_runnerSeq.queue[_runnerSeq.idx];
+  showRunnerModal(_runnerSeq.team, r.pidx, r.key, true);
+}
+function _seqAdvance(){
+  if(!_runnerSeq) return;
+  _runnerSeq.idx++;
+  _seqStep();
 }
 
 // ─── TRAMOS (#4 Fase B): cómo avanzó el corredor en cada rayita del rombo ──
@@ -1694,6 +1729,13 @@ function applyRunnerMove(team,pidx,inn,action){
   switch(action){
     case 'to2':  pl.bases=Math.max(pl.bases,2); showToast('Corredor avanzó a 2ª'); break;
     case 'to3':  pl.bases=Math.max(pl.bases,3); showToast('Corredor avanzó a 3ª'); break;
+    // Avance NEUTRO (rodado): una base, tramo GRIS. Desde 3ª → anota.
+    case 'advn':
+      if(pl.bases>=3){ pl.scored=true; recordTramo(pl,4,'','gris'); showToast('✓ Corredor anotó'); }
+      else { pl.bases=pl.bases+1; recordTramo(pl,pl.bases,'','gris'); showToast(`Corredor avanzó a ${pl.bases===2?'2ª':'3ª'}`); }
+      break;
+    // Se quedó: no hace nada (el corredor permanece en su base).
+    case 'stay': showToast('Corredor se quedó'); break;
     case 'score':         pl.bases=Math.max(pl.bases,3); pl.scored=true; showToast('✓ Corredor anotó'); break;
     case 'score-earned':  pl.bases=Math.max(pl.bases,3); pl.scored=true; pl.earned=true;  showToast('✓ Carrera limpia'); break;
     case 'score-unearned':pl.bases=Math.max(pl.bases,3); pl.scored=true; pl.earned=false; showToast('✓ Carrera sucia');  break;
@@ -2315,6 +2357,14 @@ function applyPlay(team,pidx,inn,play){
   if(play.type!=='score' && play.type!=='clear'){
     gs.playHistory.push({team, pidx, inn});
     gs.currentBatter[team]=(gs.currentBatter[team]+1)%(gs.teams[team].players.length||9);
+  }
+  // RODADO NORMAL (out del bateador) con corredores en base → menú manual de
+  // corredores (Opción 1): el usuario mueve/saca cada uno. Se difiere autoAdvance
+  // hasta terminar la secuencia. El FORZADO (type 'advance' + FC) NO entra aquí.
+  if(play.type==='out' && ['R63','R43','R53','R13','R23','R33'].includes(play.id)){
+    const stR=computeBaseState(team,inn,pidx);
+    const qR=[stR.third,stR.second,stR.first].filter(Boolean);
+    if(qR.length){ startRunnerSequence(team,inn,qR,()=>autoAdvance(team,pidx,inn)); return; }
   }
   // Auto-avanzar solo cuando es turno al bate real (no movimiento de corredor)
   if(play.type!=='score') autoAdvance(team,pidx,inn);
