@@ -2247,7 +2247,7 @@ function advanceRunners(team,pidx,inn,play){
     pl.scored=true;
     pl.rbiCreditPidx=pidx; pl.rbiCreditInn=inn;
     // Cierra la travesía en VERDE hasta home (tramo 4) — línea completa (#4 Fase C)
-    for(let bb=from+1;bb<=4;bb++) recordTramo(pl,bb,hitLetra,'verde');
+    for(let bb=from+1;bb<=4;bb++){ recordTramo(pl,bb,hitLetra,'verde'); if(pl.tramos&&pl.tramos[bb]) pl.tramos[bb].por=nm(pidx); }
     refreshCell(team,r.pidx,r.key);
     rbiCount++;
     moved.push(nm(r.pidx)+' anotó');
@@ -2256,7 +2256,7 @@ function advanceRunners(team,pidx,inn,play){
     const from=r.play.bases||1;
     r.play.bases=to;
     // Tramos recorridos por el avance en VERDE con la letra del hit productor
-    for(let bb=from+1;bb<=to;bb++) recordTramo(r.play,bb,hitLetra,'verde');
+    for(let bb=from+1;bb<=to;bb++){ recordTramo(r.play,bb,hitLetra,'verde'); if(r.play.tramos&&r.play.tramos[bb]) r.play.tramos[bb].por=nm(pidx); }
     refreshCell(team,r.pidx,r.key);
     moved.push(nm(r.pidx)+' →'+bNames[to]);
   }
@@ -4234,7 +4234,9 @@ function narratePlay(team,pidx,inn){
       for(let k=2;k<=4;k++){
         const t=p.tramos[k]; if(!t || k===termK) continue;
         const base=bn[k]; const L=t.letra;
-        if(L==='SB'||L==='RB') parts.push(k===4?'Robó el home y anotó.':`Robó ${base}.`);
+        const tipoHit={'1B':'sencillo','2B':'doble','3B':'triple','HR':'jonrón'}[L];
+        if(tipoHit && t.por) parts.push(`Avanzó a ${base} impulsado por el ${tipoHit} de ${t.por}.`);
+        else if(L==='SB'||L==='RB') parts.push(k===4?'Robó el home y anotó.':`Robó ${base}.`);
         else if(L==='WP') parts.push(k===4?'Anotó por wild pitch/passed ball.':`Avanzó a ${base} por wild pitch/passed ball.`);
         else if(L==='OR') parts.push(`Out en revire yendo a ${base}.`);
         else if(L==='IR'||L==='CS') parts.push(`Cogido robando en ${base}.`);
@@ -4245,7 +4247,10 @@ function narratePlay(team,pidx,inn){
     // Indiferencia no registra tramo → fallback para no perder la frase.
     if(p.runNote==='indiferencia') parts.push('Avanzó por indiferencia (no es robo).');
     if(p.scored){
-      parts.push(p.earned===false ? 'Anotó carrera sucia.' : 'Anotó carrera limpia.');
+      const t4=p.tramos&&p.tramos[4];
+      const tipoHit4=t4&&{'1B':'sencillo','2B':'doble','3B':'triple','HR':'jonrón'}[t4.letra];
+      if(tipoHit4&&t4.por) parts.push(`Anotó impulsado por el ${tipoHit4} de ${t4.por}.`);
+      else parts.push(p.earned===false ? 'Anotó carrera sucia.' : 'Anotó carrera limpia.');
     } else if(p.runnerOut){
       const bn={2:'segunda',3:'tercera',4:'home'};
       const base=bn[p.runnerOutBase]||'bases';
