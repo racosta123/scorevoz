@@ -2237,6 +2237,7 @@ function advanceRunners(team,pidx,inn,play){
   const moved=[];
   const bNames=['','1ª','2ª','3ª'];
   let rbiCount=0;
+  const impulsados=[];   // corredores que ESTE hit trae/adelanta (para la celda del bateador)
 
   // Letra de los tramos que el corredor recorre EMPUJADO por este hit (verde).
   const hitLetra={1:'1B',2:'2B',3:'3B',4:'HR'}[b]||'1B';
@@ -2251,6 +2252,7 @@ function advanceRunners(team,pidx,inn,play){
     refreshCell(team,r.pidx,r.key);
     rbiCount++;
     moved.push(nm(r.pidx)+' anotó');
+    impulsados.push({nombre:nm(r.pidx), desde:from, anoto:true});
   }
   function adv(r,to){
     const from=r.play.bases||1;
@@ -2259,6 +2261,7 @@ function advanceRunners(team,pidx,inn,play){
     for(let bb=from+1;bb<=to;bb++){ recordTramo(r.play,bb,hitLetra,'verde'); if(r.play.tramos&&r.play.tramos[bb]) r.play.tramos[bb].por=nm(pidx); }
     refreshCell(team,r.pidx,r.key);
     moved.push(nm(r.pidx)+' →'+bNames[to]);
+    impulsados.push({nombre:nm(r.pidx), desde:from, anoto:false, hasta:to});
   }
 
   if(b===1){
@@ -2276,6 +2279,7 @@ function advanceRunners(team,pidx,inn,play){
   }
   if(b===4) rbiCount++;  // HR: el bateador se impulsa a sí mismo
   if(rbiCount>0) gs.plays[team][pidx][inn].rbi=(gs.plays[team][pidx][inn].rbi||0)+rbiCount;
+  if(impulsados.length) gs.plays[team][pidx][inn].impulsados=impulsados;
 
   return moved.join(' · ');
 }
@@ -4260,6 +4264,17 @@ function narratePlay(team,pidx,inn){
     }
     // Indiferencia no registra tramo → fallback para no perder la frase.
     if(p.runNote==='indiferencia') parts.push('Avanzó por indiferencia (no es robo).');
+    // Celda del BATEADOR: a quién impulsó/adelantó con este batazo (solo hits ponen p.impulsados).
+    if(p.impulsados && p.impulsados.length){
+      const bnp={1:'1ª',2:'2ª',3:'3ª'};
+      const anotaron=p.impulsados.filter(x=>x.anoto);
+      const avanzaron=p.impulsados.filter(x=>!x.anoto);
+      if(anotaron.length===1)
+        parts.push(`Impulsó a ${anotaron[0].nombre}, que anotó desde ${bnp[anotaron[0].desde]||anotaron[0].desde+'ª'}.`);
+      else if(anotaron.length>1)
+        parts.push(`Impulsó a ${anotaron.map(x=>`${x.nombre} (desde ${bnp[x.desde]||x.desde+'ª'})`).join(' y a ')}, que anotaron.`);
+      avanzaron.forEach(x=>parts.push(`Adelantó a ${x.nombre} de ${bnp[x.desde]||x.desde+'ª'} a ${bnp[x.hasta]||x.hasta+'ª'}.`));
+    }
     if(p.scored){
       const t4=p.tramos&&p.tramos[4];
       const tipoHit4=t4&&{'1B':'sencillo','2B':'doble','3B':'triple','HR':'jonrón'}[t4.letra];
