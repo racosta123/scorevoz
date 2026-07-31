@@ -1714,6 +1714,29 @@ function _seqAdvance(){
   _seqStep();
 }
 
+// Rodado normal con corredores: antes del secuenciador, preguntar el destino del
+// bateador (out normal vs FC/bola ocupada → 1ª). Reusa el modal genérico (#mbody).
+function askBatterFateThenRunners(team,pidx,inn,qR){
+  document.getElementById('mtitle').textContent='DESTINO DEL BATEADOR';
+  const body=document.getElementById('mbody'); body.innerHTML='';
+  const s=document.createElement('div'); s.className='modal-section'; s.textContent='¿QUÉ PASÓ CON EL BATEADOR?'; body.appendChild(s);
+  const g=document.createElement('div'); g.className='play-buttons'; body.appendChild(g);
+  const mk=(lbl,cls,fn)=>{ const b=document.createElement('button'); b.className=`play-btn ${cls}`; b.textContent=lbl; b.style.gridColumn='1/-1'; b.onclick=fn; g.appendChild(b); };
+  const startSeq=()=>{ closeModal(); startRunnerSequence(team,inn,qR,()=>autoAdvance(team,pidx,inn)); };
+  mk('✕ Out normal','out-btn',startSeq);
+  mk('▶ FC / Bola ocupada → 1ª','',()=>{
+    const bp=gs.plays[team][pidx][inn];
+    bp.bases=1; bp.type='advance'; bp.ab=true; bp.h=false; bp.runNote='FC';
+    recordTramo(bp,1,'FC','gris');
+    refreshCell(team,pidx,inn);
+    gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
+    updateScores();
+    startSeq();
+  });
+  setModalForceChoice(true);
+  document.getElementById('modal').classList.add('show');
+}
+
 // ─── TRAMOS (#4 Fase B): cómo avanzó el corredor en cada rayita del rombo ──
 // pl.tramos = { [baseDestino]: {letra,color} }  (1=home→1ª, 2=1ª→2ª, 3=2ª→3ª, 4=3ª→home)
 // Solo DATO en esta sub-fase; drawDiamond aún no lo lee (eso es Fase C).
@@ -2366,7 +2389,7 @@ function applyPlay(team,pidx,inn,play){
   if(play.type==='out' && ['R63','R43','R53','R13','R23','R33'].includes(play.id)){
     const stR=computeBaseState(team,inn,pidx);
     const qR=[stR.third,stR.second,stR.first].filter(Boolean);
-    if(qR.length){ startRunnerSequence(team,inn,qR,()=>autoAdvance(team,pidx,inn)); return; }
+    if(qR.length){ askBatterFateThenRunners(team,pidx,inn,qR); return; }
   }
   // Auto-avanzar solo cuando es turno al bate real (no movimiento de corredor)
   if(play.type!=='score') autoAdvance(team,pidx,inn);
