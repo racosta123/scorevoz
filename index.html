@@ -4231,17 +4231,31 @@ function narratePlay(team,pidx,inn){
     if(p.tramos){
       const bn={2:'segunda',3:'tercera',4:'home'};
       const termK = p.runnerOut ? (p.runnerOutBase||0) : (p.scored ? 4 : 0);
-      for(let k=2;k<=4;k++){
-        const t=p.tramos[k]; if(!t || k===termK) continue;
-        const base=bn[k]; const L=t.letra;
-        const tipoHit={'1B':'sencillo','2B':'doble','3B':'triple','HR':'jonrón'}[L];
-        if(tipoHit && t.por) parts.push(`Avanzó a ${base} impulsado por el ${tipoHit} de ${t.por}.`);
-        else if(L==='SB'||L==='RB') parts.push(k===4?'Robó el home y anotó.':`Robó ${base}.`);
-        else if(L==='WP') parts.push(k===4?'Anotó por wild pitch/passed ball.':`Avanzó a ${base} por wild pitch/passed ball.`);
-        else if(L==='OR') parts.push(`Out en revire yendo a ${base}.`);
-        else if(L==='IR'||L==='CS') parts.push(`Cogido robando en ${base}.`);
-        else if(L==='TT') parts.push(`Out en tira y tira hacia ${base}.`);
-        else parts.push(`Avanzó a ${base}.`);
+      const tipoHitMap={'1B':'sencillo','2B':'doble','3B':'triple','HR':'jonrón'};
+      let k=2;
+      while(k<=4){
+        const t=p.tramos[k];
+        if(!t || k===termK){ k++; continue; }
+        const L=t.letra; const tipoHit=tipoHitMap[L];
+        if(tipoHit && t.por){
+          // HIT con impulsor: agrupar tramos consecutivos con mismo .por y misma .letra
+          // → UNA frase con la base FINAL del grupo. Si el grupo llega al terminal
+          //   (anotó/out), lo cubre el bloque p.scored/p.runnerOut → no narrar aquí.
+          let j=k;
+          while(j+1<=4 && j+1!==termK && p.tramos[j+1] && p.tramos[j+1].por===t.por && p.tramos[j+1].letra===L) j++;
+          const reachesTerm = termK && j+1===termK && p.tramos[termK] && p.tramos[termK].por===t.por && p.tramos[termK].letra===L;
+          if(!reachesTerm) parts.push(`Avanzó a ${bn[j]} impulsado por el ${tipoHit} de ${t.por}.`);
+          k=j+1;
+        } else {
+          const base=bn[k];
+          if(L==='SB'||L==='RB') parts.push(`Robó ${base}.`);
+          else if(L==='WP') parts.push(`Avanzó a ${base} por wild pitch/passed ball.`);
+          else if(L==='OR') parts.push(`Out en revire yendo a ${base}.`);
+          else if(L==='IR'||L==='CS') parts.push(`Cogido robando en ${base}.`);
+          else if(L==='TT') parts.push(`Out en tira y tira hacia ${base}.`);
+          else parts.push(`Avanzó a ${base}.`);
+          k++;
+        }
       }
     }
     // Indiferencia no registra tramo → fallback para no perder la frase.
