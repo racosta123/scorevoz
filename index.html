@@ -1643,7 +1643,9 @@ function showRunnerModal(team,pidx,inn,seqMode){
   gAdv.appendChild(mkBtn(`▶ Avanzó a ${nbN}`,          'run-btn-adv', 'advn',   false));
   gAdv.appendChild(mkBtn(`⚡ Robó ${nbN} (SB)`,        'run-btn-adv', 'rob',    false));
   gAdv.appendChild(mkBtn(`⚠ Error → ${nbN}`,           'run-btn-adv', 'err',    false));
-  gAdv.appendChild(mkBtn(`🌀 WP / PB / Balk → ${nbN}`, 'run-btn-adv', 'wp',     false));
+  gAdv.appendChild(mkBtn(`🌀 Wild Pitch → ${nbN}`,  'run-btn-adv', 'wp', false));
+  gAdv.appendChild(mkBtn(`🌀 Passed Ball → ${nbN}`, 'run-btn-adv', 'pb', false));
+  gAdv.appendChild(mkBtn(`🌀 Balk → ${nbN}`,        'run-btn-adv', 'bk', false));
   if(pl.bases<3) gAdv.appendChild(mkBtn('▶▶ Avanzó a 3ª','run-btn-adv','to3',  false));
   gAdv.appendChild(mkBtn('⏸ Se quedó (sin avance)',    'run-btn-back','stay',   true));
 
@@ -1796,20 +1798,23 @@ function applyRunnerMove(team,pidx,inn,action){
       pl.bases=Math.min(pl.bases+1,3); pl.runNote='indiferencia';
       showToast('Indiferencia defensiva — corredor avanzó'); break;
     case 'err':  pl.bases=Math.min(pl.bases+1,3); showToast('Avanzó por error'); break;
-    case 'wp':
+    case 'wp': case 'pb': case 'bk': {
+      // Wild pitch / passed ball / balk: misma lógica, letra propia según la acción.
+      const L={wp:'WP',pb:'PB',bk:'BK'}[action];
+      const nombre={wp:'wild pitch',pb:'passed ball',bk:'balk'}[action];
       if(pl.bases>=3){
-        // Corredor en 3ª: anota por WP/PB/Balk. Antes Math.min(...,3) lo dejaba
-        // clavado en 3ª y el botón "→ Home" fallaba en silencio.
+        // Corredor en 3ª: anota (antes Math.min(...,3) lo dejaba clavado en 3ª).
         pl.scored=true;
-        pl.scoreNote='WP/PB';        // registra el motivo SIN pisar el sym del hit
-        recordTramo(pl,4,'WP','anaranjado'); // tramo 3ª→home
-        showToast('✓ Anotó (WP/PB/Balk)');
+        pl.scoreNote=L;              // motivo real (WP/PB/BK), sin pisar el sym del hit
+        recordTramo(pl,4,L,'anaranjado'); // tramo 3ª→home
+        showToast(`✓ Anotó (${nombre})`);
       } else {
         pl.bases=pl.bases+1;         // 1ª→2ª o 2ª→3ª (nunca vuela a home)
-        recordTramo(pl,pl.bases,'WP','anaranjado');
-        showToast('Avanzó (WP/PB/Balk)');
+        recordTramo(pl,pl.bases,L,'anaranjado');
+        showToast(`Avanzó (${nombre})`);
       }
       break;
+    }
     case 'back': {
       // Regresa exactamente una base — si estaba anotado, anula la carrera (y el RBI
       // que se le había acreditado automáticamente, si lo hubo). No inventa dónde
@@ -4253,7 +4258,9 @@ function narratePlay(team,pidx,inn){
         } else {
           const base=bn[k];
           if(L==='SB'||L==='RB') parts.push(`Robó ${base}.`);
-          else if(L==='WP') parts.push(`Avanzó a ${base} por wild pitch/passed ball.`);
+          else if(L==='WP') parts.push(`Avanzó a ${base} por wild pitch.`);
+          else if(L==='PB') parts.push(`Avanzó a ${base} por passed ball.`);
+          else if(L==='BK') parts.push(`Avanzó a ${base} por balk.`);
           else if(L==='OR') parts.push(`Out en revire yendo a ${base}.`);
           else if(L==='IR'||L==='CS') parts.push(`Cogido robando en ${base}.`);
           else if(L==='TT') parts.push(`Out en tira y tira hacia ${base}.`);
@@ -4280,7 +4287,9 @@ function narratePlay(team,pidx,inn){
       const tipoHit4=t4&&{'1B':'sencillo','2B':'doble','3B':'triple','HR':'jonrón'}[t4.letra];
       if(tipoHit4&&t4.por) parts.push(`Anotó impulsado por el ${tipoHit4} de ${t4.por}.`);
       else if(t4&&t4.letra==='RB') parts.push('Anotó robando el home.');
-      else if(t4&&t4.letra==='WP') parts.push('Anotó por wild pitch/passed ball.');
+      else if(t4&&t4.letra==='WP') parts.push('Anotó por wild pitch.');
+      else if(t4&&t4.letra==='PB') parts.push('Anotó por passed ball.');
+      else if(t4&&t4.letra==='BK') parts.push('Anotó por balk.');
       else parts.push(p.earned===false ? 'Anotó carrera sucia.' : 'Anotó carrera limpia.');
     } else if(p.runnerOut){
       const bn={2:'segunda',3:'tercera',4:'home'};
