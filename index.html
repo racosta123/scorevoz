@@ -4235,7 +4235,7 @@ function narratePlay(team,pidx,inn){
       let k=2;
       while(k<=4){
         const t=p.tramos[k];
-        if(!t || k===termK){ k++; continue; }
+        if(!t || k===termK || (t.color==='verde' && !t.por)){ k++; continue; }
         const L=t.letra; const tipoHit=tipoHitMap[L];
         if(tipoHit && t.por){
           // HIT con impulsor: agrupar tramos consecutivos con mismo .por y misma .letra
