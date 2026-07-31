@@ -1663,6 +1663,8 @@ function showRunnerModal(team,pidx,inn,seqMode){
   gOut.appendChild(mkBtn('✕ Out en revire (OR)', 'run-btn-out','or', false));
   gOut.appendChild(mkBtn('✕ Robo fallido (IR)',  'run-btn-out','ir', false));
   gOut.appendChild(mkBtn('✕ Tira y tira (TT)',   'run-btn-out','tt', true));
+  gOut.appendChild(mkBtn(`✕ Out en ${nbN}`,      'run-btn-out', nb===2?'out2':nb===3?'out3':'outH', false));
+  gOut.appendChild(mkBtn('✕ CS — Cogido robando','run-btn-out','cs', false));
 
   // ── OTROS ────────────────────────────────────────────────
   if(pl.scored||pl.bases>1){
