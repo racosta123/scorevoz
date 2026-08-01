@@ -177,6 +177,9 @@
   .play-btn.walk-btn:hover { border-color:#00bfff; color:#00bfff; background:rgba(0,191,255,.08); }
   .modal-close { width:100%; margin-top:10px; background:transparent; border:1px solid rgba(255,255,255,.08); border-radius:10px; color:#8fa3b7; font-family:'Inter',sans-serif; font-size:0.78rem; padding:9px; cursor:pointer; transition:all .15s; }
   .modal-close:hover { border-color:#ff4d67; color:#ff4d67; }
+  #mygames-list { max-height:50vh; overflow-y:auto; }
+  .mygame-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 4px; border-bottom:1px solid rgba(255,255,255,.08); font-size:0.78rem; color:#c8dff0; }
+  .mygame-row button { background:rgba(0,229,153,.12); color:#00e599; border:1px solid #00e599; border-radius:8px; font-family:'Bebas Neue',sans-serif; font-size:0.85rem; letter-spacing:1px; padding:5px 14px; cursor:pointer; flex-shrink:0; }
   /* ── TOAST ──────────────────────────────────────────────── */
   .toast { position:fixed; top:72px; right:16px; background:#0c1928; border:1px solid #00e599; border-radius:12px; padding:10px 16px; font-size:0.78rem; color:#fff; z-index:500; transform:translateX(120%); transition:transform .3s; max-width:260px; box-shadow:0 4px 20px rgba(0,0,0,.7); }
   .toast.show  { transform:translateX(0); }
@@ -318,7 +321,7 @@
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
   import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-  import { getFirestore, doc, setDoc }
+  import { getFirestore, doc, setDoc, collection, getDocs, getDoc }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
   import { initializeAppCheck, ReCaptchaV3Provider }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js';
@@ -363,29 +366,54 @@
     const user = auth.currentUser;
     if (!user) { showToast('Inicia sesión para guardar en la nube', true); return; }
     if (typeof gs === 'undefined') { showToast('No hay partido activo', true); return; }
-    const vName = (gs.teams?.v?.name || 'V').replace(/\s+/g,'_');
-    const lName = (gs.teams?.l?.name || 'L').replace(/\s+/g,'_');
+    const vRaw = gs.teams?.v?.name || 'VISITANTE';
+    const lRaw = gs.teams?.l?.name || 'LOCAL';
+    const vName = vRaw.replace(/\s+/g,'_');
+    const lName = lRaw.replace(/\s+/g,'_');
     const id = `${vName}_vs_${lName}_${Date.now()}`;
     await setDoc(doc(db, 'usuarios', user.uid, 'partidas', id), {
       gs: JSON.stringify(gs),
       uid: user.uid,
-      savedAt: Date.now()
+      savedAt: Date.now(),
+      vName: vRaw,
+      lName: lRaw
     });
     showToast('Partido guardado en la nube ☁️');
+  };
+
+  window.fbListGames = async () => {
+    const user = auth.currentUser;
+    if (!user) { showToast('Inicia sesión para ver tus partidos', true); return null; }
+    const snap = await getDocs(collection(db, 'usuarios', user.uid, 'partidas'));
+    const list = [];
+    snap.forEach(d => { const x=d.data(); list.push({ id:d.id, savedAt:x.savedAt||0, vName:x.vName||null, lName:x.lName||null }); });
+    list.sort((a,b) => b.savedAt - a.savedAt);
+    return list;
+  };
+
+  window.fbLoadGame = async (id) => {
+    const user = auth.currentUser;
+    if (!user) { showToast('Inicia sesión primero', true); return; }
+    const snap = await getDoc(doc(db, 'usuarios', user.uid, 'partidas', id));
+    if (!snap.exists()) { showToast('Partido no encontrado', true); return; }
+    if (typeof window.rehydrateGame === 'function') { window.rehydrateGame(snap.data().gs); showToast('Partido cargado ☁️'); }
   };
 
   onAuthStateChanged(auth, user => {
     const btn     = document.getElementById('auth-btn');
     const saveBtn = document.getElementById('save-cloud-btn');
+    const gamesBtn= document.getElementById('mygames-btn');
     if (!btn) return;
     if (user) {
       btn.textContent = `🔓 ${firstName(user.displayName).toUpperCase()}`;
       btn.onclick = window.fbSignOut;
       if (saveBtn) saveBtn.style.display = 'inline-block';
+      if (gamesBtn) gamesBtn.style.display = 'inline-block';
     } else {
       btn.textContent = '🔑 ENTRAR';
       btn.onclick = window.fbSignIn;
       if (saveBtn) saveBtn.style.display = 'none';
+      if (gamesBtn) gamesBtn.style.display = 'none';
     }
   });
 </script>
@@ -401,6 +429,14 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="mygames-overlay">
+  <div class="modal">
+    <h3>MIS PARTIDOS</h3>
+    <div id="mygames-list"></div>
+    <button class="modal-close" onclick="closeMyGames()">Cerrar</button>
+  </div>
+</div>
+
 <header>
   <div class="logo">Voz<span>Score</span> ⚾</div>
   <div style="display:flex;align-items:center;gap:12px">
@@ -413,6 +449,7 @@
     <button id="jugador-btn" onclick="openJugadorModal()" style="display:none;background:var(--cyan);color:#071018;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(0,191,255,0.3)">👤 JUGADOR</button>
     <div id="lang-toggle" style="display:none" onclick="toggleLang()">🎤 ES</div>
     <button id="save-cloud-btn" onclick="window.fbSaveGame && window.fbSaveGame()" style="display:none;background:rgba(0,229,153,.12);color:#00e599;border:1px solid #00e599;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer">☁️ GUARDAR</button>
+    <button id="mygames-btn" onclick="openMyGames()" style="display:none;background:rgba(0,191,255,.12);color:#00bfff;border:1px solid #00bfff;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer">📂 MIS PARTIDOS</button>
     <button id="mode-btn" onclick="toggleMode()" style="background:rgba(255,255,255,.06);color:#8fa3b7;border:1px solid rgba(255,255,255,.18);border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer">BÁSICO</button>
     <button id="auth-btn" onclick="window.fbSignIn && window.fbSignIn()" style="background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer">🔑 ENTRAR</button>
   </div>
@@ -1135,6 +1172,68 @@ function startGame(){
     if(td) selectCell('v',0,1,td,true);
   },150);
 }
+
+// ─── CARGAR PARTIDO GUARDADO (rehidratar gs completo) ─────────
+function resetLineScoreDOM(){
+  // buildLineScore APPENDea (no limpia): dejar cada fila con solo su 1ª celda
+  // (EQUIPO / nombre) antes de reconstruir, o se duplican columnas.
+  ['lsh','lsrv','lsrl'].forEach(fid=>{
+    const row=document.getElementById(fid);
+    while(row.children.length>1) row.removeChild(row.lastChild);
+  });
+}
+
+window.rehydrateGame = function(gsString){
+  gs = JSON.parse(gsString);
+  INNINGS = gs.scores.v.length;          // LA TRAMPA: restaurar ANTES de build*()
+  resetLineScoreDOM();
+  document.getElementById('setup-screen').style.display='none';
+  document.getElementById('game-screen').style.display='block';
+  document.getElementById('vpanel').style.display='flex';
+  document.getElementById('game-status').style.display='flex';
+  document.getElementById('lang-toggle').style.display='block';
+  document.getElementById('numeritos-btn').style.display='block';
+  document.getElementById('cambio-pit-btn').style.display='block';
+  document.getElementById('jugador-btn').style.display='block';
+  document.getElementById('pitch-bar').style.display='flex';
+  buildLineScore(); buildInningNav(); buildScoresheets();
+  ['v','l'].forEach(t=>{
+    Object.keys(gs.plays[t]||{}).forEach(pidx=>{
+      Object.keys(gs.plays[t][pidx]||{}).forEach(inn=>{ refreshCell(t,+pidx,+inn); });
+    });
+  });
+  ['v','l'].forEach(t=> gs.teams[t].players.forEach((_,i)=> updateStats(t,i)));
+  updateScores(); updatePitchCounterUI();
+  setInning(gs.currentInning||1);
+  gs.activeBatter=null;                   // Fase 1: partido en pausa, sin celda activa
+};
+
+window.openMyGames = async () => {
+  const list = await window.fbListGames();
+  if (list===null) return;               // sin sesión (toast ya salió)
+  const cont = document.getElementById('mygames-list'); cont.innerHTML='';
+  if (!list.length){ cont.textContent='No tienes partidos guardados.'; }
+  else list.forEach(g=>{
+    const row=document.createElement('div'); row.className='mygame-row';
+    const info=document.createElement('div');
+    const nombres = (g.vName&&g.lName) ? `${g.vName} vs ${g.lName}` : g.id;
+    const fecha = g.savedAt ? new Date(g.savedAt).toLocaleString() : '';
+    info.textContent = fecha ? `${nombres} · ${fecha}` : nombres;   // textContent: sin inyección
+    const btn=document.createElement('button'); btn.textContent='ABRIR';
+    btn.addEventListener('click', ()=> loadAndClose(g.id));
+    row.append(info,btn); cont.appendChild(row);
+  });
+  document.getElementById('mygames-overlay').classList.add('show');
+};
+
+window.closeMyGames = ()=> document.getElementById('mygames-overlay').classList.remove('show');
+
+window.loadAndClose = async (id)=>{
+  const activo = gs && gs.teams && gs.teams.v.players.length>0;
+  if (activo && !confirm('Tienes un partido activo sin guardar. ¿Cargar otro y descartar el actual?')) return;
+  await window.fbLoadGame(id);
+  closeMyGames();
+};
 
 // ─── LINE SCORE ───────────────────────────────────────────
 function buildLineScore(){
