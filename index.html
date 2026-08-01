@@ -3310,10 +3310,15 @@ function computeNumeritosData(){
     const spIdx=gs.teams[pt].players.findIndex(p=>p.pos==='P');
     const starterName=pit?.name||(spIdx>=0?gs.teams[pt].players[spIdx].name:'PITCHER');
     const sorted=[...changes].sort((a,b)=>a.inn-b.inn);
+    // Última entrada REALMENTE jugada (máx entrada con algún play), no INNINGS
+    // (config=9) ni gs.currentInning (puntero de VISTA, cambia al navegar).
+    const lastPlayed=Math.max(1,...['v','l'].flatMap(tt=>
+      (gs.teams[tt]?.players||[]).flatMap((_,pi)=>
+        Object.keys(gs.plays[tt]?.[pi]||{}).map(Number))));
     const stints=[];
-    stints.push({name:starterName,from:1,to:sorted.length>0?sorted[0].inn-1:INNINGS,role:'AB'});
+    stints.push({name:starterName,from:1,to:sorted.length>0?sorted[0].inn-1:lastPlayed,role:'AB'});
     sorted.forEach((ch,i)=>{
-      const to=i<sorted.length-1?sorted[i+1].inn-1:INNINGS;
+      const to=i<sorted.length-1?sorted[i+1].inn-1:lastPlayed;
       stints.push({name:ch.inName,from:ch.inn,to,role:'RP'});
     });
     const tw=(pt==='v'&&vWins)||(pt==='l'&&lWins);
@@ -3330,8 +3335,10 @@ function computeNumeritosData(){
           if(p.sym==='HR'||p.sym==='IHR') hr++;
         }
       });
-      const ip=Math.max(1,st.to-st.from+1);
-      return{...st,ip,h,r,er:r,bb,k,hr,era:r*9/ip,whip:(h+bb)/ip,k9:k*9/ip,bb9:bb*9/ip,
+      // Relevo que entró pero aún no lanzó (from>lastPlayed) → 0 IP, no 1.0 falso.
+      const ip=st.to>=st.from ? (st.to-st.from+1) : 0;
+      const era=ip>0?r*9/ip:0, whip=ip>0?(h+bb)/ip:0, k9=ip>0?k*9/ip:0, bb9=ip>0?bb*9/ip:0;
+      return{...st,ip,h,r,er:r,bb,k,hr,era,whip,k9,bb9,
         dec:i===0&&tw?'W':i===0&&tl?'L':''};
     });
   };
