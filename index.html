@@ -3478,11 +3478,36 @@ function buildPitcherReport(team){
     const k9 = st.ip>0 ? (st.k*9/st.ip).toFixed(1) : '0.0';
     const bb9 = st.ip>0 ? (st.bb*9/st.ip).toFixed(1) : '0.0';
     const kbb = st.bb>0 ? (st.k/st.bb).toFixed(2) : (st.k>0?'∞':'0.00');
+    // ── IGP (Índice Global del Pitcher, 0-100) ──────────────────
+    // 4 categorías × 25%. Cada métrica escala lineal malo→excelente, clamp [0,100].
+    const scale=(v,malo,exc)=>{
+      const pct = exc>malo ? (v-malo)/(exc-malo) : (malo-v)/(malo-exc);
+      return Math.max(0,Math.min(100,pct*100));
+    };
+    const pctStrikes = pitcheos.total>0 ? pitcheos.strikes/pitcheos.total : 0;
+    const scaleERA     = scale(st.era,  10.00, 0.00); // más bajo mejor
+    const scaleWHIP    = scale(st.whip,  2.50, 1.10); // más bajo mejor
+    const scaleK9      = scale(st.k9,    2,    9);     // más alto mejor
+    const scaleBB9     = scale(st.bb9,   9,    3);     // más bajo mejor
+    const scaleStrikes = scale(pctStrikes, 0.40, 0.60); // más alto mejor
+    // Categorías redondeadas a entero; el total suma las YA REDONDEADAS para
+    // que el manager pueda cuadrar la cuenta con lo que ve en pantalla.
+    const igpDom = Math.round((scaleK9 + scaleWHIP)/2);
+    const igpCon = Math.round((scaleBB9 + scaleStrikes)/2);
+    const igpEfi = Math.round(scaleStrikes);
+    const igpRes = Math.round(scaleERA);
+    // Datos insuficientes: sin entradas lanzadas o < 15 pitcheos → no calcular.
+    const igpInsuf = st.ip===0 || pitcheos.total<15;
+    const igp = igpInsuf
+      ? { total:null, dominio:0, control:0, eficiencia:0, resistencia:0 }
+      : { total: Math.round((igpDom + igpCon + igpEfi + igpRes)/4),
+          dominio: igpDom, control: igpCon, eficiencia: igpEfi, resistencia: igpRes };
     return {
       nombre: st.name,
       entradaEntro: st.from,
       ip: st.ip, h: st.h, r: st.r, er: st.er, bb: st.bb, k: st.k, hr: st.hr,
       era, whip, k9, bb9, kbb,
+      igp,
       pitcheos,
       limiteConfigurado: null
     };
