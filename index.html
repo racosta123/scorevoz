@@ -2321,6 +2321,30 @@ function applyPlay(team,pidx,inn,play){
     showToast('🔒 Todavía no llegamos a esa entrada/turno — no se puede marcar',true);
     return;
   }
+  // ── WP/PB/BK sobre el BATEADOR: NO son turno al bate ────────────────────
+  // Wild pitch / passed ball: solo suman UNA bola (addPitch dispara auto-BB a
+  // las 4 solo). No crean celda, no consumen turno, no mueven corredores (el
+  // anotador los mueve aparte con el menú de corredores).
+  if(play.id==='WP'||play.id==='PB'){ addPitch(team,'balls'); return; }
+  // Balk: NO toca al bateador (turno y cuenta intactos). Avanza CADA corredor
+  // una base (3ª anota, SIN RBI al bateador). Mismo tramo naranja 'BK' que el
+  // menú de corredores → el relato ("Anotó/Avanzó por balk.") ya lo cubre.
+  if(play.id==='BK'){
+    const nm=i=>gs.teams[team].players[i].name;
+    const st=computeBaseState(team,inn,pidx);
+    const moved=[];
+    [st.third,st.second,st.first].forEach(r=>{   // adelante→atrás: no chocan destinos
+      if(!r) return;
+      const rpl=r.play;
+      if(rpl.bases>=3){ rpl.scored=true; rpl.scoreNote='BK'; recordTramo(rpl,4,'BK','anaranjado'); moved.push(nm(r.pidx)+' anotó (balk)'); }
+      else { rpl.bases=rpl.bases+1; recordTramo(rpl,rpl.bases,'BK','anaranjado'); moved.push(nm(r.pidx)+' →'+['','1ª','2ª','3ª'][rpl.bases]); }
+      refreshCell(team,r.pidx,r.key);
+    });
+    gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
+    updateScores(); renderGameState();
+    showToast(moved.length?`✓ Balk · ${moved.join(' · ')}`:'✓ Balk (sin corredores)');
+    return;
+  }
   if(play.type==='clear'){
     delete gs.plays[team][pidx][inn];
     refreshCell(team,pidx,inn);
