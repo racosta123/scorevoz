@@ -6091,6 +6091,18 @@ async function downloadPlayerFichaFinalPDF(){
 #pitcher-ficha-final .ptf-pitchcard .t{font-size:8.5px;font-weight:700;color:#8a97ad;letter-spacing:.5px}
 #pitcher-ficha-final .ptf-pitchcard .v{font-size:18px;font-weight:800;color:#123059;margin-top:4px}
 
+#pitcher-ficha-final .ptf-igp-body{padding:6px 16px 16px;text-align:center}
+#pitcher-ficha-final .ptf-igp-num{font-size:72px;font-weight:800;line-height:1}
+#pitcher-ficha-final .ptf-igp-max{font-size:20px;font-weight:700;color:#8a97ad;margin-left:4px}
+#pitcher-ficha-final .ptf-igp-label{font-size:13px;font-weight:800;letter-spacing:2px;margin-top:2px}
+#pitcher-ficha-final .ptf-igp-bars{margin-top:16px;display:flex;flex-direction:column;gap:9px}
+#pitcher-ficha-final .ptf-igp-row{display:flex;align-items:center;gap:10px}
+#pitcher-ficha-final .ptf-igp-rlbl{width:94px;text-align:left;font-size:10px;font-weight:800;color:#123059;letter-spacing:.4px}
+#pitcher-ficha-final .ptf-igp-track{flex:1;height:12px;background:#e5e7eb;border-radius:6px;overflow:hidden}
+#pitcher-ficha-final .ptf-igp-fill{height:100%;border-radius:6px}
+#pitcher-ficha-final .ptf-igp-rval{width:30px;text-align:right;font-size:13px;font-weight:800;color:#123059}
+#pitcher-ficha-final .ptf-igp-insuf{padding:24px 18px;text-align:center;font-size:12px;font-weight:600;color:#5a6c8c;line-height:1.5}
+
 #pitcher-ficha-final .ptf-limit{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #e3e8f0;border-radius:10px;padding:11px 16px}
 #pitcher-ficha-final .ptf-limit .l1{font-size:10px;font-weight:700;color:#123059;letter-spacing:1px}
 #pitcher-ficha-final .ptf-limit .l2{font-size:9.5px;color:#8a97ad;margin-top:2px}
@@ -6159,6 +6171,31 @@ function ptfBuildHTML(ctx){
         const overLimit=stats.pitcheos.total>=limit;
         return `<div class="val" style="color:${overLimit?'#dc2626':'#123059'}">Límite: ${limit} · Restantes: ${restantes}${overLimit?' ⚠️':''}</div>`;
       })();
+  // ── IGP: número gigante + 4 barras, color por rango (mismo en total y barras) ──
+  const igp = stats.igp || {total:null};
+  const igpTone = v => v>=80 ? ['#34d399','EXCELENTE']
+                     : v>=60 ? ['#fbbf24','SÓLIDO']
+                     : v>=40 ? ['#fb923c','EN DESARROLLO']
+                     :         ['#f87171','A MEJORAR'];
+  const igpBar = (lbl,v) => {
+    const [c]=igpTone(v);
+    return `<div class="ptf-igp-row"><div class="ptf-igp-rlbl">${lbl}</div>`
+         + `<div class="ptf-igp-track"><div class="ptf-igp-fill" style="width:${v}%;background:${c}"></div></div>`
+         + `<div class="ptf-igp-rval">${v}</div></div>`;
+  };
+  const igpHTML = (igp.total===null||igp.total===undefined)
+    ? `<div class="ptf-igp-insuf">IGP no disponible — se necesitan al menos 15 lanzamientos para calcularlo.</div>`
+    : (()=>{ const [col,lab]=igpTone(igp.total);
+        return `<div class="ptf-igp-body">
+          <div class="ptf-igp-num" style="color:${col}">${igp.total}<span class="ptf-igp-max">/100</span></div>
+          <div class="ptf-igp-label" style="color:${col}">${lab}</div>
+          <div class="ptf-igp-bars">
+            ${igpBar('DOMINIO',igp.dominio)}
+            ${igpBar('CONTROL',igp.control)}
+            ${igpBar('EFICIENCIA',igp.eficiencia)}
+            ${igpBar('RESISTENCIA',igp.resistencia)}
+          </div>
+        </div>`; })();
   return `
   <div class="ptf-page">
     <div class="ptf-card ptf-header ptf-mb">
@@ -6193,6 +6230,11 @@ function ptfBuildHTML(ctx){
           <div><div class="t">IP</div><div class="b">${stats.ip}</div></div>
         </div>
       </div>
+    </div>
+
+    <div class="ptf-card ptf-mb">
+      <div class="ptf-sec-title">ÍNDICE GLOBAL DEL PITCHER (IGP)</div>
+      ${igpHTML}
     </div>
 
     <div class="ptf-card ptf-mb">
