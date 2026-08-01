@@ -1603,19 +1603,22 @@ document.getElementById('modal').addEventListener('click',e=>{ if(e.target===doc
 function showRunnerModal(team,pidx,inn,seqMode){
   const p=gs.teams[team].players[pidx];
   const pl=gs.plays[team][pidx][inn];
+  // Blindaje visual: si pl.bases viene inválida (null/0/undefined, ej. avance
+  // por 'T' con bases:null) el menú mostraba "UNDEFINED". Normalizar a 1-3.
+  const baseActual = (pl.bases>=1 && pl.bases<=3) ? pl.bases : 1;
   const bn={1:'1ª base',2:'2ª base',3:'3ª base'};
   document.getElementById('mtitle').textContent=`${p.name} · CORREDOR E${inn}`;
   const body=document.getElementById('mbody'); body.innerHTML='';
 
   const info=document.createElement('div');
-  info.innerHTML=`<div style="text-align:center;padding:6px 0 14px"><div style="color:var(--blue);font-size:0.7rem;letter-spacing:.1em;margin-bottom:4px">MOVIMIENTO DE CORREDOR</div><div style="color:var(--text-dim);font-size:0.78rem">Actualmente en <strong style="color:#fff">${bn[pl.bases]||'base'}</strong> · Entrada ${inn} · <em>${pl.sym}</em></div></div>`;
+  info.innerHTML=`<div style="text-align:center;padding:6px 0 14px"><div style="color:var(--blue);font-size:0.7rem;letter-spacing:.1em;margin-bottom:4px">MOVIMIENTO DE CORREDOR</div><div style="color:var(--text-dim);font-size:0.78rem">Actualmente en <strong style="color:#fff">${bn[baseActual]||'base'}</strong> · Entrada ${inn} · <em>${pl.sym}</em></div></div>`;
   body.appendChild(info);
 
   const grid=document.createElement('div');
   grid.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px';
 
-  const nb=pl.bases<3?pl.bases+1:4;
-  const nbN={2:'2ª',3:'3ª',4:'Home'}[nb];
+  const nb = baseActual<3 ? baseActual+1 : 4;
+  const nbN = {1:'1ª',2:'2ª',3:'3ª',4:'Home'}[nb] || 'siguiente base';
 
   const mkBtn=(lbl,cls,action,full)=>{
     const b=document.createElement('button');
