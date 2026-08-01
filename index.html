@@ -6121,7 +6121,7 @@ function ptfBuildHTML(ctx){
   const weekday=today.split(',')[0]?.trim()||today;
   const dateOnly=today.includes(',')?today.split(',')[1].trim():today;
   const limitHTML = (limit===undefined||limit===null)
-    ? `<div class="val">Límite: no configurado</div>`
+    ? `<div class="val">Sin límite de pitcheos</div>`
     : (()=>{
         const restantes=Math.max(0,limit-stats.pitcheos.total);
         const overLimit=stats.pitcheos.total>=limit;
