@@ -207,6 +207,12 @@
     .game-content { padding-bottom:300px; }
     #game-state-inline { display:none !important; }
   }
+  /* ── ESCRITORIO: barras al flujo (sin fixed) → elimina el vacío grande ── */
+  @media(min-width:769px){
+    .pitch-bar   { position:static; bottom:auto; box-shadow:none; }
+    .voice-panel { position:static; bottom:auto; box-shadow:none; }
+    .game-content { padding-bottom:16px; }
+  }
   /* ── PITCH COUNTER BAR ──────────────────────────────────── */
   #outs-indicator { display:none; }
   .pitch-bar { position:fixed; left:0; right:0; bottom:100px; z-index:150; background:#081220; padding:8px 16px; border-top:2px solid rgba(0,229,153,.20); box-shadow:0 -4px 24px rgba(0,0,0,.65); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
