@@ -3464,7 +3464,7 @@ function computeNumeritosData(){
     const tw=(pt==='v'&&vWins)||(pt==='l'&&lWins);
     const tl=(pt==='v'&&lWins)||(pt==='l'&&vWins);
     return stints.map((st,i)=>{
-      let h=0,r=0,bb=0,k=0,hr=0;
+      let h=0,r=0,er=0,bb=0,k=0,hr=0;
       // ── Reparto de H/R/BB/K/HR por SEQ en la entrada COMPARTIDA — FASE 3A ──
       // Rango de seq dueño del stint: (loSeq, hiSeq]. loSeq/hiSeq vienen de
       // seqAtChange (Fase 2.5). El rango de entradas se AMPLÍA hasta la entrada
@@ -3497,7 +3497,12 @@ function computeNumeritosData(){
             take = atExit ? false : true;
           }
           if(!take) continue;
-          if(p.h) h++; if(p.scored) r++;
+          if(p.h) h++;
+          // FASE 3B: toda carrera suma a r; solo suma a ER (limpia) si NO está
+          // marcada como sucia (earned===false). Ausente o true ⇒ limpia (default
+          // de index.html:1493). Va DENTRO del filtro take → se reparte por seq
+          // igual que r (una carrera en entrada compartida cae al pitcher correcto).
+          if(p.scored){ r++; if(p.earned!==false) er++; }
           if(p.sym==='BB'||p.sym==='BBI') bb++;
           if(p.sym==='KS'||p.sym==='KL'||p.sym==='KC'||p.sym==='KC 2-3'||p.sym==='K corrido') k++;
           if(p.sym==='HR'||p.sym==='IHR') hr++;
@@ -3523,8 +3528,9 @@ function computeNumeritosData(){
       const totalOuts = Math.max(0, (3-entryOutsDone) + 3*(exitInn-st.from-1) + exitOuts);
       const realIP = totalOuts/3;                // innings reales para ERA/WHIP/K9/BB9 (13 outs → 4.333, NO 4.1)
       const ip = Math.floor(totalOuts/3) + (totalOuts%3)/10; // formato baseball .1/.2 SOLO para mostrar
-      const era=realIP>0?r*9/realIP:0, whip=realIP>0?(h+bb)/realIP:0, k9=realIP>0?k*9/realIP:0, bb9=realIP>0?bb*9/realIP:0;
-      return{...st,ip,outs:totalOuts,h,r,er:r,bb,k,hr,era,whip,k9,bb9,
+      // ERA se calcula con carreras LIMPIAS (er), por definición — FASE 3B.
+      const era=realIP>0?er*9/realIP:0, whip=realIP>0?(h+bb)/realIP:0, k9=realIP>0?k*9/realIP:0, bb9=realIP>0?bb*9/realIP:0;
+      return{...st,ip,outs:totalOuts,h,r,er,bb,k,hr,era,whip,k9,bb9,
         dec:i===0&&tw?'W':i===0&&tl?'L':''};
     });
   };
@@ -3659,10 +3665,12 @@ function buildPitcherReport(team){
       balls: src?.balls||0,
       fouls: src?.fouls||0
     };
-    const era = st.ip>0 ? (st.er*9/st.ip).toFixed(2) : '0.00';
-    const whip = st.ip>0 ? ((st.h+st.bb)/st.ip).toFixed(2) : '0.00';
-    const k9 = st.ip>0 ? (st.k*9/st.ip).toFixed(1) : '0.0';
-    const bb9 = st.ip>0 ? (st.bb*9/st.ip).toFixed(1) : '0.0';
+    // Innings REALES = st.outs/3 (NO st.ip, que es formato .1/.2 y no es decimal
+    // real: 4.1 ≠ 4.333). Corrige el sesgo de Fase 2. st.er ya es carreras LIMPIAS.
+    const era = st.outs>0 ? (st.er*9/(st.outs/3)).toFixed(2) : '0.00';
+    const whip = st.outs>0 ? ((st.h+st.bb)/(st.outs/3)).toFixed(2) : '0.00';
+    const k9 = st.outs>0 ? (st.k*9/(st.outs/3)).toFixed(1) : '0.0';
+    const bb9 = st.outs>0 ? (st.bb*9/(st.outs/3)).toFixed(1) : '0.0';
     const kbb = st.bb>0 ? (st.k/st.bb).toFixed(2) : (st.k>0?'∞':'0.00');
     // ── IGP (Índice Global del Pitcher, 0-100) ──────────────────
     // 4 categorías × 25%. Cada métrica escala lineal malo→excelente, clamp [0,100].
