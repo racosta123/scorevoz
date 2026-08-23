@@ -1434,10 +1434,20 @@ function drawDiamond(play){
   // 2ª→3ª=sup-izq, 3ª→home=inf-izq. Margen hacia adentro para no cortarse en el borde.
   const SEG=[null,[D.home,D.first,[43,43]],[D.first,D.second,[43,11]],[D.second,D.third,[11,11]],[D.third,D.home,[11,43]]];
   if(p && p.tramos && p.type!=='clear'){
+    // BUG A: si el corredor está OUT (runnerOut/csOut), el base-path NO debe verse
+    // vivo aunque tenga tramos verdes previos. Corte informativo: los tramos ANTES
+    // de la base del out conservan su color vivo (llegó ahí); el tramo del out y
+    // posteriores → color OUT (rojo si csOut, ámbar si solo runnerOut). Sin
+    // runnerOutBase (datos viejos): TODO a color OUT (fallback seguro, nunca vivo).
+    // Recoloreo SOLO visual; p.tramos guardado queda intacto.
+    const isOut=p.runnerOut===true||p.csOut===true;
+    const outCol=TRAMO_COL.rojo;   // corredor out = rojo SIEMPRE (forzado y FC iguales)
+    const rob=p.runnerOutBase;
     for(let k=1;k<=4;k++){
       const t=p.tramos[k]; if(!t) continue;
       const a=SEG[k][0], b=SEG[k][1], mid=SEG[k][2];
-      const col=TRAMO_COL[t.color]||'#8fa3b7';
+      let col=TRAMO_COL[t.color]||'#8fa3b7';
+      if(isOut && (rob==null || k>=rob)) col=outCol;
       s+=base(a,b,col,2.5);
       if(t.letra) s+=`<text x="${mid[0]}" y="${mid[1]}" text-anchor="middle" dominant-baseline="central" font-size="6" font-weight="700" fill="${col}" stroke="#0b1420" stroke-width="1.4" paint-order="stroke" style="pointer-events:none">${t.letra}</text>`;
     }
@@ -2329,6 +2339,13 @@ function advanceRunners(team,pidx,inn,play){
     if(runner){
       const rpl=runner.play;
       rpl.csOut=true; rpl.runnerOut=true;
+      // BUG A: el corredor de FC sale out en la base a la que iba FORZADO = la
+      // siguiente a la que ocupaba (bases+1, tope home=4). Se graba runnerOutBase
+      // (para dots/etiqueta) y un tramo ROJO en esa base (para el base-path),
+      // análogo al forzado. Antes quedaba undefined → se dibujaba vivo.
+      const fcOutBase=Math.min((runner.play.bases||1)+1,4);
+      rpl.runnerOutBase=fcOutBase;
+      recordTramo(rpl,fcOutBase,'FC','rojo');
       refreshCell(team,runner.pidx,runner.key);
       return 'FC — '+nm(runner.pidx)+' out';
     }
