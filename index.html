@@ -3351,7 +3351,11 @@ function applyCambioPitcher(inn){
   // es "número de cambios que ya había antes de este" + 1 (se calcula ANTES
   // de hacer el push de abajo, con el mismo `changes.length` de la línea de outName).
   const newIdx=changes.length+1;
-  gs.pitcherChanges[pitCambioTeam].push({inn,inName,outName,pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},inningLog:{...pc.inningLog}});
+  // Outs que había en la entrada al momento del cambio (0-2). Se cuentan sobre
+  // el equipo que BATEA (battingSide). Guardado para uso futuro (reparto de IP
+  // a media entrada). FASE 1: solo captura, no altera ningún cálculo actual.
+  const outsAtChange=countOutsInInning(battingSide,inn);
+  gs.pitcherChanges[pitCambioTeam].push({inn,inName,outName,outsAtChange,pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},inningLog:{...pc.inningLog}});
   gs.pitchCount[battingSide]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
   const limitSel=document.getElementById('pit-cambio-limit');
   if(!gs.pitcherLimits[pitCambioTeam]) gs.pitcherLimits[pitCambioTeam]={};
