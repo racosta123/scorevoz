@@ -3465,10 +3465,38 @@ function computeNumeritosData(){
     const tl=(pt==='v'&&lWins)||(pt==='l'&&vWins);
     return stints.map((st,i)=>{
       let h=0,r=0,bb=0,k=0,hr=0;
+      // ── Reparto de H/R/BB/K/HR por SEQ en la entrada COMPARTIDA — FASE 3A ──
+      // Rango de seq dueño del stint: (loSeq, hiSeq]. loSeq/hiSeq vienen de
+      // seqAtChange (Fase 2.5). El rango de entradas se AMPLÍA hasta la entrada
+      // del cambio de salida (extTo), porque en ese inning conviven jugadas del
+      // saliente (seq<=hiSeq) y del entrante (seq>hiSeq). Cada jugada se asigna
+      // por su seq al stint dueño; las entradas NO fronterizas cuentan enteras.
+      const loSeq = i>0             ? (sorted[i-1].seqAtChange ?? -Infinity) : -Infinity;
+      const hiSeq = i<sorted.length ? (sorted[i].seqAtChange   ??  Infinity) :  Infinity;
+      // ¿Hay seqAtChange utilizable en cada frontera? (partidos viejos: no)
+      const entryHasSeq = !(i>0)             || sorted[i-1].seqAtChange!==undefined;
+      const exitHasSeq  = !(i<sorted.length) || sorted[i].seqAtChange!==undefined;
+      // Última entrada a mirar: la del cambio de salida (compartida) o, si es el
+      // último pitcher, st.to (=lastPlayed). Amplía en 1 el rango previo.
+      const extTo = i<sorted.length ? sorted[i].inn : st.to;
       gs.teams[bt].players.forEach((_,pidx)=>{
-        for(let inn=st.from;inn<=st.to;inn++){
+        for(let inn=st.from;inn<=extTo;inn++){
           const p=(gs.plays[bt][pidx]||{})[inn];
           if(!p) continue;
+          const atEntry = i>0             && inn===st.from;        // entrada del cambio de ENTRADA
+          const atExit  = i<sorted.length && inn===sorted[i].inn;  // entrada del cambio de SALIDA
+          let take;
+          if(!atEntry && !atExit){
+            take = true;                        // entrada EXCLUSIVA del stint → idéntico al comportamiento previo
+          } else if(p.seq!==undefined && (!atEntry||entryHasSeq) && (!atExit||exitHasSeq)){
+            take = p.seq>loSeq && p.seq<=hiSeq;  // frontera con seq utilizable → reparto fino
+          } else {
+            // FALLBACK (partido viejo / sin seq) = comportamiento previo por entrada:
+            // la entrada de SALIDA pertenece entera al siguiente pitcher (no aquí);
+            // la de ENTRADA pertenece entera a este stint.
+            take = atExit ? false : true;
+          }
+          if(!take) continue;
           if(p.h) h++; if(p.scored) r++;
           if(p.sym==='BB'||p.sym==='BBI') bb++;
           if(p.sym==='KS'||p.sym==='KL'||p.sym==='KC'||p.sym==='KC 2-3'||p.sym==='K corrido') k++;
