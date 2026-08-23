@@ -3471,10 +3471,28 @@ function computeNumeritosData(){
           if(p.sym==='HR'||p.sym==='IHR') hr++;
         }
       });
-      // Relevo que entró pero aún no lanzó (from>lastPlayed) → 0 IP, no 1.0 falso.
-      const ip=st.to>=st.from ? (st.to-st.from+1) : 0;
-      const era=ip>0?r*9/ip:0, whip=ip>0?(h+bb)/ip:0, k9=ip>0?k*9/ip:0, bb9=ip>0?bb*9/ip:0;
-      return{...st,ip,h,r,er:r,bb,k,hr,era,whip,k9,bb9,
+      // ── IP en OUTS reales (formato baseball .1/.2) — FASE 2 ──
+      // El saliente lanza los primeros outsAtChange outs de la entrada del
+      // cambio; el entrante hereda esa entrada con esos outs ya hechos. Se
+      // suman outs TOTALES y solo al final se convierten a formato .1/.2.
+      // outsAtChange ausente (partidos previos a Fase 1) → 0.
+      const entryOutsDone = i>0 ? (sorted[i-1].outsAtChange||0) : 0; // outs ya hechos al ENTRAR (abridor: 0)
+      let exitInn, exitOuts;
+      if(i<sorted.length){                       // fue relevado por un cambio posterior
+        exitInn  = sorted[i].inn;
+        exitOuts = sorted[i].outsAtChange||0;     // outs que lanzó antes de salir
+      }else{                                      // último pitcher: nunca fue relevado
+        exitInn  = lastPlayed;
+        exitOuts = countOutsInInning(bt,lastPlayed); // outs reales de la última entrada (puede ser parcial)
+      }
+      // Entrada de entrada aporta (3-entryOutsDone); intermedias ×3; salida aporta exitOuts.
+      // La fórmula unificada también cubre "entra y sale en la misma entrada" por álgebra.
+      // Relevo que entró pero aún no lanzó → total negativo → clamp a 0 (no 1.0 falso).
+      const totalOuts = Math.max(0, (3-entryOutsDone) + 3*(exitInn-st.from-1) + exitOuts);
+      const realIP = totalOuts/3;                // innings reales para ERA/WHIP/K9/BB9 (13 outs → 4.333, NO 4.1)
+      const ip = Math.floor(totalOuts/3) + (totalOuts%3)/10; // formato baseball .1/.2 SOLO para mostrar
+      const era=realIP>0?r*9/realIP:0, whip=realIP>0?(h+bb)/realIP:0, k9=realIP>0?k*9/realIP:0, bb9=realIP>0?bb*9/realIP:0;
+      return{...st,ip,outs:totalOuts,h,r,er:r,bb,k,hr,era,whip,k9,bb9,
         dec:i===0&&tw?'W':i===0&&tl?'L':''};
     });
   };
