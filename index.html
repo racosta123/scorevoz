@@ -3355,7 +3355,11 @@ function applyCambioPitcher(inn){
   // el equipo que BATEA (battingSide). Guardado para uso futuro (reparto de IP
   // a media entrada). FASE 1: solo captura, no altera ningún cálculo actual.
   const outsAtChange=countOutsInInning(battingSide,inn);
-  gs.pitcherChanges[pitCambioTeam].push({inn,inName,outName,outsAtChange,pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},inningLog:{...pc.inningLog}});
+  // Orden temporal (seq) de la última jugada YA registrada antes de que entre
+  // el relevo. Permite a fases futuras repartir H/R por seq (jugadas con seq<=
+  // seqAtChange = del saliente; seq> = del entrante). FASE 2.5: solo captura.
+  const seqAtChange=gs.seq||0;
+  gs.pitcherChanges[pitCambioTeam].push({inn,inName,outName,outsAtChange,seqAtChange,pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},inningLog:{...pc.inningLog}});
   gs.pitchCount[battingSide]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
   const limitSel=document.getElementById('pit-cambio-limit');
   if(!gs.pitcherLimits[pitCambioTeam]) gs.pitcherLimits[pitCambioTeam]={};
