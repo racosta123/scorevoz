@@ -1444,12 +1444,25 @@ function drawDiamond(play){
     const outCol=TRAMO_COL.rojo;   // corredor out = rojo SIEMPRE (forzado y FC iguales)
     const rob=p.runnerOutBase;
     for(let k=1;k<=4;k++){
-      const t=p.tramos[k]; if(!t) continue;
-      const a=SEG[k][0], b=SEG[k][1], mid=SEG[k][2];
-      let col=TRAMO_COL[t.color]||'#8fa3b7';
-      if(isOut && (rob==null || k>=rob)) col=outCol;
-      s+=base(a,b,col,2.5);
-      if(t.letra) s+=`<text x="${mid[0]}" y="${mid[1]}" text-anchor="middle" dominant-baseline="central" font-size="6" font-weight="700" fill="${col}" stroke="#0b1420" stroke-width="1.4" paint-order="stroke" style="pointer-events:none">${t.letra}</text>`;
+      const t=p.tramos[k];
+      if(t){
+        const a=SEG[k][0], b=SEG[k][1], mid=SEG[k][2];
+        let col=TRAMO_COL[t.color]||'#8fa3b7';
+        if(isOut && (rob==null || k>=rob)) col=outCol;
+        s+=base(a,b,col,2.5);
+        if(t.letra) s+=`<text x="${mid[0]}" y="${mid[1]}" text-anchor="middle" dominant-baseline="central" font-size="6" font-weight="700" fill="${col}" stroke="#0b1420" stroke-width="1.4" paint-order="stroke" style="pointer-events:none">${t.letra}</text>`;
+      } else {
+        // BUG #5 Etapa 1 — RED DE SEGURIDAD: la RAMA 1 solo dibuja desde p.tramos
+        // e ignora p.bases. Si un avance movió al corredor (to2/to3/score/err…) sin
+        // grabar tramo, ese segmento quedaba invisible. Aquí se rellena el segmento
+        // faltante SEG[k] usando p.bases/p.scored, con el MISMO criterio de out del
+        // Bug A (rojo si out, hc vivo si no). Solo visual; no muta p.tramos ni letra.
+        const passed = k<4 ? k<=(p.bases||0) : (p.scored || (p.bases||0)>=4);
+        if(passed){
+          const col=(isOut && (rob==null || k>=rob)) ? outCol : hc;
+          s+=base(SEG[k][0], SEG[k][1], col, 2.5);
+        }
+      }
     }
   } else if(p && p.type!=='out' && p.type!=='clear'){
     if(p.runnerOut){
