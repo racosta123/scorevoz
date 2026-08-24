@@ -266,7 +266,7 @@
   /* ── CHAT ASISTENTE ─────────────────────────────────────── */
   .help-btn { width:44px; height:44px; border-radius:50%; border:2px solid var(--amber); background:rgba(255,182,72,.12); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0; transition:all .2s; padding:0; }
   .help-btn:hover { background:rgba(255,182,72,.28); transform:scale(1.08); }
-  #chat-panel { position:fixed; bottom:100px; left:0; right:0; z-index:190; background:#060d1e; border-top:2px solid rgba(255,182,72,.3); display:flex; flex-direction:column; height:68vh; max-height:500px; transform:translateY(110%); transition:transform .32s cubic-bezier(.4,0,.2,1); box-shadow:0 -8px 48px rgba(0,0,0,.85); }
+  #chat-panel { position:fixed; bottom:100px; left:0; right:0; z-index:190; background:#060d1e; border-top:2px solid rgba(255,182,72,.3); display:flex; flex-direction:column; height:68vh; max-height:500px; transform:translateY(calc(100% + 160px)); transition:transform .32s cubic-bezier(.4,0,.2,1); box-shadow:0 -8px 48px rgba(0,0,0,.85); }
   #chat-panel.open { transform:translateY(0); }
   .chat-hdr { background:#081220; border-bottom:1px solid rgba(255,255,255,.08); padding:10px 16px; display:flex; align-items:center; gap:10px; flex-shrink:0; }
   .chat-hdr-info { flex:1; min-width:0; }
