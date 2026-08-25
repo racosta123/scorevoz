@@ -1860,6 +1860,23 @@ function askBatterFateThenRunners(team,pidx,inn,qR){
     refreshCell(team,pidx,inn);
     gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
     updateScores();
+    // FC con UN SOLO corredor forzado (únicamente 1ª ocupada): el force out es
+    // inequívoco → out AUTOMÁTICO en 2ª (patrón Bug A), SIN abrir el menú. Con
+    // MÚLTIPLES (qR.length>1) se mantiene el menú manual: el anotador decide
+    // dónde cayó cada force.
+    if(qR.length===1 && qR[0].play.bases===1){
+      const rr=qR[0], rpl=rr.play;
+      rpl.csOut=true; rpl.runnerOut=true;
+      const ob=Math.min((rr.play.bases||1)+1,4); // 1ª→2ª
+      rpl.runnerOutBase=ob;
+      recordTramo(rpl,ob,'FC','rojo');
+      refreshCell(team,rr.pidx,rr.key);
+      gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
+      updateScores();
+      closeModal();
+      autoAdvance(team,pidx,inn);
+      return;
+    }
     startSeq();
   });
   setModalForceChoice(true);
