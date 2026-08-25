@@ -4499,7 +4499,11 @@ function narratePlay(team,pidx,inn){
   const walkNarr={'BB':'Base por bolas, pasó a primera.','BBI':'Base intencional, fue a primera.','BG':'Golpeado por pitcheo (HBP), se embasó.','INT':'Interferencia, se embasó.','OB':'Obstrucción, se embasó.'};
   const advNarr={'SB':'Base robada.','WP':'Avanzó por wild pitch.','PB':'Avanzó por passed ball.','BK':'Avanzó por balk.','T':'Avanzó por tiro.','FC':"Llegó a primera por fielder's choice.",'PC':'Pisa y corre.','IND':'Avanzó por indiferencia (no es robo).'};
   let parts=[];
-  if(hitNarr[sym])       parts.push(hitNarr[sym]);
+  // FC / bola ocupada: el bateador quedó VIVO en 1ª (runNote==='FC') aunque su
+  // sym siga siendo el del rodado. Se narra la embasada, NO "out en primera".
+  const rolaDir={'6-3':'al campo corto','4-3':'a segunda','5-3':'a tercera','1-3':'al pitcher','2-3':'al catcher','3-3':'a primera'};
+  if(p.runNote==='FC')   parts.push(rolaDir[sym]?`Rola ${rolaDir[sym]}, se embasó en bola ocupada (FC).`:`Se embasó en bola ocupada (FC).`);
+  else if(hitNarr[sym])  parts.push(hitNarr[sym]);
   else if(outNarr[sym])  parts.push(outNarr[sym]);
   else if(walkNarr[sym]) parts.push(walkNarr[sym]);
   else if(advNarr[sym])  parts.push(advNarr[sym]);
