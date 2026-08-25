@@ -4529,8 +4529,16 @@ function narratePlay(team,pidx,inn){
           let j=k;
           while(j+1<=4 && j+1!==termK && p.tramos[j+1] && p.tramos[j+1].por===t.por && p.tramos[j+1].letra===L) j++;
           const reachesTerm = termK && j+1===termK && p.tramos[termK] && p.tramos[termK].por===t.por && p.tramos[termK].letra===L;
-          if(!reachesTerm) parts.push(`Avanzó a ${bn[j]} impulsado por el ${tipoHit} de ${t.por}.`);
-          k=j+1;
+          // ERROR 2: si el OUT terminal (runnerOut) cae justo tras el grupo
+          // (j+1===termK) y el corredor alcanzó esa base (p.bases>=termK), el tramo
+          // del empuje a termK fue SOBRESCRITO por el out → reportar la base REAL
+          // (termK), no j. GUARDA: solo para hits multi-base (2B/3B/HR) que de verdad
+          // empujan varias bases; un sencillo no llega tan lejos → así no se le
+          // atribuye al impulsor un tramo que fue robo/WP (sencillo+robo+out). Solo texto.
+          const pushedToOut = p.runnerOut && j+1===termK && (p.bases||0)>=termK && ['2B','3B','HR'].includes(L);
+          const endBase = pushedToOut ? termK : j;
+          if(!reachesTerm) parts.push(`Avanzó a ${bn[endBase]} impulsado por el ${tipoHit} de ${t.por}.`);
+          k=endBase+1;
         } else {
           const base=bn[k];
           if(L==='SB'||L==='RB') parts.push(`Robó ${base}.`);
