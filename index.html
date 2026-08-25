@@ -1598,15 +1598,20 @@ function selectCell(team,pidx,inn,td,trusted){
     return; // NO resetear pitchAB
   }
 
+  // ── NARRATIVA (clic en jugada TERMINADA) — BÁSICO y PRO ──────────────
+  // Solo lectura: muestra la travesía del corredor y NO resetea la cuenta
+  // (pitchAB) ni reasigna el foco. Va DESPUÉS de la rama corredor vivo (ese
+  // sigue a modo corredor) y ANTES del reset de pitchAB. Excluye la celda del
+  // bateador activo y las llamadas programáticas (trusted).
+  if(!trusted && existingPl && existingPl.type!=='clear' && !isActiveBatterCell(team,pidx,inn)){
+    showNarrativeModal(team,pidx,inn); return;
+  }
+
   // ── MODO NORMAL (bateador) ──
-  // Clic sencillo sobre una jugada YA registrada que NO es la del bateador
-  // activo: NO reasigna el foco (gs.activeBatter/gs.selected) ni resetea el
-  // conteo de pitcheos — evita que la voz o el bloqueo de botones S/B/F del
-  // equipo equivocado se desalineen solo por leer una jugada pasada. Para
-  // modificarla se usa doble clic (pide confirmación). En modo PRO, la vista
-  // narrativa ya existente cumple este mismo propósito, así que se respeta.
-  const isProNarrative=appMode==='pro' && existingPl && existingPl.type!=='clear';
-  if(!trusted && existingPl && !isProNarrative && !isActiveBatterCell(team,pidx,inn)){
+  // Guard residual: celda con jugada NO capturada por la narrativa de arriba
+  // (p. ej. celda vaciada type==='clear'), que no es la del bateador activo →
+  // NO reasigna foco ni resetea el conteo; solo avisa. Modificar = doble clic.
+  if(!trusted && existingPl && !isActiveBatterCell(team,pidx,inn)){
     const p=gs.teams[team].players[pidx];
     document.getElementById('selinfo').innerHTML=
       `<strong>${p.name}</strong><span>${gs.teams[team].name} · E${inn} · ya registrada (doble clic para modificar)</span>`;
@@ -1629,9 +1634,6 @@ function selectCell(team,pidx,inn,td,trusted){
   // ponche/base siguen cayendo sobre el bateador correcto.
   lockPitchButtons(team);
 
-  if(appMode==='pro' && existingPl && existingPl.type!=='clear'){
-    showNarrativeModal(team,pidx,inn); return;
-  }
   document.querySelectorAll('.dc.active').forEach(c=>c.classList.remove('active'));
   td.classList.add('active');
   selCell={team,pidx,inn,td};
@@ -4579,7 +4581,7 @@ function showNarrativeModal(team,pidx,inn){
   const body=document.getElementById('mbody');
   body.innerHTML=`<div class="narrative-panel">${narratePlay(team,pidx,inn)}</div>
   <div style="margin-top:10px;display:flex;gap:6px">
-    <button class="modal-close" style="flex:1" onclick="closeModal();selectCell('${team}',${pidx},'${inn}',document.getElementById('c-${team}-${pidx}-${inn}'))">✏️ EDITAR</button>
+    <button class="modal-close" style="flex:1" onclick="closeModal();showModal('${team}',${pidx},'${inn}')">✏️ EDITAR</button>
     <button class="modal-close" style="flex:1" onclick="closeModal()">CERRAR</button>
   </div>`;
   document.getElementById('modal').classList.add('show');
