@@ -2447,6 +2447,13 @@ function advanceRunners(team,pidx,inn,play){
   if(play.type==='error'||play.type==='reach'){
     return forceAdvanceRunners(team,pidx,inn,play.bases||1);
   }
+  // ── Toque de sacrificio (SH): el bateador es out, pero avanza en cadena a los
+  // corredores FORZADOS (desde 1ª). Reutiliza forceAdvanceRunners (mismo motor que
+  // walk/error): mueve solo a los forzados, respeta huecos (1ª+3ª → solo 1ª), y no
+  // toca a nadie si 1ª está vacía. SQ (squeeze) NO entra: es lógica aparte. ──
+  if(play.id==='SH'){
+    return forceAdvanceRunners(team,pidx,inn,1);
+  }
   if(play.type!=='hit') return '';
   const b=play.bases===4?4:(play.bases||0);
   if(!b) return '';
