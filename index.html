@@ -2349,6 +2349,20 @@ function advanceRunners(team,pidx,inn,play){
       gs.plays[team][pidx][inn].rbi=(gs.plays[team][pidx][inn].rbi||0)+1;
       return nm(st.third.pidx)+(play._pcTagUp?' anotó (pisa y corre)':' anotó (SF)');
     }
+    // NO-ANOTA (nadie anotó por el SF: 3er out con outs>=3, o sin corredor en 3ª):
+    // no fue sacrificio → convertir la jugada GUARDADA a fly out normal F{n} con
+    // ab:true (cuenta turno al bate). El número sale del sym (SF8→8), del flyPos
+    // (pisa y corre con 'SF' pelado) o fallback '8' (central). Se limpia el runNote
+    // "F{n} SF" para que no quede engañoso. No toca el dibujo (este camino nunca
+    // grabó tramo). El bloque que SÍ anota queda intacto (retorna antes).
+    const bp=gs.plays[team][pidx][inn];
+    if(bp){
+      const m=/^SF(\d)/.exec(bp.sym||'');
+      const fn=m?m[1]:(play.flyPos?String(play.flyPos):'8');
+      bp.sym=`F${fn}`;
+      bp.ab=true;
+      if(bp.runNote && /^F\d+\s*SF$/.test(bp.runNote)) delete bp.runNote;
+    }
     return '';
   }
   // ── DP: identificar corredor forzado por ruta, preservar su hit ──
