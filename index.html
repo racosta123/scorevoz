@@ -4582,13 +4582,34 @@ function narratePlay(team,pidx,inn){
   // (Cubeta A). La frase ya incluye la preposición; se le concatena el nombre (pushBy).
   // Hoy solo el elevado de sacrificio (SF); crecerá con SH/SQ/fly cuando se capturen.
   const pushFrase={'SF':'con elevado de sacrificio de'};
+  // Dirección del jardinero para la frase del SF del BATEADOR (dígito del sym: 7/8/9).
+  const jardFrase={7:'al jardinero izquierdo',8:'al jardinero central',9:'al jardinero derecho'};
   if(p.runNote==='FC')   parts.push(rolaDir[sym]?`Rola ${rolaDir[sym]}, se embasó en bola ocupada (FC).`:`Se embasó en bola ocupada (FC).`);
   else if(hitNarr[sym])  parts.push(hitNarr[sym]);
   else if(outNarr[sym])  parts.push(outNarr[sym]);
   else if(walkNarr[sym]) parts.push(walkNarr[sym]);
   else if(advNarr[sym])  parts.push(advNarr[sym]);
   else if(sym.startsWith('E')) parts.push(`Error del defensor (${sym}), se embasó.`);
+  // SF con jardinero (SF7/SF8/SF9): frase propia con dirección. El 'SF' pelado ya lo
+  // tomó outNarr arriba; aquí solo caen las variantes numeradas que antes iban al fallback.
+  else if(/^SF/.test(sym)){
+    const j=+String(sym).replace(/[^0-9]/g,'').slice(-1);
+    parts.push(jardFrase[j] ? `Elevado de sacrificio ${jardFrase[j]}.` : 'Elevado de sacrificio.');
+  }
   else if(sym) parts.push(`Jugada: ${sym}.`);
+  // "Impulsó a {corredor}" — escaneo inverso GENERAL: corredores de este inning que
+  // acreditan su carrera a ESTE bateador (mismo patrón que undoLastPlay). Reachable
+  // para type:'out' (va FUERA del gate de abajo). Por ahora se EMITE solo para el SF
+  // (/^SF/); se extenderá luego a rola/DP/fly. No toca el bloque de hits (type!=='out').
+  const _impulsadosOut=[];
+  (gs.teams[team].players||[]).forEach((_,i)=>{
+    if(i===pidx) return;
+    const rp=(gs.plays[team][i]||{})[inn];
+    if(rp && rp.rbiCreditPidx===pidx && rp.rbiCreditInn===inn && rp.scored)
+      _impulsadosOut.push(gs.teams[team].players[i].name);
+  });
+  if(/^SF/.test(sym) && _impulsadosOut.length)
+    parts.push(`Impulsó a ${_impulsadosOut.join(' y a ')}.`);
   if(p.type!=='out'){
     // Narrar cada TRAMO INTERMEDIO de la travesía (2=1ª→2ª, 3=2ª→3ª) según su motivo.
     // El tramo TERMINAL (donde anotó o lo sacaron out) NO se narra aquí: lo cubren
