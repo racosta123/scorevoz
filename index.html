@@ -3432,7 +3432,39 @@ function renderCambioPitFields(){
         title="Mantén: di nombre del pitcher">🎤</button>
     </div>
     <button class="play-btn" onclick="applyCambioPitcher(${inn})" style="width:100%;margin-top:10px;border-color:var(--green);color:var(--green)">✓ CONFIRMAR CAMBIO</button>
+    ${changes.length?`<button class="play-btn" onclick="undoLastPitcherChange('${pitCambioTeam}')" style="width:100%;margin-top:6px;border-color:var(--red);color:var(--red)">↩ Deshacer último cambio</button>`:''}
   `;
+}
+
+// Deshace el ÚLTIMO cambio de pitcher del equipo dado (Opción A): quita la última
+// entrada de gs.pitcherChanges[team], restaura el conteo de lanzamientos del lado que
+// batea desde el snapshot archivado, y borra el límite que ese cambio fijó. No toca
+// el otro equipo, ni gs.plays, ni el abridor (gs.pitcher). Independiente de undoLastPlay.
+function undoLastPitcherChange(team){
+  const changes=gs.pitcherChanges[team];
+  if(!changes||!changes.length){ showToast('No hay cambios de pitcher que deshacer para este equipo',true); return; }
+  const teamName=gs.teams[team]?.name||(team==='v'?'Visitante':'Local');
+  if(!confirm(`¿Deshacer el último cambio de pitcher de ${teamName}? Se descartarán los lanzamientos posteriores al cambio.`)) return;
+  const removed=changes.pop();
+  // Restaurar el conteo del lado que BATEA (contrario al del pitcher) al estado ANTES
+  // del cambio deshecho — mismo lado que resetea applyCambioPitcher (~3496).
+  const battingSide=team==='v'?'l':'v';
+  // Blindaje: un guardado antiguo podría no traer `pitches`/`inningLog` — restaurar a
+  // ceros/vacío en vez de tronar. Los cambios creados por applyCambioPitcher sí los traen.
+  const rp=removed.pitches||{};
+  gs.pitchCount[battingSide]={
+    total:rp.total||0, strikes:rp.strikes||0,
+    balls:rp.balls||0, fouls:rp.fouls||0,
+    inningLog:{...(removed.inningLog||{})}
+  };
+  // Borrar el límite que ESTE cambio fijó: newIdx = changes.length+1 con el length YA
+  // reducido por el pop (mismo valor que tenía al crearse, ver applyCambioPitcher ~3486).
+  const newIdx=changes.length+1;
+  if(gs.pitcherLimits[team]) delete gs.pitcherLimits[team][newIdx];
+  updatePitchCounterUI();
+  renderCambioPitFields();
+  const curName=changes.length?changes[changes.length-1].inName:(gs.pitcher[team].name||'abridor');
+  showToast(`↩ Deshecho el cambio (entraba ${removed.inName}) — vuelve ${curName}`);
 }
 
 function pitCambioMicStart(e){
