@@ -1931,9 +1931,9 @@ function applyRunnerMove(team,pidx,inn,action){
     case 'rob':
       if(pl.bases>=3){
         // Robo de HOME: anota (antes Math.min(...,3) lo dejaba clavado en 3ª).
-        pl.scored=true; recordTramo(pl,4,'RB','amarillo'); showToast('✓ Robó el home (anota)');
+        pl.scored=true; recordTramo(pl,4,'RB','amarillo'); pl.sb=(pl.sb||0)+1; showToast('✓ Robó el home (anota)');
       } else {
-        pl.bases=Math.min(pl.bases+1,3); recordTramo(pl,pl.bases,'RB','amarillo');
+        pl.bases=Math.min(pl.bases+1,3); recordTramo(pl,pl.bases,'RB','amarillo'); pl.sb=(pl.sb||0)+1;
         showToast(`Robó ${pl.bases===2?'2ª':'3ª'} (SB)`);
       }
       break;
@@ -1981,7 +1981,12 @@ function applyRunnerMove(team,pidx,inn,action){
       // pop del tramo más alto: deshace el último avance registrado (#4 Fase B)
       if(pl.tramos){
         const ks=Object.keys(pl.tramos).map(Number).sort((a,b)=>b-a);
-        if(ks.length) delete pl.tramos[ks[0]];
+        if(ks.length){
+          // Si el tramo que se borra era un ROBO (letra 'RB'), revierte el contador
+          // dedicado pl.sb (mismo estilo manual que pl.rbi). Un avance normal no lo toca.
+          if(pl.tramos[ks[0]] && pl.tramos[ks[0]].letra==='RB') pl.sb=Math.max(0,(pl.sb||0)-1);
+          delete pl.tramos[ks[0]];
+        }
       }
       break;
     }
@@ -3451,7 +3456,7 @@ function computeNumeritosData(){
       if(pp.sym==='BB'||pp.sym==='BBI') bb++;
       if(pp.sym==='BG') hbp++;
       if(pp.sym==='KS'||pp.sym==='KL'||pp.sym==='KC'||pp.sym==='KC 2-3'||pp.sym==='K corrido') k++;
-      if(pp.sym==='SB') sb++;
+      if(pp.sb) sb+=pp.sb; else if(pp.sym==='SB') sb++;
       if(pp.sym==='SF') sf++;
       if(pp.rbi) rbi+=pp.rbi;
     });
@@ -4131,7 +4136,7 @@ function showPlayerFicha(team,pidx){
     if(pl.sym==='BB'||pl.sym==='BBI') bb++;
     if(pl.sym==='BG') hbp++;
     if(pl.sym==='KS'||pl.sym==='KL'||pl.sym==='KC'||pl.sym==='KC 2-3'||pl.sym==='K corrido') k++;
-    if(pl.sym==='SB') sb++;
+    if(pl.sb) sb+=pl.sb; else if(pl.sym==='SB') sb++;
     if(pl.sym==='SF') sf++;
     if(pl.rbi) rbi+=pl.rbi;
   });
@@ -4271,7 +4276,7 @@ function downloadPlayerFichaPDF(team,pidx){
     if(pl.sym==='BB'||pl.sym==='BBI') bb++;
     if(pl.sym==='BG') hbp++;
     if(pl.sym==='KS'||pl.sym==='KL'||pl.sym==='KC'||pl.sym==='KC 2-3'||pl.sym==='K corrido') k++;
-    if(pl.sym==='SB') sb++;
+    if(pl.sb) sb+=pl.sb; else if(pl.sym==='SB') sb++;
     if(pl.sym==='SF') sf++;
     if(pl.rbi) rbi+=pl.rbi;
   });
