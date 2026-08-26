@@ -1640,9 +1640,15 @@ function selectCell(team,pidx,inn,td,trusted){
   document.getElementById('runner-mode-banner').style.display='none';
   document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
 
-  // Reset S/B/F SIEMPRE en modo normal
-  gs.pitchAB['v']={s:0,b:0,f:0,history:[],undoCount:0};
-  gs.pitchAB['l']={s:0,b:0,f:0,history:[],undoCount:0};
+  // Reset S/B/F al seleccionar un bateador NUEVO — pero NO al reseleccionar al
+  // bateador en curso (bug: volver a su celda tras ver un historial reiniciaba el
+  // conteo). Aquí gs.activeBatter aún apunta al bateador anterior (se reasigna más
+  // abajo), así que isActiveBatterCell distingue reclic-mismo (conserva) de nuevo
+  // (resetea). El display/unlock/lock quedan FUERA para mostrar el conteo conservado.
+  if(!isActiveBatterCell(team,pidx,inn)){
+    gs.pitchAB['v']={s:0,b:0,f:0,history:[],undoCount:0};
+    gs.pitchAB['l']={s:0,b:0,f:0,history:[],undoCount:0};
+  }
   unlockPitchButtons('v');
   unlockPitchButtons('l');
   updatePitchABDisplay('v');
