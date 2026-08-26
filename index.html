@@ -2857,6 +2857,14 @@ function confirmYes(){
     if(pl){
       if(a.action==='po'||a.action==='cs'||a.action==='rd'){
         pl.runnerOut=true; pl.runnerOutSym=a.sym;
+        // Reviré por VOZ ('po'): espejo exacto de case 'or' — setear la base del out y
+        // preservar la llegada previa (RB/WP/PB/BK), grabando 'OR' solo si la base está
+        // vacía. Sin esto, la voz dejaba runnerOutBase=null → sin punto rojo en el dibujo.
+        // Gated a 'po': NO toca 'cs' (usa csRunnerOutBase) ni 'rd'.
+        if(a.action==='po'){
+          pl.runnerOutBase=pl.bases;
+          if(!pl.tramos || !pl.tramos[pl.bases]) recordTramo(pl,pl.bases,'OR','rojo');
+        }
         if(a.action==='cs'&&a.csRoute){
           pl.csRoute=a.csRoute;
           if(a.csRunnerOutBase) pl.runnerOutBase=a.csRunnerOutBase;
