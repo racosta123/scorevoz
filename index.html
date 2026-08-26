@@ -1831,8 +1831,11 @@ function showRunnerModal(team,pidx,inn,seqMode){
 // (3ª→2ª→1ª). Al resolver uno se abre el siguiente; al terminar (o llegar a 3
 // outs) se corre onDone (autoAdvance del bateador). Reusa showRunnerModal/applyRunnerMove.
 let _runnerSeq=null;
-function startRunnerSequence(team,inn,queue,onDone){
-  _runnerSeq={team,inn,queue,idx:0,onDone};
+function startRunnerSequence(team,inn,queue,onDone,batterPidx){
+  // batterPidx (Fase 1): índice del BATEADOR que originó la secuencia (la rola/out).
+  // Se guarda para que Fase 2 pueda leer qué bateó y quién fue al avanzar un corredor.
+  // Si un llamador no lo pasa, queda undefined (no rompe nada; nadie lo lee aún).
+  _runnerSeq={team,inn,queue,idx:0,onDone,batterPidx};
   _seqStep();
 }
 function _seqStep(){
@@ -1857,7 +1860,7 @@ function askBatterFateThenRunners(team,pidx,inn,qR){
   const s=document.createElement('div'); s.className='modal-section'; s.textContent='¿QUÉ PASÓ CON EL BATEADOR?'; body.appendChild(s);
   const g=document.createElement('div'); g.className='play-buttons'; body.appendChild(g);
   const mk=(lbl,cls,fn)=>{ const b=document.createElement('button'); b.className=`play-btn ${cls}`; b.textContent=lbl; b.style.gridColumn='1/-1'; b.onclick=fn; g.appendChild(b); };
-  const startSeq=()=>{ closeModal(); startRunnerSequence(team,inn,qR,()=>autoAdvance(team,pidx,inn)); };
+  const startSeq=()=>{ closeModal(); startRunnerSequence(team,inn,qR,()=>autoAdvance(team,pidx,inn),pidx); };
   mk('✕ Out normal','out-btn',startSeq);
   mk('▶ FC / Bola ocupada → 1ª','',()=>{
     const bp=gs.plays[team][pidx][inn];
@@ -1907,10 +1910,24 @@ function applyRunnerMove(team,pidx,inn,action){
     case 'to2':  pl.bases=Math.max(pl.bases,2); showToast('Corredor avanzó a 2ª'); break;
     case 'to3':  pl.bases=Math.max(pl.bases,3); showToast('Corredor avanzó a 3ª'); break;
     // Avance NEUTRO (rodado): una base, tramo GRIS. Desde 3ª → anota.
-    case 'advn':
-      if(pl.bases>=3){ pl.scored=true; recordTramo(pl,4,'','gris'); showToast('✓ Corredor anotó'); }
-      else { pl.bases=pl.bases+1; recordTramo(pl,pl.bases,'','gris'); showToast(`Corredor avanzó a ${pl.bases===2?'2ª':'3ª'}`); }
+    case 'advn': {
+      let advTo;
+      if(pl.bases>=3){ advTo=4; pl.scored=true; recordTramo(pl,4,'','gris'); showToast('✓ Corredor anotó'); }
+      else { pl.bases=pl.bases+1; advTo=pl.bases; recordTramo(pl,pl.bases,'','gris'); showToast(`Corredor avanzó a ${pl.bases===2?'2ª':'3ª'}`); }
+      // Fase 2: si el avance ocurre DENTRO de una secuencia iniciada por un out/rola
+      // del bateador (_runnerSeq.batterPidx conocido), estampar la CAUSA del empuje
+      // en campos SEPARADOS del tramo — .pushSym (sym del out, p.ej. '3-3') y .pushBy
+      // (nombre del bateador). NO se toca .letra ('') ni .color ('gris'): el dibujo
+      // queda idéntico. Solo la narrativa (Fase 3) leerá estos campos.
+      if(_runnerSeq && _runnerSeq.batterPidx!=null && pl.tramos && pl.tramos[advTo]){
+        const bp=gs.plays[team]?.[_runnerSeq.batterPidx]?.[inn];
+        if(bp){
+          pl.tramos[advTo].pushSym=bp.sym||'';
+          pl.tramos[advTo].pushBy=gs.teams[team].players[_runnerSeq.batterPidx].name;
+        }
+      }
       break;
+    }
     // Se quedó: no hace nada (el corredor permanece en su base).
     case 'stay': showToast('Corredor se quedó'); break;
     case 'score':         pl.bases=Math.max(pl.bases,3); pl.scored=true; showToast('✓ Corredor anotó'); break;
@@ -4585,6 +4602,9 @@ function narratePlay(team,pidx,inn){
           else if(L==='OR') parts.push(`Out en revire yendo a ${base}.`);
           else if(L==='IR'||L==='CS') parts.push(`Cogido robando en ${base}.`);
           else if(L==='TT') parts.push(`Out en tira y tira hacia ${base}.`);
+          // Fase 3: empujado por out/rola del bateador (campos separados pushSym+pushBy;
+          // letra vacía / color gris). Narra el CÓMO con la dirección del rolaDir existente.
+          else if(t.pushSym && t.pushBy && rolaDir[t.pushSym]) parts.push(`Avanzó a ${base} con la rola ${rolaDir[t.pushSym]} de ${t.pushBy}.`);
           else parts.push(`Avanzó a ${base}.`);
           k++;
         }
@@ -4611,6 +4631,8 @@ function narratePlay(team,pidx,inn){
       else if(t4&&t4.letra==='WP') parts.push('Anotó por wild pitch.');
       else if(t4&&t4.letra==='PB') parts.push('Anotó por passed ball.');
       else if(t4&&t4.letra==='BK') parts.push('Anotó por balk.');
+      // Fase 3: anotó empujado por out/rola del bateador (pushSym+pushBy en el tramo a home).
+      else if(t4&&t4.pushSym&&t4.pushBy&&rolaDir[t4.pushSym]) parts.push(`Anotó con la rola ${rolaDir[t4.pushSym]} de ${t4.pushBy}.`);
       else parts.push(p.earned===false ? 'Anotó carrera sucia.' : 'Anotó carrera limpia.');
     } else if(p.runnerOut){
       const bn={2:'segunda',3:'tercera',4:'home'};
