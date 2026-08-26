@@ -1581,6 +1581,10 @@ function refreshActiveBatterLock(){
 
 // ─── SELECCIÓN DE CELDA ───────────────────────────────────
 let selCell=null;
+// Timer del HISTORIAL diferido de corredor vivo: el clic simple lo programa (~260ms)
+// y el doble clic (mover) lo cancela en su primera línea, para que el modal de
+// narrativa no parpadee al hacer doble clic. Compartido (una sola pendiente a la vez).
+let _runnerHistTimer=null;
 function selectCell(team,pidx,inn,td,trusted){
   const existingPl=gs.plays[team]?.[pidx]?.[inn];
   const isLiveRunner=existingPl &&
@@ -1601,6 +1605,15 @@ function selectCell(team,pidx,inn,td,trusted){
     if(gs.activeBatter && gs.activeBatter.team!==team) gs.activeBatter=null;
     renderGameState();
     updateBatterCountBadge();
+    // HISTORIAL diferido: además de seleccionar (arriba, intacto), abrir el modal
+    // de narrativa read-only ~260ms después. Solo en clics de usuario (!trusted): las
+    // llamadas programáticas (undo, auto-avance, arranque) no deben abrir el modal.
+    // El clearTimeout antes de reprogramar evita timers huérfanos (el doble clic
+    // dispara dos onclick seguidos); handleCellDblClick lo cancela para no parpadear.
+    if(!trusted){
+      clearTimeout(_runnerHistTimer);
+      _runnerHistTimer=setTimeout(()=>showNarrativeModal(team,pidx,inn),260);
+    }
     return; // NO resetear pitchAB
   }
 
@@ -1678,6 +1691,9 @@ function openModalForSelected(){
 }
 
 function handleCellDblClick(team,pidx,inn){
+  // Cancela el HISTORIAL diferido que el/los clic(s) simple(s) del doble clic
+  // hayan programado: así el modal de narrativa NO parpadea al mover el corredor.
+  clearTimeout(_runnerHistTimer);
   const pl=gs.plays[team]?.[pidx]?.[inn];
   const isLiveRunner=pl&&pl.type!=='out'&&pl.type!=='clear'&&!pl.scored&&!pl.runnerOut;
   if(isLiveRunner){ showRunnerModal(team,pidx,inn); return; }
