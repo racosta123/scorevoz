@@ -1442,7 +1442,13 @@ function drawDiamond(play){
       if(t){
         const a=SEG[k][0], b=SEG[k][1], mid=SEG[k][2];
         let col=TRAMO_COL[t.color]||'#8fa3b7';
-        if(isOut && (rob==null || k>=rob)) col=outCol;
+        // B1 Fase 2: NO repintar de rojo una LLEGADA "hecho consumado" inequívoca que
+        // quedó en la base del out. El out ya se comunica por el punto rojo [~1481] y el
+        // anillo [~1500], que no dependen del color del tramo. Alcance ESTRECHO: solo el
+        // robo (RB) y los embases por pitcheo (WP/PB/BK). El empuje por hit (verde) NO
+        // entra: se repinta rojo como hoy. El resto (OR/gris/FC/OF…) también sigue rojo.
+        const LLEGADA=['RB','WP','PB','BK'];
+        if(isOut && (rob==null || k>=rob) && !LLEGADA.includes(t.letra)) col=outCol;
         s+=base(a,b,col,2.5);
         if(t.letra) s+=`<text x="${mid[0]}" y="${mid[1]}" text-anchor="middle" dominant-baseline="central" font-size="6" font-weight="700" fill="${col}" stroke="#0b1420" stroke-width="1.4" paint-order="stroke" style="pointer-events:none">${t.letra}</text>`;
       } else {
@@ -1919,7 +1925,11 @@ function applyRunnerMove(team,pidx,inn,action){
     // ── OUTS de corredor con tramo ROJO + letra (#4) ──
     case 'or':   // Out en revire / pickoff: out en su base ACTUAL
       pl.runnerOut=true; pl.runnerOutBase=pl.bases; pl.runnerOutSym='PO';
-      recordTramo(pl,pl.bases,'OR','rojo'); showToast('Out en revire (OR)'); break;
+      // B1 Fase 1: el out ya vive en runnerOut/runnerOutBase/runnerOutSym; NO pisar
+      // una llegada previa (RB/WP/PB/BK/verde) grabada en esta misma base. Solo se
+      // graba OR si la base está vacía (caso normal sin llegada previa).
+      if(!pl.tramos || !pl.tramos[pl.bases]) recordTramo(pl,pl.bases,'OR','rojo');
+      showToast('Out en revire (OR)'); break;
     case 'tt': { // Tira y tira / rundown: lo sacan al avanzar (base siguiente)
       const ob=Math.min((pl.bases||1)+1,4);
       pl.runnerOut=true; pl.runnerOutBase=ob; pl.runnerOutSym='RD';
@@ -4525,7 +4535,21 @@ function narratePlay(team,pidx,inn){
       let k=2;
       while(k<=4){
         const t=p.tramos[k];
-        if(!t || k===termK || (t.color==='verde' && !t.por)){ k++; continue; }
+        if(!t || k===termK || (t.color==='verde' && !t.por)){
+          // B1 Fase 3: la base TERMINAL normalmente no se narra aquí (la cubre el bloque
+          // runnerOut de abajo). EXCEPCIÓN: si al corredor lo pusieron out en una base a la
+          // que había LLEGADO por robo/embase (RB/SB/WP/PB/BK), narra esa llegada ANTES de
+          // saltar → "Robó Xª. Fue puesto out en Xª…". Un 'OR'/gris/verde terminal NO narra
+          // llegada (queda como hoy). No toca la rama del impulsor ni ERROR 1/2.
+          if(t && k===termK && p.runnerOut && bn[k]){
+            const Lt=t.letra;
+            if(Lt==='SB'||Lt==='RB') parts.push(`Robó ${bn[k]}.`);
+            else if(Lt==='WP') parts.push(`Avanzó a ${bn[k]} por wild pitch.`);
+            else if(Lt==='PB') parts.push(`Avanzó a ${bn[k]} por passed ball.`);
+            else if(Lt==='BK') parts.push(`Avanzó a ${bn[k]} por balk.`);
+          }
+          k++; continue;
+        }
         const L=t.letra; const tipoHit=tipoHitMap[L];
         if(tipoHit && t.por){
           // HIT con impulsor: agrupar tramos consecutivos con mismo .por y misma .letra
