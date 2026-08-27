@@ -467,7 +467,7 @@
       <div class="pitcher-section-label">⚾ PITCHER ABRIDOR</div>
       <div class="pitcher-row-wrap">
         <input class="player-input" id="pit-v" placeholder="Nombre del pitcher abridor" maxlength="25" style="flex:1">
-        <select id="pit-v-limit" title="Límite de lanzamientos" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.7rem;padding:6px 4px;flex-shrink:0">
+        <select id="pit-v-limit" title="Límite del partido (rige para todos los pitchers)" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.7rem;padding:6px 4px;flex-shrink:0">
           <option value="">Sin límite</option>
           <option value="50">50</option>
           <option value="65">65</option>
@@ -498,7 +498,7 @@
       <div class="pitcher-section-label">⚾ PITCHER ABRIDOR</div>
       <div class="pitcher-row-wrap">
         <input class="player-input" id="pit-l" placeholder="Nombre del pitcher abridor" maxlength="25" style="flex:1">
-        <select id="pit-l-limit" title="Límite de lanzamientos" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.7rem;padding:6px 4px;flex-shrink:0">
+        <select id="pit-l-limit" title="Límite del partido (rige para todos los pitchers)" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.7rem;padding:6px 4px;flex-shrink:0">
           <option value="">Sin límite</option>
           <option value="50">50</option>
           <option value="65">65</option>
@@ -3418,7 +3418,7 @@ function renderCambioPitFields(){
     <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
       <input class="player-input" id="pit-cambio-input" placeholder="Nombre del relevista" maxlength="25" style="flex:1">
       <select id="pit-cambio-limit" title="Límite de lanzamientos" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.7rem;padding:6px 4px;flex-shrink:0">
-        <option value="">Sin límite</option>
+        <option value="">Heredar del partido</option>
         <option value="50">50</option>
         <option value="65">65</option>
         <option value="75">75</option>
@@ -3531,7 +3531,11 @@ function applyCambioPitcher(inn){
   if(limitSel && limitSel.value!==''){
     gs.pitcherLimits[pitCambioTeam][newIdx]=parseInt(limitSel.value,10);
   } else {
-    delete gs.pitcherLimits[pitCambioTeam][newIdx];
+    // Vacío = HEREDAR el límite del partido (el del abridor, índice 0). Solo se
+    // deja sin límite si el partido tampoco tiene uno ([0] undefined).
+    const heredado = gs.pitcherLimits[pitCambioTeam][0];
+    if(heredado!==undefined) gs.pitcherLimits[pitCambioTeam][newIdx]=heredado;
+    else delete gs.pitcherLimits[pitCambioTeam][newIdx];
   }
   updatePitchCounterUI();
   closeModal();
