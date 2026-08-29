@@ -216,6 +216,7 @@
   .pitch-box { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:8px 14px; display:flex; align-items:center; gap:8px; flex:1; min-width:240px; }
   .pitch-pitcher-name { font-family:'Oswald',sans-serif; font-size:0.82rem; color:#00bfff; letter-spacing:1px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px; }
   .pitch-total { font-family:'Bebas Neue',sans-serif; font-size:2.6rem; color:#fff; line-height:1; min-width:44px; text-align:center; font-weight:900; }
+  .pitch-remain { font-family:'Bebas Neue',sans-serif; font-size:2.6rem; color:var(--green); line-height:1; min-width:44px; text-align:center; font-weight:900; }
   .pitch-sbf { font-size:0.62rem; color:#fff; line-height:1.9; }
   .btn-pc { border-radius:10px; font-family:'Bebas Neue',sans-serif; font-size:1rem; padding:5px 11px; cursor:pointer; letter-spacing:1px; transition:all .15s; }
   .btn-pc-s    { background:rgba(255,77,103,.12); border:1px solid #ff4d67; color:#ff4d67; }
@@ -536,6 +537,7 @@
       <div class="pitch-box">
         <div style="min-width:0"><div style="font-size:0.58rem;color:var(--text-dim);letter-spacing:1px;font-family:'Oswald'">VISITANTE</div><div class="pitch-pitcher-name" id="pc-name-v">—</div></div>
         <div class="pitch-total" id="pc-total-v">0</div>
+        <div class="pitch-remain" id="pc-remain-v" title="Pitcheos restantes" style="display:none"></div>
         <div class="pitch-sbf" id="pc-sbf-v">S: 0<br>B: 0<br>F: 0</div>
         <button class="btn-pc btn-pc-s" id="pc-btn-s-v" onclick="pitchBtn('strikes')">S</button>
         <button class="btn-pc btn-pc-b" id="pc-btn-b-v" onclick="pitchBtn('balls')">B</button>
@@ -545,6 +547,7 @@
       <div class="pitch-box">
         <div style="min-width:0"><div style="font-size:0.58rem;color:var(--text-dim);letter-spacing:1px;font-family:'Oswald'">LOCAL</div><div class="pitch-pitcher-name" id="pc-name-l">—</div></div>
         <div class="pitch-total" id="pc-total-l">0</div>
+        <div class="pitch-remain" id="pc-remain-l" title="Pitcheos restantes" style="display:none"></div>
         <div class="pitch-sbf" id="pc-sbf-l">S: 0<br>B: 0<br>F: 0</div>
         <button class="btn-pc btn-pc-s" id="pc-btn-s-l" onclick="pitchBtn('strikes')">S</button>
         <button class="btn-pc btn-pc-b" id="pc-btn-b-l" onclick="pitchBtn('balls')">B</button>
@@ -4074,6 +4077,21 @@ function updatePitchCounterUI(){
     const pc=gs.pitchCount[t==='v'?'l':'v'];
     const el=document.getElementById(`pc-total-${t}`);
     if(el) el.textContent=pc.total;
+    // "Quedan" = límite del pitcher ACTUAL de t − lo que lleva. Índice del pitcher
+    // actual = nº de cambios ya hechos (0=abridor, 1=1er relevo…). Misma lógica que
+    // la ficha (~6593): restantes = max(0, límite − total). Sin límite → se oculta.
+    const curIdx=(gs.pitcherChanges?.[t]||[]).length;
+    const limit=gs.pitcherLimits[t]?.[curIdx];
+    const rem=document.getElementById(`pc-remain-${t}`);
+    if(rem){
+      if(limit===undefined||limit===null){
+        rem.style.display='none';
+        rem.textContent='';
+      } else {
+        rem.textContent=Math.max(0,limit-pc.total);
+        rem.style.display='';
+      }
+    }
     const sb=document.getElementById(`pc-sbf-${t}`);
     if(sb) sb.innerHTML=`S: ${pc.strikes}<br>B: ${pc.balls}<br>F: ${pc.fouls}`;
     const pn=document.getElementById(`pc-name-${t}`);
