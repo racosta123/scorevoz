@@ -222,6 +222,9 @@
      clases lo sobreescriben. Sin parpadeo ni pitido (eso es Fase 3). */
   .pitch-remain.pr-amber { color:var(--amber); }
   .pitch-remain.pr-red   { color:var(--red); }
+  /* Fase 3-A: quedan <=5 → el número (ya en rojo) PARPADEA. Solo visual, sin pitido. */
+  @keyframes pitch-remain-flash { 0%,100%{opacity:1} 50%{opacity:.2} }
+  .pitch-remain.pr-flash { animation:pitch-remain-flash .8s ease-in-out infinite; }
   .pitch-sbf { font-size:0.62rem; color:#fff; line-height:1.9; }
   .btn-pc { border-radius:10px; font-family:'Bebas Neue',sans-serif; font-size:1rem; padding:5px 11px; cursor:pointer; letter-spacing:1px; transition:all .15s; }
   .btn-pc-s    { background:rgba(255,77,103,.12); border:1px solid #ff4d67; color:#ff4d67; }
@@ -4076,17 +4079,20 @@ function updatePitchCounterUI(){
       if(limit===undefined||limit===null){
         rem.style.display='none';
         rem.textContent='';
-        rem.classList.remove('pr-amber','pr-red');
+        rem.classList.remove('pr-amber','pr-red','pr-flash');
       } else {
         const quedan=Math.max(0,limit-pc.total);
         rem.textContent=quedan;
         rem.style.display='';
         // Fase 2: color de alerta segun umbrales. >15 verde (base), <=15 y >10
         // amarillo, <=10 rojo (incluye 0 = pasado del limite). Solo color; nunca
-        // bloquea el conteo. Parpadeo/pitido = Fase 3.
-        rem.classList.remove('pr-amber','pr-red');
+        // bloquea el conteo.
+        rem.classList.remove('pr-amber','pr-red','pr-flash');
         if(quedan<=10)      rem.classList.add('pr-red');
         else if(quedan<=15) rem.classList.add('pr-amber');
+        // Fase 3-A: quedan <=5 → además del rojo, PARPADEA (sigue parpadeando en 0 =
+        // pasado del limite). Sin pitido (eso es Fase 3-B).
+        if(quedan<=5) rem.classList.add('pr-flash');
       }
     }
     const sb=document.getElementById(`pc-sbf-${t}`);
