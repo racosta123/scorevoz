@@ -1155,6 +1155,9 @@ function startGame(){
   // y todos los pitchers. Vacío = null (sin límite, adultos).
   const _mpl=document.getElementById('match-limit');
   gs.matchPitchLimit = (_mpl && _mpl.value!=='') ? parseInt(_mpl.value,10) : null;
+  // Fase 3-B (Paso 1): desbloquear el audio DENTRO de este gesto (click de "Iniciar
+  // juego") para que la sirena pueda sonar el resto de la sesión sin trabas de autoplay.
+  wakeSirenAudio();
   gs.currentBatter = { v:0, l:0 };
   gs.playHistory = [];
   gs.seq = 0;
@@ -3897,8 +3900,82 @@ function updateBattingTeamButtons(){
 // Los botones S/B/F y deshacer del HUD enrutan SIEMPRE al bateador real, sin
 // importar en qué panel físico estén (viven en el panel del pitcher). Así el
 // conteo y el ponche/base automáticos siguen ligados al bateador correcto.
-function pitchBtn(type){ if(!gs.activeBatter) return; addPitch(gs.activeBatter.team, type); }
+function pitchBtn(type){
+  if(!gs.activeBatter) return;
+  const team=gs.activeBatter.team;   // equipo que BATEA; el pitcher que lanza es el panel contrario
+  addPitch(team, type);
+  // Fase 3-B (Paso 1): sirena si el pitcher que acaba de lanzar quedó con quedan<=5.
+  // Solo por TOQUE de S/B/F (este handler). El conteo del pitcher vive en gs.pitchCount[team]
+  // (ya actualizado por addPitch). Sin límite (matchPitchLimit null) → nunca suena. No bloquea.
+  if(gs.matchPitchLimit!=null){
+    const quedan=Math.max(0, gs.matchPitchLimit - gs.pitchCount[team].total);
+    if(quedan<=5) playSirena();
+  }
+}
 function undoPitchBtn(){ if(!gs.activeBatter) return; undoPitch(gs.activeBatter.team); }
+
+// ─── SIRENA DE ALERTA (Fase 3-B, Paso 1) ───────────────────
+// "Wee-ooo" suave con Web Audio API (sin archivos) cuando un pitcher marca una
+// pichada por TOQUE con quedan<=5. Nunca bloquea marcar; falla en silencio si no
+// hay audio. Callar (botón) y voz son pasos siguientes.
+const SIREN_VOLUME   = 0.06;  // pico de ganancia (0..1). BAJO = discreto.
+const SIREN_FREQ_LO  = 600;   // Hz — tono grave del ciclo
+const SIREN_FREQ_HI  = 900;   // Hz — tono agudo del ciclo
+const SIREN_CYCLE_MS = 700;   // ms — duración de un "wee-ooo" (sube y baja)
+let sirenCtx=null;            // AudioContext único de la sesión
+let sirenCurrent=null;        // { osc, gain } de la sirena sonando (para cortar solape)
+
+// Despierta/desbloquea el audio DENTRO de un gesto de usuario (startGame).
+function wakeSirenAudio(){
+  try{
+    if(!sirenCtx){
+      const AC=window.AudioContext||window.webkitAudioContext;
+      if(!AC) return;
+      sirenCtx=new AC();
+    }
+    if(sirenCtx.state==='suspended') sirenCtx.resume();
+  }catch(e){ /* audio no disponible: nunca romper el juego */ }
+}
+
+// Corta cualquier sirena en curso (anti-solape al marcar rápido).
+function stopSirena(){
+  if(!sirenCurrent) return;
+  try{
+    const now=sirenCtx.currentTime;
+    sirenCurrent.gain.gain.cancelScheduledValues(now);
+    sirenCurrent.gain.gain.setValueAtTime(0, now);
+    sirenCurrent.osc.stop(now);
+    sirenCurrent.osc.disconnect(); sirenCurrent.gain.disconnect();
+  }catch(e){}
+  sirenCurrent=null;
+}
+
+// Reproduce un "wee-ooo" suave. Requiere sirenCtx ya despierto (startGame).
+function playSirena(){
+  if(!sirenCtx || sirenCtx.state!=='running') return; // sin gesto previo: no suena
+  stopSirena();                                       // cortar la anterior antes de sonar
+  try{
+    const now=sirenCtx.currentTime;
+    const dur=SIREN_CYCLE_MS/1000;
+    const osc=sirenCtx.createOscillator();
+    const gain=sirenCtx.createGain();
+    osc.type='sine';
+    // Frecuencia: sube LO→HI y baja HI→LO (el "wee-ooo").
+    osc.frequency.setValueAtTime(SIREN_FREQ_LO, now);
+    osc.frequency.linearRampToValueAtTime(SIREN_FREQ_HI, now+dur/2);
+    osc.frequency.linearRampToValueAtTime(SIREN_FREQ_LO, now+dur);
+    // Envolvente: ataque/relajación cortos para evitar clicks.
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(SIREN_VOLUME, now+0.03);
+    gain.gain.setValueAtTime(SIREN_VOLUME, now+dur-0.05);
+    gain.gain.linearRampToValueAtTime(0, now+dur);
+    osc.connect(gain); gain.connect(sirenCtx.destination);
+    sirenCurrent={osc,gain};
+    osc.onended=()=>{ if(sirenCurrent && sirenCurrent.osc===osc) sirenCurrent=null; };
+    osc.start(now);
+    osc.stop(now+dur);
+  }catch(e){ /* nunca romper el juego por audio */ }
+}
 
 // ─── CONTADOR DE LANZAMIENTOS ──────────────────────────────
 function addPitch(team,type){
