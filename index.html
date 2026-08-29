@@ -458,6 +458,21 @@
 <div id="setup-screen">
   <div class="setup-title">⚾ NUEVA ANOTACIÓN</div>
   <div class="setup-sub">INGRESA EQUIPOS Y ALINEACIONES</div>
+  <!-- LÍMITE ÚNICO DEL PARTIDO (Fase 2): un solo campo, aplica a AMBOS equipos y todos
+       los pitchers. Reemplaza los dos campos por-equipo — imposible poner números distintos. -->
+  <div class="match-limit-row" style="display:flex;align-items:center;gap:10px;justify-content:center;background:rgba(0,229,153,.06);border:1px solid rgba(0,229,153,.22);border-radius:12px;padding:11px 16px;margin:0 auto 14px;max-width:520px;flex-wrap:wrap">
+    <label for="match-limit" style="font-family:'Oswald',sans-serif;font-size:0.82rem;letter-spacing:1px;color:var(--green)">⚾ LÍMITE DE PITCHEOS DEL PARTIDO</label>
+    <select id="match-limit" title="Límite único del partido — rige para ambos equipos y todos los pitchers" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.8rem;padding:6px 10px;flex-shrink:0">
+      <option value="">Sin límite</option>
+      <option value="50">50</option>
+      <option value="65">65</option>
+      <option value="75">75</option>
+      <option value="80">80</option>
+      <option value="85">85</option>
+      <option value="95">95</option>
+      <option value="105">105</option>
+    </select>
+  </div>
   <div class="team-setup">
     <h3><span style="color:var(--blue)">▶ VISITANTE</span></h3>
     <div class="team-name-row">
@@ -472,15 +487,6 @@
       <div class="pitcher-section-label">⚾ PITCHER ABRIDOR</div>
       <div class="pitcher-row-wrap">
         <input class="player-input" id="pit-v" placeholder="Nombre del pitcher abridor" maxlength="25" style="flex:1">
-        <select id="pit-v-limit" title="Límite del partido (rige para todos los pitchers)" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.7rem;padding:6px 4px;flex-shrink:0">
-          <option value="">Sin límite</option>
-          <option value="50">50</option>
-          <option value="65">65</option>
-          <option value="75">75</option>
-          <option value="85">85</option>
-          <option value="95">95</option>
-          <option value="105">105</option>
-        </select>
         <button class="pitcher-batea-toggle" id="pitbt-v" onclick="togglePitcherBatea('v',this)" title="Pitcher que también batea (tipo Ohtani)">¿BATEA?</button>
         <button class="setup-mic-row" id="pitmb-v"
           onmousedown="pitcherPttStart('v',event)" onmouseup="pitcherPttEnd(event)"
@@ -503,15 +509,6 @@
       <div class="pitcher-section-label">⚾ PITCHER ABRIDOR</div>
       <div class="pitcher-row-wrap">
         <input class="player-input" id="pit-l" placeholder="Nombre del pitcher abridor" maxlength="25" style="flex:1">
-        <select id="pit-l-limit" title="Límite del partido (rige para todos los pitchers)" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.7rem;padding:6px 4px;flex-shrink:0">
-          <option value="">Sin límite</option>
-          <option value="50">50</option>
-          <option value="65">65</option>
-          <option value="75">75</option>
-          <option value="85">85</option>
-          <option value="95">95</option>
-          <option value="105">105</option>
-        </select>
         <button class="pitcher-batea-toggle" id="pitbt-l" onclick="togglePitcherBatea('l',this)" title="Pitcher que también batea (tipo Ohtani)">¿BATEA?</button>
         <button class="setup-mic-row" id="pitmb-l"
           onmousedown="pitcherPttStart('l',event)" onmouseup="pitcherPttEnd(event)"
@@ -1142,27 +1139,18 @@ function startGame(){
     const pitBatea=document.getElementById(`pitbt-${t}`).classList.contains('active');
     gs.pitcher[t]={name:pitName||'PITCHER',batea:pitBatea};
     gs.pitcherChanges[t]=[];
-    gs.pitcherLimits[t]={};
-    // Límite del abridor = posición 0, misma indexación que buildPitcherReport/getPitchStints
-    const pitLimitSel=document.getElementById(`pit-${t}-limit`);
-    if(pitLimitSel && pitLimitSel.value!==''){
-      gs.pitcherLimits[t][0]=parseInt(pitLimitSel.value,10);
-    }
+    gs.pitcherLimits[t]={}; // legado: se deja vacío. El límite ya NO se captura por-equipo
+                            // aquí; la fuente única es gs.matchPitchLimit (abajo, tras el loop).
     if(pitBatea&&pitName){
       const idx=pl.length;
       pl.push({name:pitName,pos:'P',bat:idx+1});
       gs.plays[t][idx]={};
     }
   });
-  // LÍMITE ÚNICO DEL PARTIDO (Fase 1). Provisional: se llena de los DOS campos viejos
-  // del lineup (visitante manda; si vacío, local; si ninguno, null). La captura con un
-  // solo campo "Límite del partido" es Fase 2. gs.pitcherLimits[t][0] se sigue llenando
-  // arriba como legado hasta la limpieza de Fase 2-3.
-  const _mplV=document.getElementById('pit-v-limit');
-  const _mplL=document.getElementById('pit-l-limit');
-  gs.matchPitchLimit = (_mplV && _mplV.value!=='') ? parseInt(_mplV.value,10)
-                     : (_mplL && _mplL.value!=='') ? parseInt(_mplL.value,10)
-                     : null;
+  // LÍMITE ÚNICO DEL PARTIDO (Fase 2): un solo campo del lineup, aplica a ambos equipos
+  // y todos los pitchers. Vacío = null (sin límite, adultos).
+  const _mpl=document.getElementById('match-limit');
+  gs.matchPitchLimit = (_mpl && _mpl.value!=='') ? parseInt(_mpl.value,10) : null;
   gs.currentBatter = { v:0, l:0 };
   gs.playHistory = [];
   gs.seq = 0;
@@ -3433,22 +3421,18 @@ function renderCambioPitFields(){
       histHTML+=`<div style="font-size:0.68rem;padding:3px 0;color:var(--text-dim);border-bottom:1px solid rgba(255,255,255,.06)"><span style="color:#fff;font-weight:600">${ch.outName}</span> — E${ch.inn} · ${ch.pitches.total} lanz (${ch.pitches.strikes}S ${ch.pitches.balls}B ${ch.pitches.fouls}F)<br><span style="font-size:0.58rem;color:var(--blue)">${iDetail||'sin desglose'}</span></div>`;
     });
   }
+  // LÍMITE ÚNICO DEL PARTIDO (Fase 2): ya no hay override por relevista. Solo texto
+  // informativo — el relevista SIEMPRE usa gs.matchPitchLimit.
+  const _mpl=gs.matchPitchLimit;
+  const limitInfoHTML=`<div style="margin-top:6px;font-size:0.72rem;font-family:'Oswald',sans-serif;letter-spacing:.5px;color:var(--green)">Límite del partido: <strong style="color:#fff">${(_mpl===null||_mpl===undefined)?'Sin límite':_mpl}</strong></div>`;
   fieldsDiv.innerHTML=`
     <div class="modal-section" style="margin-top:10px">SALE — ${curName||'Pitcher actual'}</div>
     ${innHTML}
     <div class="modal-section" style="margin-top:4px">ENTRA — ENTRADA ${inn}</div>
     ${histHTML}
+    ${limitInfoHTML}
     <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
       <input class="player-input" id="pit-cambio-input" placeholder="Nombre del relevista" maxlength="25" style="flex:1">
-      <select id="pit-cambio-limit" title="Límite de lanzamientos" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.7rem;padding:6px 4px;flex-shrink:0">
-        <option value="">Heredar del partido</option>
-        <option value="50">50</option>
-        <option value="65">65</option>
-        <option value="75">75</option>
-        <option value="85">85</option>
-        <option value="95">95</option>
-        <option value="105">105</option>
-      </select>
       <button class="setup-mic-row" id="pit-cambio-mic"
         onmousedown="pitCambioMicStart(event)" onmouseup="pitCambioMicEnd(event)"
         ontouchstart="pitCambioMicStart(event)" ontouchend="pitCambioMicEnd(event)"
@@ -3460,9 +3444,9 @@ function renderCambioPitFields(){
 }
 
 // Deshace el ÚLTIMO cambio de pitcher del equipo dado (Opción A): quita la última
-// entrada de gs.pitcherChanges[team], restaura el conteo de lanzamientos del lado que
-// batea desde el snapshot archivado, y borra el límite que ese cambio fijó. No toca
-// el otro equipo, ni gs.plays, ni el abridor (gs.pitcher). Independiente de undoLastPlay.
+// entrada de gs.pitcherChanges[team] y restaura el conteo de lanzamientos del lado que
+// batea desde el snapshot archivado. No toca el otro equipo, ni gs.plays, ni el abridor
+// (gs.pitcher). El límite es único del partido (gs.matchPitchLimit), no se toca aquí.
 function undoLastPitcherChange(team){
   const changes=gs.pitcherChanges[team];
   if(!changes||!changes.length){ showToast('No hay cambios de pitcher que deshacer para este equipo',true); return; }
@@ -3480,10 +3464,8 @@ function undoLastPitcherChange(team){
     balls:rp.balls||0, fouls:rp.fouls||0,
     inningLog:{...(removed.inningLog||{})}
   };
-  // Borrar el límite que ESTE cambio fijó: newIdx = changes.length+1 con el length YA
-  // reducido por el pop (mismo valor que tenía al crearse, ver applyCambioPitcher ~3486).
-  const newIdx=changes.length+1;
-  if(gs.pitcherLimits[team]) delete gs.pitcherLimits[team][newIdx];
+  // LÍMITE ÚNICO DEL PARTIDO (Fase 2): ya no hay límite por-índice que borrar al deshacer;
+  // el límite es gs.matchPitchLimit y no cambia con los relevos.
   updatePitchCounterUI();
   renderCambioPitFields();
   const curName=changes.length?changes[changes.length-1].inName:(gs.pitcher[team].name||'abridor');
@@ -3534,11 +3516,6 @@ function applyCambioPitcher(inn){
   // si no la instantánea sale en cero y el conteo del entrante nunca arranca limpio.
   const battingSide=pitCambioTeam==='v'?'l':'v';
   const pc=gs.pitchCount[battingSide];
-  // Posición del pitcher que ENTRA en buildPitcherReport/getPitchStints:
-  // stints[0]=abridor, stints[1]=changes[0], stints[2]=changes[1]... por eso
-  // es "número de cambios que ya había antes de este" + 1 (se calcula ANTES
-  // de hacer el push de abajo, con el mismo `changes.length` de la línea de outName).
-  const newIdx=changes.length+1;
   // Outs que había en la entrada al momento del cambio (0-2). Se cuentan sobre
   // el equipo que BATEA (battingSide). Guardado para uso futuro (reparto de IP
   // a media entrada). FASE 1: solo captura, no altera ningún cálculo actual.
@@ -3549,10 +3526,9 @@ function applyCambioPitcher(inn){
   const seqAtChange=gs.seq||0;
   gs.pitcherChanges[pitCambioTeam].push({inn,inName,outName,outsAtChange,seqAtChange,pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},inningLog:{...pc.inningLog}});
   gs.pitchCount[battingSide]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
-  // LÍMITE ÚNICO DEL PARTIDO (Fase 1): el relevista NO fija ni hereda límite propio —
-  // todos los pitchers leen gs.matchPitchLimit. Ya no se escribe gs.pitcherLimits por
-  // índice. El select del modal (pit-cambio-limit) queda inerte hasta que se elimine
-  // en Fase 2. (Antes, 230be43: heredaba de [0] u override por relevista.)
+  // LÍMITE ÚNICO DEL PARTIDO (Fase 2): el relevista NO fija ni hereda límite propio —
+  // todos los pitchers leen gs.matchPitchLimit. Ya no existe el select de override en el
+  // modal (solo texto informativo). (Antes, 230be43: heredaba de [0] u override.)
   updatePitchCounterUI();
   closeModal();
   showToast(`✓ E${inn}: sale ${outName} (${pc.total} lanz) — entra ${inName}`);
