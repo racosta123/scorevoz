@@ -667,6 +667,7 @@ let gs = {
   pitcher:{ v:{name:'',batea:false}, l:{name:'',batea:false} },
   pitcherChanges:{ v:[], l:[] },
   pitcherLimits:{ v:{}, l:{} }, // { [idx]: numero } — limite de lanzamientos por POSICION de pitcher (indice de buildPitcherReport/getPitchStints), nunca por nombre
+  matchPitchLimit:null, // LIMITE UNICO DEL PARTIDO (numero) o null = sin limite. Igual para ambos equipos y todos los pitchers. Fuente unica de verdad (Fase 1+). gs.pitcherLimits queda como legado/compat hasta Fase 2-3.
   pitchCount:{ v:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}}, l:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}} },
   pitchAB:{ v:{s:0,b:0,f:0,history:[],undoCount:0}, l:{s:0,b:0,f:0,history:[],undoCount:0} },
   selected:null,
@@ -1153,6 +1154,15 @@ function startGame(){
       gs.plays[t][idx]={};
     }
   });
+  // LÍMITE ÚNICO DEL PARTIDO (Fase 1). Provisional: se llena de los DOS campos viejos
+  // del lineup (visitante manda; si vacío, local; si ninguno, null). La captura con un
+  // solo campo "Límite del partido" es Fase 2. gs.pitcherLimits[t][0] se sigue llenando
+  // arriba como legado hasta la limpieza de Fase 2-3.
+  const _mplV=document.getElementById('pit-v-limit');
+  const _mplL=document.getElementById('pit-l-limit');
+  gs.matchPitchLimit = (_mplV && _mplV.value!=='') ? parseInt(_mplV.value,10)
+                     : (_mplL && _mplL.value!=='') ? parseInt(_mplL.value,10)
+                     : null;
   gs.currentBatter = { v:0, l:0 };
   gs.playHistory = [];
   gs.seq = 0;
@@ -1186,6 +1196,12 @@ function resetLineScoreDOM(){
 
 window.rehydrateGame = function(gsString){
   gs = JSON.parse(gsString);
+  // COMPAT LÍMITE ÚNICO (Fase 1): guardados viejos no traen gs.matchPitchLimit; traían
+  // el límite por-pitcher en gs.pitcherLimits. Derivar el único del partido del abridor
+  // (visitante manda; si no, local) para no perder el dato ni romper. Si nada había → null.
+  if(gs.matchPitchLimit===undefined){
+    gs.matchPitchLimit = gs.pitcherLimits?.v?.[0] ?? gs.pitcherLimits?.l?.[0] ?? null;
+  }
   INNINGS = gs.scores.v.length;          // LA TRAMPA: restaurar ANTES de build*()
   resetLineScoreDOM();
   document.getElementById('setup-screen').style.display='none';
@@ -3533,17 +3549,10 @@ function applyCambioPitcher(inn){
   const seqAtChange=gs.seq||0;
   gs.pitcherChanges[pitCambioTeam].push({inn,inName,outName,outsAtChange,seqAtChange,pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},inningLog:{...pc.inningLog}});
   gs.pitchCount[battingSide]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
-  const limitSel=document.getElementById('pit-cambio-limit');
-  if(!gs.pitcherLimits[pitCambioTeam]) gs.pitcherLimits[pitCambioTeam]={};
-  if(limitSel && limitSel.value!==''){
-    gs.pitcherLimits[pitCambioTeam][newIdx]=parseInt(limitSel.value,10);
-  } else {
-    // Vacío = HEREDAR el límite del partido (el del abridor, índice 0). Solo se
-    // deja sin límite si el partido tampoco tiene uno ([0] undefined).
-    const heredado = gs.pitcherLimits[pitCambioTeam][0];
-    if(heredado!==undefined) gs.pitcherLimits[pitCambioTeam][newIdx]=heredado;
-    else delete gs.pitcherLimits[pitCambioTeam][newIdx];
-  }
+  // LÍMITE ÚNICO DEL PARTIDO (Fase 1): el relevista NO fija ni hereda límite propio —
+  // todos los pitchers leen gs.matchPitchLimit. Ya no se escribe gs.pitcherLimits por
+  // índice. El select del modal (pit-cambio-limit) queda inerte hasta que se elimine
+  // en Fase 2. (Antes, 230be43: heredaba de [0] u override por relevista.)
   updatePitchCounterUI();
   closeModal();
   showToast(`✓ E${inn}: sale ${outName} (${pc.total} lanz) — entra ${inName}`);
@@ -4081,11 +4090,10 @@ function updatePitchCounterUI(){
     const pc=gs.pitchCount[t==='v'?'l':'v'];
     const el=document.getElementById(`pc-total-${t}`);
     if(el) el.textContent=pc.total;
-    // "Quedan" = límite del pitcher ACTUAL de t − lo que lleva. Índice del pitcher
-    // actual = nº de cambios ya hechos (0=abridor, 1=1er relevo…). Misma lógica que
-    // la ficha (~6593): restantes = max(0, límite − total). Sin límite → se oculta.
-    const curIdx=(gs.pitcherChanges?.[t]||[]).length;
-    const limit=gs.pitcherLimits[t]?.[curIdx];
+    // "Quedan" = LIMITE UNICO DEL PARTIDO − lo que lleva. Mismo número para ambos
+    // equipos y todos los pitchers (Fase 1+). restantes = max(0, límite − total).
+    // Sin límite (null/undefined) → se oculta.
+    const limit=gs.matchPitchLimit;
     const rem=document.getElementById(`pc-remain-${t}`);
     if(rem){
       if(limit===undefined||limit===null){
@@ -6731,7 +6739,7 @@ async function renderPitcherFichaFinal(team,idx){
   const teamColor=team==='v'?'#1d4ed8':'#0d9f6e';
   const helmetSrc=team==='v'?'img/casco-vis.webp':'img/casco-loc.webp';
   const today=new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  const limit=gs.pitcherLimits[team]?.[idx];
+  const limit=gs.matchPitchLimit; // LIMITE UNICO DEL PARTIDO — igual para todo pitcher (Fase 1+)
 
   const container=document.getElementById('pitcher-ficha-final');
   container.innerHTML=ptfBuildHTML({teamName,teamColor,helmetSrc,pitcherName:stats.nombre,entradaEntro:stats.entradaEntro,stats,today,limit});
