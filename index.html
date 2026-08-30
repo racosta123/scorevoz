@@ -2704,6 +2704,22 @@ function applyPlay(team,pidx,inn,play){
   // Se estampa SOLO al crear el objeto de jugada — nunca se re-estampa cuando
   // una jugada ya existente solo se muta después (score(), applyRunnerMove()).
   gs.seq=(gs.seq||0)+1;
+  // FASE A (corrección de tipo — infra de respaldo): al aplicar una jugada NUEVA del
+  // bateador, fotografiar (deep-copy) el estado de los corredores VIVOS de la entrada
+  // JUSTO ANTES de moverlos, para poder restaurarlos si luego se corrige el tipo (Fase B).
+  // Se usa el MISMO set que advanceRunners va a mutar (computeBaseState → ocupantes 1ª/2ª/3ª),
+  // así la foto contiene exactamente a quienes la jugada podría mover. Deep-copy vía JSON:
+  // los objetos de jugada son datos planos (sin funciones ni ciclos), así que quedan
+  // desligados por completo — mutar al corredor después NO altera la foto. Solo en jugada
+  // NUEVA: en una CORRECCIÓN (hasExistingPlay) NO se re-fotografía, la foto original
+  // sobrevive. Campo aditivo: nadie lo lee aún; viaja en gs → se persiste solo.
+  let _preState=null;
+  if(!hasExistingPlay){
+    const stPrev=computeBaseState(team,inn,pidx);
+    _preState=[stPrev.first,stPrev.second,stPrev.third]
+      .filter(Boolean)
+      .map(r=>({pidx:r.pidx, key:r.key, base:r.play.bases, play:JSON.parse(JSON.stringify(r.play))}));
+  }
   // Pelota bateada: sumar 1 lanzamiento (strike) al pitcher antes de procesar la jugada.
   // Solo en jugada NUEVA — al CORREGIR una jugada ya registrada (hasExistingPlay) el
   // lanzamiento ya se contó al marcarla; reclasificar el resultado no cambia cuántos
@@ -2752,6 +2768,10 @@ function applyPlay(team,pidx,inn,play){
     const wLetra=(play.sym==='BG')?'GP':'BB'; // BG = golpeado (HBP) → GP; resto → BB
     recordTramo(_plHit,1,wLetra,'cian');
   }
+  // Adjuntar la foto de respaldo al objeto RECIÉN creado del bateador (existe en todas
+  // las ramas: score/SBH/else). Solo jugada nueva (_preState≠null). Se hace ANTES de
+  // advanceRunners para que la foto refleje el estado previo puro. Fase B la leerá.
+  if(_preState) gs.plays[team][pidx][inn]._preState=_preState;
   const runSummary=advanceRunners(team,pidx,inn,play);
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
