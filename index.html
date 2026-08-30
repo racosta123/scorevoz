@@ -2720,6 +2720,35 @@ function applyPlay(team,pidx,inn,play){
       .filter(Boolean)
       .map(r=>({pidx:r.pidx, key:r.key, base:r.play.bases, play:JSON.parse(JSON.stringify(r.play))}));
   }
+  // FASE B (corrección de tipo): al CORREGIR una jugada ya registrada, antes de re-crear
+  // la celda del bateador (abajo) hay que rescatar su foto _preState —la celda se re-crea
+  // y se perdería— y RESTAURAR a los corredores a la posición que tenían ANTES de la jugada
+  // errónea, para que el nuevo tipo se aplique desde un estado limpio (un fly out no los
+  // mueve; un hit sí). El reacomodo por tag-up lo hace el anotador a mano con el menú de
+  // corredores; aquí NO se automatiza.
+  let _restoreState=null;
+  if(hasExistingPlay){
+    _restoreState=(gs.plays[team][pidx][inn]||{})._preState||null;
+    if(!_restoreState){
+      // DEGRADACIÓN (partidos previos a la Fase A, sin foto): no restaurar a ciegas. Si hay
+      // corredores en base, bloquear la corrección para no corromper; sin corredores no hay
+      // nada que restaurar y la corrección sigue normal.
+      const stNow=computeBaseState(team,inn,pidx);
+      if(stNow.first||stNow.second||stNow.third){
+        showToast('No se puede corregir el tipo con corredores en base en partidos previos a esta versión',true);
+        return;
+      }
+    } else {
+      // Restaurar cada corredor de la foto a su estado guardado. Deep-copy de VUELTA (JSON)
+      // para no religar la celda a la foto: así la foto sobrevive intacta y una segunda
+      // corrección seguirá partiendo del ORIGINAL verdadero, no del corrupto.
+      _restoreState.forEach(r=>{
+        if(!gs.plays[team][r.pidx]) gs.plays[team][r.pidx]={};
+        gs.plays[team][r.pidx][r.key]=JSON.parse(JSON.stringify(r.play));
+        refreshCell(team,r.pidx,r.key);
+      });
+    }
+  }
   // Pelota bateada: sumar 1 lanzamiento (strike) al pitcher antes de procesar la jugada.
   // Solo en jugada NUEVA — al CORREGIR una jugada ya registrada (hasExistingPlay) el
   // lanzamiento ya se contó al marcarla; reclasificar el resultado no cambia cuántos
@@ -2769,9 +2798,12 @@ function applyPlay(team,pidx,inn,play){
     recordTramo(_plHit,1,wLetra,'cian');
   }
   // Adjuntar la foto de respaldo al objeto RECIÉN creado del bateador (existe en todas
-  // las ramas: score/SBH/else). Solo jugada nueva (_preState≠null). Se hace ANTES de
-  // advanceRunners para que la foto refleje el estado previo puro. Fase B la leerá.
-  if(_preState) gs.plays[team][pidx][inn]._preState=_preState;
+  // las ramas: score/SBH/else). En jugada NUEVA se adjunta la foto recién tomada
+  // (_preState). En CORRECCIÓN se RE-ADJUNTA la MISMA foto original (_restoreState) al
+  // objeto re-creado, para que una segunda corrección siga regresando al estado ORIGINAL
+  // verdadero (no al corrupto). Se hace ANTES de advanceRunners.
+  const _snap=_preState||_restoreState;
+  if(_snap) gs.plays[team][pidx][inn]._preState=_snap;
   const runSummary=advanceRunners(team,pidx,inn,play);
   refreshCell(team,pidx,inn);
   gs.teams[team].players.forEach((_,i)=>updateStats(team,i));
