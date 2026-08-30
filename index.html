@@ -1191,6 +1191,15 @@ function resetLineScoreDOM(){
 
 window.rehydrateGame = function(gsString){
   gs = JSON.parse(gsString);
+  // DEGRADACIÓN DE PARTIDOS VIEJOS ANIDADOS: antes del fix, la foto (_preState) guardaba
+  // corredores CON su propia foto adentro → crecía exponencialmente (un partido pudo
+  // quedar guardado con _preState de megabytes → congelaba al re-guardar o al corregir).
+  // Al cargar, de-anidar: por cada celda con foto, borrar el _preState de cada entrada de
+  // la foto. El delete descarta el subárbol anidado completo de un golpe (O(nº celdas), NO
+  // recorre el árbol gigante). En partidos ya sanos no hay nada que borrar (no-op).
+  ['v','l'].forEach(t=>Object.values(gs.plays?.[t]||{}).forEach(row=>
+    Object.values(row||{}).forEach(cell=>
+      Array.isArray(cell&&cell._preState) && cell._preState.forEach(e=>{ if(e&&e.play) delete e.play._preState; }))));
   // COMPAT LÍMITE ÚNICO (Fase 1): guardados viejos no traen gs.matchPitchLimit; traían
   // el límite por-pitcher en gs.pitcherLimits. Derivar el único del partido del abridor
   // (visitante manda; si no, local) para no perder el dato ni romper. Si nada había → null.
@@ -2677,6 +2686,19 @@ function isBattedBallPlay(play){
   return false;
 }
 
+// Deep-copy de un objeto de jugada SIN su _preState anidado. Al fotografiar a un corredor
+// para la foto (_preState) hay que preservar TODO su estado (bases, scored, tramos,
+// runnerOut, csOut, rbiCreditPidx…) pero NUNCA su propio _preState: si la foto guardara
+// fotos adentro, cada jugada nueva anidaría foto-dentro-de-foto (el corredor vivo ya trae
+// _preState adjunto de cuando ÉL bateó) y el tamaño crecería exponencialmente hasta ahogar
+// a JSON.stringify → freeze en rallies largos. Solo se despoja del CLON; el objeto vivo no
+// se toca. tramos SÍ se conserva (narrativa del corredor restaurado).
+function clonePlaySinFoto(play){
+  const c=JSON.parse(JSON.stringify(play));
+  delete c._preState;
+  return c;
+}
+
 // ─── APLICAR JUGADA ───────────────────────────────────────
 function applyPlay(team,pidx,inn,play){
   // Candado autoritativo (Fase 1 — bloqueo por celda activa): applyPlay es el
@@ -2742,7 +2764,7 @@ function applyPlay(team,pidx,inn,play){
     const stPrev=computeBaseState(team,inn,pidx);
     _preState=[stPrev.first,stPrev.second,stPrev.third]
       .filter(Boolean)
-      .map(r=>({pidx:r.pidx, key:r.key, base:r.play.bases, play:JSON.parse(JSON.stringify(r.play))}));
+      .map(r=>({pidx:r.pidx, key:r.key, base:r.play.bases, play:clonePlaySinFoto(r.play)}));
   }
   // FASE B (corrección de tipo): al CORREGIR una jugada ya registrada, antes de re-crear
   // la celda del bateador (abajo) hay que rescatar su foto _preState —la celda se re-crea
@@ -2768,7 +2790,10 @@ function applyPlay(team,pidx,inn,play){
       // corrección seguirá partiendo del ORIGINAL verdadero, no del corrupto.
       _restoreState.forEach(r=>{
         if(!gs.plays[team][r.pidx]) gs.plays[team][r.pidx]={};
-        gs.plays[team][r.pidx][r.key]=JSON.parse(JSON.stringify(r.play));
+        // Despojar _preState también al restaurar: en juegos nuevos la foto ya viene sin
+        // foto anidada, pero en partidos viejos (guardados con _preState gigante anidado)
+        // esto impide re-inyectar la basura anidada en la celda viva del corredor.
+        gs.plays[team][r.pidx][r.key]=clonePlaySinFoto(r.play);
         refreshCell(team,r.pidx,r.key);
       });
     }
