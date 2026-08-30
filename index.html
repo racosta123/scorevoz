@@ -4747,8 +4747,10 @@ function narratePlay(team,pidx,inn){
   else if(sym) parts.push(`Jugada: ${sym}.`);
   // "Impulsó a {corredor}" — escaneo inverso GENERAL: corredores de este inning que
   // acreditan su carrera a ESTE bateador (mismo patrón que undoLastPlay). Reachable
-  // para type:'out' (va FUERA del gate de abajo). Por ahora se EMITE solo para el SF
-  // (/^SF/); se extenderá luego a rola/DP/fly. No toca el bloque de hits (type!=='out').
+  // para type:'out' (va FUERA del gate de abajo). Se EMITE para cualquier out que YA
+  // tenga el dato de impulso (rbiCredit al bateador): hoy SF y SH forzado lo setean;
+  // walk/error/HBP no son type 'out' (excluidos); DP no setea rbiCredit (sin RBI).
+  // Rola manual y squeeze aún no acreditan rbiCredit → fases posteriores. No toca hits.
   const _impulsadosOut=[];
   (gs.teams[team].players||[]).forEach((_,i)=>{
     if(i===pidx) return;
@@ -4756,7 +4758,7 @@ function narratePlay(team,pidx,inn){
     if(rp && rp.rbiCreditPidx===pidx && rp.rbiCreditInn===inn && rp.scored)
       _impulsadosOut.push(gs.teams[team].players[i].name);
   });
-  if(/^SF/.test(sym) && _impulsadosOut.length)
+  if(p.type==='out' && _impulsadosOut.length>0)
     parts.push(`Impulsó a ${_impulsadosOut.join(' y a ')}.`);
   if(p.type!=='out'){
     // Narrar cada TRAMO INTERMEDIO de la travesía (2=1ª→2ª, 3=2ª→3ª) según su motivo.
