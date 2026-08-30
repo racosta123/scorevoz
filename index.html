@@ -1721,6 +1721,13 @@ function handleCellDblClick(team,pidx,inn){
   const pl=gs.plays[team]?.[pidx]?.[inn];
   const isLiveRunner=pl&&pl.type!=='out'&&pl.type!=='clear'&&!pl.scored&&!pl.runnerOut;
   if(isLiveRunner){ showRunnerModal(team,pidx,inn); return; }
+  // CORRECCIÓN de corredor TERMINADO (Fase 1): un corredor que ya anotó o quedó out
+  // (scored/runnerOut/csOut) reabre el MISMO menú en MODO CORRECCIÓN (doble clic). El
+  // clic simple sigue abriendo el historial de lectura (selectCell → showNarrativeModal),
+  // intacto. Se EXCLUYE el out propio del BATEADOR (type==='out' sin flags de corredor:
+  // ponche/flyout/DP del bateador) → ése sigue yendo al catálogo para re-marcar.
+  const isTerminatedRunner=pl&&pl.type!=='clear'&&(pl.scored||pl.runnerOut||pl.csOut);
+  if(isTerminatedRunner){ showRunnerModal(team,pidx,inn,false,true); return; }
   if(!canOpenMarkModal(team,pidx,inn,pl)) return;
   showModal(team,pidx,inn);
 }
@@ -1770,7 +1777,7 @@ function closeModal(){ setModalForceChoice(false); document.getElementById('moda
 document.getElementById('modal').addEventListener('click',e=>{ if(e.target===document.getElementById('modal') && !modalForceChoice) closeModal(); });
 
 // ─── MODAL MOVIMIENTO DE CORREDOR ────────────────────────────
-function showRunnerModal(team,pidx,inn,seqMode){
+function showRunnerModal(team,pidx,inn,seqMode,correctMode){
   const p=gs.teams[team].players[pidx];
   const pl=gs.plays[team][pidx][inn];
   // Blindaje visual: si pl.bases viene inválida (null/0/undefined, ej. avance
@@ -1809,6 +1816,34 @@ function showRunnerModal(team,pidx,inn,seqMode){
     d.className='modal-section'; d.style.marginTop='10px'; d.textContent=txt;
     return d;
   };
+
+  // ── MODO CORRECCIÓN (corredor ya terminado) — Fase 1: solo Revivir y Desanotar ──
+  // Reabre el menú para un corredor que anotó o quedó out. Muta SOLO este corredor (pl):
+  // "Revivir" (acción 'revive') limpia todos los campos de out; "Desanotar" reusa el
+  // 'back' existente (scored=false + resta RBI + pop del tramo a home). NO se muestran
+  // las acciones normales (avanzar/anotar/out) para no crear estados incompatibles
+  // (scored+out a la vez); tras corregir el corredor queda vivo y el menú normal
+  // (doble clic) vuelve a estar disponible.
+  if(correctMode){
+    body.appendChild(sec('CORREGIR'));
+    const gFix=document.createElement('div'); gFix.className='play-buttons'; body.appendChild(gFix);
+    const mkFix=(lbl,cls,action)=>{
+      const b=document.createElement('button');
+      b.className=`run-btn ${cls}`; b.textContent=lbl; b.style.gridColumn='1/-1';
+      b.onclick=()=>{ applyRunnerMove(team,pidx,inn,action); closeModal(); };
+      gFix.appendChild(b);
+    };
+    if(pl.runnerOut||pl.csOut) mkFix('✓ Revivir (quitar out)','run-btn-adv','revive');
+    if(pl.scored)              mkFix('🏠✖ Desanotar (anular carrera)','run-btn-back','back');
+    if(!pl.runnerOut&&!pl.csOut&&!pl.scored){
+      const nota=document.createElement('div');
+      nota.style.cssText='color:var(--text-dim);font-size:0.75rem;text-align:center;padding:8px 0';
+      nota.textContent='Este corredor no tiene nada que corregir.';
+      body.appendChild(nota);
+    }
+    document.getElementById('modal').classList.add('show');
+    return;
+  }
 
   // ── AVANZAR ──────────────────────────────────────────────
   body.appendChild(sec('AVANZAR'));
@@ -2024,6 +2059,38 @@ function applyRunnerMove(team,pidx,inn,action){
         recordTramo(pl,pl.bases,L,'anaranjado');
         showToast(`Avanzó (${nombre})`);
       }
+      break;
+    }
+    case 'revive': {
+      // CANDADO DE SEGURIDAD (caso g): NO revivir un out que reabriría una media-entrada
+      // YA CERRADA. Los outs son DERIVADOS, pero los punteros de flujo (gs.alBate/
+      // activeBatter/currentInning) NO rebobinan. Señal fiable: gs.alBate = dónde está
+      // el bateador en curso (currentInning es solo puntero de VISTA). Si esta media-
+      // entrada (team,inn) tiene 3+ outs (cerrada) y NO es la de gs.alBate → revivir la
+      // reabriría → se bloquea con aviso. Revivir dentro de la entrada en curso, o
+      // cualquier entrada con <3 outs, sigue permitido (no dispara este candado).
+      const alB=gs.alBate;
+      const isCurrentHalf = alB && alB.team===team && parseInt(alB.inn)===parseInt(inn);
+      if(countOutsInInning(team,inn)>=3 && !isCurrentHalf){
+        showToast('No se puede revivir este out porque reabriría una entrada ya cerrada. (Esa corrección llegará en una versión futura.)',true);
+        return;
+      }
+      // CORRECCIÓN (Fase 1): out → safe. Limpia TODO el conjunto de campos de out
+      // JUNTOS (mapa de saneo) para no dejar nada colgado. Los outs de la entrada son
+      // DERIVADOS (countOutsInInning cuenta runnerOut/csOut) → bajan SOLOS al limpiar
+      // estos flags, sin tocar ningún contador. El corredor queda vivo en su base actual
+      // (pl.bases). La causa previa de cómo llegó (tramos de bases inferiores) se
+      // conserva; solo se quita el tramo terminal ROJO que fabricó el out.
+      delete pl.runnerOut; delete pl.csOut;
+      delete pl.runnerOutBase; delete pl.runnerOutSym;
+      delete pl.csRoute; delete pl.dpRoute; delete pl.forceRoute;
+      if(pl.tramos){
+        Object.keys(pl.tramos).forEach(k=>{
+          const t=pl.tramos[k];
+          if(t && t.color==='rojo' && ['OR','TT','IR','OF','FC'].includes(t.letra)) delete pl.tramos[k];
+        });
+      }
+      showToast('✓ Out anulado — corredor vivo en '+(['','1ª','2ª','3ª'][pl.bases]||'base'));
       break;
     }
     case 'back': {
