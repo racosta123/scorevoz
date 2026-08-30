@@ -1891,6 +1891,30 @@ function showRunnerModal(team,pidx,inn,seqMode,correctMode){
     gOtr.appendChild(mkBtn(`↩ Regresó a ${bn[backTo]}`,'run-btn-back','back',true));
   }
 
+  // ── CORREGIR JUGADA DEL BATEADOR (puerta de entrada a Fase B) ─────────────
+  // El menú de corredor no permitía llegar a corregir el TIPO del turno al bate (hit→out,
+  // etc.). Este botón abre el catálogo (showModal) → al re-elegir el tipo, applyPlay corre
+  // con hasExistingPlay=true y dispara la restauración de corredores desde _preState.
+  // GATE: solo cuando esta celda es el ÚLTIMO turno registrado (el bateador de ESTE turno,
+  // no un corredor heredado — corregir a uno heredado restauraría las bases a ANTES de su
+  // turno y borraría lo posterior) Y tiene foto (_preState; nunca en juegos pre-Fase-A).
+  // Excluido de seqMode (la secuencia exige acción de corredor) y de correctMode (retorna
+  // antes, arriba). Aditivo: no toca los botones ni onclick existentes.
+  {
+    const last=gs.playHistory[gs.playHistory.length-1];
+    const esBateadorDeEsteTurno = !seqMode && last &&
+      last.team===team && last.pidx===pidx && String(last.inn)===String(inn) && !!pl._preState;
+    if(esBateadorDeEsteTurno){
+      body.appendChild(sec('CORREGIR JUGADA'));
+      const gCorr=document.createElement('div'); gCorr.className='play-buttons'; body.appendChild(gCorr);
+      const b=document.createElement('button');
+      b.className='run-btn run-btn-back'; b.style.gridColumn='1/-1';
+      b.textContent='✎ Corregir jugada del bateador (era otro tipo)';
+      b.onclick=()=>{ closeModal(); showModal(team,pidx,inn); };
+      gCorr.appendChild(b);
+    }
+  }
+
   if('webkitSpeechRecognition' in window||'SpeechRecognition' in window){
     const micBtn=document.createElement('button');
     micBtn.id='runner-mic-btn';
