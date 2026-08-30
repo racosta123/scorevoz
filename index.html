@@ -2272,21 +2272,37 @@ function computeBaseState(team,inn,excludePidx){
 // — si no hay espacio, anota. Un corredor que ya iba más adelante (base > target) solo se
 // mueve si el empuje de los de abajo lo alcanza (cadena), nunca si no hay colisión real.
 // Se respeta el orden relativo entre corredores y nunca se apila dos en una base.
-function forceAdvanceRunners(team,pidx,inn,target){
+function forceAdvanceRunners(team,pidx,inn,target,pushSym){
   const nm=i=>gs.teams[team].players[i].name;
   const st=computeBaseState(team,inn,pidx);
   const occ={1:st.first,2:st.second,3:st.third}; // se actualiza a medida que se mueve gente
   const moved=[];
   let rbiCount=0;
+  // Narrativa "quién + cómo" (Fase 1): si el llamador identifica el tipo de empuje
+  // (pushSym: 'SH' toque, 'BB' base por bolas), graba la CAUSA en el tramo de CADA
+  // corredor forzado (destino), con letra vacía + color 'gris' — MISMO patrón que la
+  // rola manual: no dibuja letra; el segmento pasa de color vivo a gris. pushBy = nombre
+  // del BATEADOR que originó el empuje. Sin pushSym (p.ej. error) no estampa nada →
+  // comportamiento idéntico a hoy. La narrativa lee pushSym/pushBy vía pushFrase.
+  const stampCause=(pl,to)=>{
+    if(!pushSym) return;
+    recordTramo(pl,to,'','gris');
+    if(pl.tramos && pl.tramos[to]){
+      pl.tramos[to].pushSym=pushSym;
+      pl.tramos[to].pushBy=nm(pidx);
+    }
+  };
 
   const place=(r,to)=>{
     const pl=r.play;
     if(to>=4){
       pl.bases=3; pl.scored=true;
       pl.rbiCreditPidx=pidx; pl.rbiCreditInn=inn; // para poder restar el RBI si el anotador lo regresa
+      stampCause(pl,4);
       rbiCount++; moved.push(nm(r.pidx)+' anotó');
     } else {
       pl.bases=to;
+      stampCause(pl,to);
       occ[to]=r;
       moved.push(nm(r.pidx)+' →'+['','1ª','2ª','3ª'][to]);
     }
@@ -2472,7 +2488,12 @@ function advanceRunners(team,pidx,inn,play){
   }
   // ── Bases por bola / golpe (HBP/INT/OB): siempre envasan en 1ª ──────────
   if(play.type==='walk'){
-    return forceAdvanceRunners(team,pidx,inn,1);
+    // Fase 1 narrativa: solo la base por bolas REAL (BB/BBI) marca causa 'BB' en los
+    // corredores empujados. HBP/INT/OB (BG/INT/OB) tienen otra frase → fase posterior
+    // (pushSym null = sin causa, igual que hoy). El bateador que recibe la BB narra su
+    // propia embasada aparte; esto solo toca a los corredores forzados.
+    const ps=/^BB/.test(play.sym||'')?'BB':null;
+    return forceAdvanceRunners(team,pidx,inn,1,ps);
   }
   // ── Error / K corrido: el bateador ocupa `bases` (1ª por defecto, o la base
   // dictada en el avance del error) — empuje mínimo en cadena desde ahí. ──
@@ -2484,7 +2505,7 @@ function advanceRunners(team,pidx,inn,play){
   // walk/error): mueve solo a los forzados, respeta huecos (1ª+3ª → solo 1ª), y no
   // toca a nadie si 1ª está vacía. SQ (squeeze) NO entra: es lógica aparte. ──
   if(play.id==='SH'){
-    return forceAdvanceRunners(team,pidx,inn,1);
+    return forceAdvanceRunners(team,pidx,inn,1,'SH');
   }
   if(play.type!=='hit') return '';
   const b=play.bases===4?4:(play.bases||0);
@@ -4729,7 +4750,7 @@ function narratePlay(team,pidx,inn){
   // Mapa hermano de rolaDir para causas NO-rola que empujan/anotan a un corredor
   // (Cubeta A). La frase ya incluye la preposición; se le concatena el nombre (pushBy).
   // Hoy solo el elevado de sacrificio (SF); crecerá con SH/SQ/fly cuando se capturen.
-  const pushFrase={'SF':'con elevado de sacrificio de'};
+  const pushFrase={'SF':'con elevado de sacrificio de','SH':'con el toque de sacrificio de','BB':'con la base por bolas a'};
   // Dirección del jardinero para la frase del SF del BATEADOR (dígito del sym: 7/8/9).
   const jardFrase={7:'al jardinero izquierdo',8:'al jardinero central',9:'al jardinero derecho'};
   if(p.runNote==='FC')   parts.push(rolaDir[sym]?`Rola ${rolaDir[sym]}, se embasó en bola ocupada (FC).`:`Se embasó en bola ocupada (FC).`);
