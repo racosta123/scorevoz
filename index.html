@@ -2704,8 +2704,11 @@ function applyPlay(team,pidx,inn,play){
   // Se estampa SOLO al crear el objeto de jugada — nunca se re-estampa cuando
   // una jugada ya existente solo se muta después (score(), applyRunnerMove()).
   gs.seq=(gs.seq||0)+1;
-  // Pelota bateada: sumar 1 lanzamiento (strike) al pitcher antes de procesar la jugada
-  if(isBattedBallPlay(play)){
+  // Pelota bateada: sumar 1 lanzamiento (strike) al pitcher antes de procesar la jugada.
+  // Solo en jugada NUEVA — al CORREGIR una jugada ya registrada (hasExistingPlay) el
+  // lanzamiento ya se contó al marcarla; reclasificar el resultado no cambia cuántos
+  // lanzamientos se tiraron, así que no se re-suma (evita el pitcheo fantasma).
+  if(isBattedBallPlay(play) && !hasExistingPlay){
     if(!gs.pitchCount[team].inningLog) gs.pitchCount[team].inningLog={};
     if(!gs.pitchCount[team].inningLog[inn]) gs.pitchCount[team].inningLog[inn]={s:0,b:0,f:0};
     gs.pitchCount[team].total++;
@@ -2713,8 +2716,9 @@ function applyPlay(team,pidx,inn,play){
     gs.pitchCount[team].inningLog[inn].s++;
     updatePitchCounterUI();
   }
-  // BG (golpe/HBP): sumar 1 lanzamiento contado como BOLA
-  if(play.id==='BG'){
+  // BG (golpe/HBP): sumar 1 lanzamiento contado como BOLA. Igual que la pelota
+  // bateada: solo en jugada NUEVA — al corregir un BG ya registrado no se re-suma.
+  if(play.id==='BG' && !hasExistingPlay){
     if(!gs.pitchCount[team].inningLog) gs.pitchCount[team].inningLog={};
     if(!gs.pitchCount[team].inningLog[inn]) gs.pitchCount[team].inningLog[inn]={s:0,b:0,f:0};
     gs.pitchCount[team].total++;
