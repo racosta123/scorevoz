@@ -1790,7 +1790,20 @@ function setModalForceChoice(force){
   if(cancelBtn) cancelBtn.style.display=force?'none':'';
 }
 function closeModal(){ setModalForceChoice(false); document.getElementById('modal').classList.remove('show'); }
-document.getElementById('modal').addEventListener('click',e=>{ if(e.target===document.getElementById('modal') && !modalForceChoice) closeModal(); });
+// HISTORIAL (bug #8): al VER el historial de un corredor vivo, selectCell dejó gs.selected
+// apuntando a la celda del corredor. Si al cerrar la narrativa no se restaura, el siguiente
+// ponche/base/registro caería en esa celda equivocada. _narrativeOpen marca que el modal
+// mostrado es la narrativa read-only; al cerrarla (CERRAR o clic afuera) se regresa la
+// selección al bateador en curso reusando returnToActiveBatter(). NO se toca closeModal
+// (lo comparten catálogo/corredor/ponche); EDITAR lo apaga sin regresar (edita la celda vista).
+let _narrativeOpen=false;
+function closeNarrativeToBatter(){ _narrativeOpen=false; closeModal(); returnToActiveBatter(); }
+document.getElementById('modal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('modal') && !modalForceChoice){
+    const wasNarr=_narrativeOpen; _narrativeOpen=false; closeModal();
+    if(wasNarr) returnToActiveBatter();
+  }
+});
 
 // ─── MODAL MOVIMIENTO DE CORREDOR ────────────────────────────
 function showRunnerModal(team,pidx,inn,seqMode,correctMode){
@@ -5084,9 +5097,10 @@ function showNarrativeModal(team,pidx,inn){
   const body=document.getElementById('mbody');
   body.innerHTML=`<div class="narrative-panel">${narratePlay(team,pidx,inn)}</div>
   <div style="margin-top:10px;display:flex;gap:6px">
-    <button class="modal-close" style="flex:1" onclick="closeModal();showModal('${team}',${pidx},'${inn}')">✏️ EDITAR</button>
-    <button class="modal-close" style="flex:1" onclick="closeModal()">CERRAR</button>
+    <button class="modal-close" style="flex:1" onclick="_narrativeOpen=false;closeModal();showModal('${team}',${pidx},'${inn}')">✏️ EDITAR</button>
+    <button class="modal-close" style="flex:1" onclick="closeNarrativeToBatter()">CERRAR</button>
   </div>`;
+  _narrativeOpen=true;
   document.getElementById('modal').classList.add('show');
 }
 
