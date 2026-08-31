@@ -4625,6 +4625,18 @@ function showPlayerFicha(team,pidx){
   const lwStr=(lw>=0?'+':'')+lw.toFixed(2);
   const lwColor=lw>0?'var(--green)':lw<0?'var(--red)':'var(--text-dim)';
 
+  // ── Bateo con corredores (Fase 2) ─────────────────────────
+  // SIN mask ni gate: todo el slot, igual que AB/H/AVG de arriba → coherencia
+  // total en esta pantalla (la separación por ocupante vive en Numeritos, Fase 3).
+  // Si Y=0 (no le tocó la situación) NO se muestra promedio: sería un ".000"
+  // engañoso (parecería que falló siempre). En su lugar: "0 de 0 · sin turnos".
+  const sit=computeSituationalBat(team,pidx);
+  const fmtSit=(hh,abb)=>abb>0
+    ? `${hh} de ${abb} <span style="color:var(--text-dim)">(${fmt3(hh/abb)})</span>`
+    : `0 de 0 <span style="color:var(--text-dim)">· sin turnos</span>`;
+  const sitCorrStr=fmtSit(sit.hConCorr,sit.abConCorr);
+  const sitRispStr=fmtSit(sit.hRISP,sit.abRISP);
+
   // ── Calificación OPS ──────────────────────────────────────
   const opsRating=ops>=1.0?{lbl:'EXCELENTE', col:'var(--green)',   bg:'rgba(0,229,153,.08)',  bc:'rgba(0,229,153,.25)'}:
                   ops>=0.8?{lbl:'MUY BUENO', col:'var(--cyan)',    bg:'rgba(0,191,255,.08)',  bc:'rgba(0,191,255,.25)'}:
@@ -4698,6 +4710,17 @@ function showPlayerFicha(team,pidx){
     <div class="jug-metric-grid">
       ${mbox('AVG',fmt3(avg))}${mbox('OBP',fmt3(obp))}
       ${mbox('SLG',fmt3(slg))}${mbox('OPS',fmt3(ops))}
+    </div>
+    <div class="modal-section" style="margin-top:14px">BATEO EN SITUACIÓN</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;background:rgba(255,255,255,.03);border-radius:9px;padding:8px 12px">
+        <span style="font-family:'Oswald',sans-serif;font-size:.72rem;color:var(--text-dim)">Con corredores en base</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:#fff;letter-spacing:.5px">${sitCorrStr}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;background:rgba(255,255,255,.03);border-radius:9px;padding:8px 12px">
+        <span style="font-family:'Oswald',sans-serif;font-size:.72rem;color:var(--text-dim)">En posición de anotar <span style="color:var(--amber)">RISP</span></span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:#fff;letter-spacing:.5px">${sitRispStr}</span>
+      </div>
     </div>
     ${ratingHTML}
     <div class="jug-lw-box" style="margin-top:8px">
