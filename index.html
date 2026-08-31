@@ -5002,7 +5002,7 @@ function narratePlay(team,pidx,inn){
   if(!p||p.type==='clear') return 'Sin jugada registrada.';
   const sym=p.sym||'';
   const hitNarr={'1B':'Bateó sencillo, llegó a primera.','2B':'Bateó doble, llegó a segunda.','3B':'Bateó triple, llegó a tercera.','HR':'Jonrón, recorrió las cuatro bases.','IHR':'Jonrón dentro del parque.','LS':'Hit sencillo por el lado izquierdo.','RS':'Hit sencillo por el lado derecho.','MI':'Hit sencillo por el medio cuadro.','LC':'Doble al left-center.','RC':'Doble al right-center.','LL':'Hit por la línea izquierda.','RL':'Hit por la línea derecha.','B':'Bunt hit, llegó a primera.'};
-  const outNarr={'KS':'Ponche swing.','KL':'Ponche cantado, sin tirarle.','F7':'Fly out al left field.','F8':'Fly out al center field.','F9':'Fly out al right field.','P':'Pop fly, out.','L':'Línea atrapada, out.','FF':'Foul fly, out.','6-3':'Rodado al short, out en primera.','4-3':'Rodado al segunda, out en primera.','5-3':'Rodado al tercera, out en primera.','1-3':'Rodado al pitcher, out en primera.','3':'Rodado a primera sin asistencia, out.','6-4-3':'Doble play 6-4-3.','5-4-3':'Doble play 5-4-3.','SH':'Sacrificio toque, avanzó el corredor.','SF':'Sacrificio fly, avanzó el corredor.','IF':'Infield fly, out automático.','OR':'Out por regla.','GDP':'Bateado en doble play.','CS':'Cogido robando, out.','RD':'Tira y tira (rundown), out.','TP':'Triple play.'};
+  const outNarr={'KS':'Ponche swing.','KL':'Ponche cantado, sin tirarle.','F7':'Elevado al jardinero izquierdo, out.','F8':'Elevado al jardinero central, out.','F9':'Elevado al jardinero derecho, out.','P':'Globo al cuadro, out.','L':'Línea, out.','FF':'Foul fly, out.','6-3':'Rodado al short, out en primera.','4-3':'Rodado al segunda, out en primera.','5-3':'Rodado al tercera, out en primera.','1-3':'Rodado al pitcher, out en primera.','3':'Rodado a primera sin asistencia, out.','6-4-3':'Doble play 6-4-3.','5-4-3':'Doble play 5-4-3.','SH':'Sacrificio toque, avanzó el corredor.','SF':'Sacrificio fly, avanzó el corredor.','IF':'Infield fly, out.','OR':'Out por regla.','GDP':'Bateado en doble play.','CS':'Cogido robando, out.','RD':'Tira y tira (rundown), out.','TP':'Triple play.'};
   const walkNarr={'BB':'Base por bolas, pasó a primera.','BBI':'Base intencional, fue a primera.','BG':'Golpeado por pitcheo (HBP), se embasó.','INT':'Interferencia, se embasó.','OB':'Obstrucción, se embasó.'};
   const advNarr={'SB':'Base robada.','WP':'Avanzó por wild pitch.','PB':'Avanzó por passed ball.','BK':'Avanzó por balk.','T':'Avanzó por tiro.','FC':"Llegó a primera por fielder's choice.",'PC':'Pisa y corre.','IND':'Avanzó por indiferencia (no es robo).'};
   let parts=[];
@@ -5015,12 +5015,21 @@ function narratePlay(team,pidx,inn){
   const pushFrase={'SF':'con elevado de sacrificio de','SH':'con el toque de sacrificio de','BB':'con la base por bolas a'};
   // Dirección del jardinero para la frase del SF del BATEADOR (dígito del sym: 7/8/9).
   const jardFrase={7:'al jardinero izquierdo',8:'al jardinero central',9:'al jardinero derecho'};
+  // Posición defensiva (1..9) → frase en español, para elevados/líneas/foul flies numerados.
+  const posDe={1:'al pitcher',2:'al catcher',3:'a primera',4:'a segunda',5:'a tercera',6:'al short',7:'al jardinero izquierdo',8:'al jardinero central',9:'al jardinero derecho'};
   if(p.runNote==='FC')   parts.push(rolaDir[sym]?`Rola ${rolaDir[sym]}, se embasó en bola ocupada (FC).`:`Se embasó en bola ocupada (FC).`);
   else if(hitNarr[sym])  parts.push(hitNarr[sym]);
   else if(outNarr[sym])  parts.push(outNarr[sym]);
   else if(walkNarr[sym]) parts.push(walkNarr[sym]);
   else if(advNarr[sym])  parts.push(advNarr[sym]);
   else if(sym.startsWith('E')) parts.push(`Error del defensor (${sym}), se embasó.`);
+  // Elevados / líneas / foul flies NUMERADOS (F{n}/L{n}/FF{n}): frase con la posición
+  // en español desde el dígito del sym (= posición defensiva estándar 1..9). Van DESPUÉS
+  // de outNarr (F7/F8/F9, P, L, FF, IF pelados ya tienen su frase ahí) y ANTES del genérico
+  // — solo capturan los que hoy caían a "Jugada: {sym}". No matchean SF{n} (empieza con S).
+  else if(/^F([1-9])$/.test(sym))  parts.push(`Elevado ${posDe[+sym.slice(1)]}, out.`);
+  else if(/^L([1-9])$/.test(sym))  parts.push(`Línea ${posDe[+sym.slice(1)]}, out.`);
+  else if(/^FF([1-9])$/.test(sym)) parts.push(`Foul fly ${posDe[+sym.slice(2)]}, out.`);
   // SF con jardinero (SF7/SF8/SF9): frase propia con dirección. El 'SF' pelado ya lo
   // tomó outNarr arriba; aquí solo caen las variantes numeradas que antes iban al fallback.
   else if(/^SF/.test(sym)){
