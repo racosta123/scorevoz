@@ -3754,6 +3754,39 @@ function applyCambioPitcher(inn){
   showToast(`✓ E${inn}: sale ${outName} (${pc.total} lanz) — entra ${inName}`);
 }
 
+// ─── BATEO CON CORREDORES EN BASE (derivado) ───────────────
+// Dos medidas situacionales para un bateador, calculadas escaneando sus jugadas y la foto
+// _preState (los corredores que había ANTES de cada turno, en base 1/2/3):
+//   • abConCorr/hConCorr → turnos y hits con AL MENOS un corredor en base (_preState.length>0).
+//   • abRISP/hRISP        → turnos y hits en posición de anotar (algún corredor en 2ª o 3ª).
+// Derivado puro (solo lectura, no muta gs, no guarda contadores). Sigue el MISMO patrón que
+// el average normal (updateStats): AB = p.ab (BB/HBP/SF/SH traen ab:false → excluidos del
+// denominador), H = p.h. Reusa el gate from/to/mask de getBat para separar ocupantes de un
+// slot en sustituciones (scoredOnly → ab/h en false → no cuenta batting; battingOnly →
+// conserva el bateo). SOLO turnos con _preState PRESENTE: los viejos (pre-Fase-A, sin foto)
+// se excluyen de ambas medidas — degradación limpia, ni a favor ni en contra. Batting-around:
+// cada columna de la entrada es una celda propia en `plays` → se cuenta una sola vez.
+function computeSituationalBat(team,pidx,from=1,to=Infinity,mask=null){
+  const plays=gs.plays[team]?.[pidx]||{};
+  let abConCorr=0,hConCorr=0,abRISP=0,hRISP=0;
+  Object.entries(plays).forEach(([inn,p])=>{
+    if(!p) return;
+    const i=parseInt(inn);
+    if(i<from||i>to) return;
+    if(!('_preState' in p)) return;                 // turno viejo sin foto → excluir
+    const mode=mask&&mask[i];
+    const pp = mode==='battingOnly' ? {...p,scored:false}
+             : mode==='scoredOnly'  ? {sym:'R',type:'advance',scored:true,ab:false,h:false}
+             : p;
+    const ps=p._preState;                           // situación real del turno (array de corredores)
+    const hayCorr=Array.isArray(ps)&&ps.length>0;
+    const hayRISP=Array.isArray(ps)&&ps.some(e=>e&&(e.base===2||e.base===3));
+    if(hayCorr){ if(pp.ab) abConCorr++; if(pp.h) hConCorr++; }
+    if(hayRISP){ if(pp.ab) abRISP++;    if(pp.h) hRISP++;    }
+  });
+  return {abConCorr,hConCorr,abRISP,hRISP};
+}
+
 // ─── NUMERITOS: CAPA DE DATOS COMPARTIDA (FASE 1) ──────────
 // Única fuente de verdad para renderNumeritosFinal() (plantilla HTML +
 // html2canvas). No duplicar este cálculo en ningún otro lado.
