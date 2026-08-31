@@ -821,9 +821,9 @@ const POS_WORD_MAP = {
   'segunda base':4,'segunda':4,'cuatro':4,
   'tercera base':5,'tercera':5,'cinco':5,
   'short stop':6,'shortstop':6,'parador':6,'short':6,'seis':6,
-  'jardín izquierdo':7,'left field':7,'izquierda':7,'left':7,'siete':7,
+  'jardín izquierdo':7,'left field':7,'izquierda':7,'izquierdo':7,'left':7,'siete':7,
   'jardín central':8,'jardín centro':8,'center field':8,'centro':8,'center':8,'central':8,'ocho':8,
-  'jardín derecho':9,'right field':9,'derecha':9,'right':9,'nueve':9,
+  'jardín derecho':9,'right field':9,'derecha':9,'derecho':9,'right':9,'nueve':9,
 };
 const POS_ABBR = ['P','C','1B','2B','3B','SS','LF','CF','RF'];
 
@@ -3217,6 +3217,21 @@ function extractOutPositions(text){
   return [];
 }
 
+// Posición defensiva (1-9) desde texto: primero dígito directo, si no, nombre vía
+// POS_WORD_MAP. Reusa normalizeNumberWords (cardinales "ocho"→8). NO confunde el
+// ordinal de base con el número de posición: normalizeNumberWords solo toca cardinales,
+// así que "segunda"/"tercera" quedan como palabra → POS_WORD_MAP les da 4/5 (no 2/3).
+// Devuelve string '1'..'9' o null. Lo usa la rama de LÍNEA (el fly conserva su propio mapeo).
+function posFromText(text){
+  const t=normalizeNumberWords(text);
+  const dm=/\b([1-9])\b/.exec(t);
+  if(dm) return dm[1];
+  for(const [word,num] of Object.entries(POS_WORD_MAP)){
+    if(t.includes(word)) return String(num);
+  }
+  return null;
+}
+
 // Extrae TODAS las posiciones de un doble play dictado por voz.
 // Acepta dígitos O palabras: "del cinco al cinco del cinco al tres", "del 6 al 4 al 3", etc.
 function extractDPPositions(text){
@@ -3370,9 +3385,9 @@ function interpretVoice(text){
   }
   // Fly outs con fildeador específico (posiciones 1-9, sacrificio fly)
   if(!matched&&/\bfly\b|elevado/.test(text)){
-    const jar=/\b7\b|izquierda|left\b/.test(text)?'7'
+    const jar=/\b7\b|izquierda|izquierdo|left\b/.test(text)?'7'
              :/\b8\b|centr|center\b/.test(text)?'8'
-             :/\b9\b|derecha|right\b/.test(text)?'9'
+             :/\b9\b|derecha|derecho|right\b/.test(text)?'9'
              :/\bcatcher\b|\breceptor\b/.test(text)?'2'
              :/\binicialista\b|\bprimera\b/.test(text)?'3'
              :/\bcamarero\b|\bsegunda\b/.test(text)?'4'
@@ -3392,11 +3407,13 @@ function interpretVoice(text){
     }
   }
 
-  // Línea atrapada con posición específica (L+pos)
+  // Línea atrapada con posición específica (L+pos). Acepta dígito ("línea al 6") O
+  // nombre de posición ("línea al short"/"línea a segunda") vía posFromText — mismo
+  // universo que el elevado. Sin posición → 'L' pelado (como antes).
   if(!matched&&/\blínea\b|\blinea\b|\blinietazo\b/.test(text)){
-    const pos=/\b([1-9])\b/.exec(text);
+    const pos=posFromText(text);
     const lPlay=PLAY_CATALOG.outs.find(p=>p.id==='L');
-    if(lPlay) matched=pos?{...lPlay,sym:`L${pos[1]}`,label:`L${pos[1]} Línea al ${pos[1]}`}:lPlay;
+    if(lPlay) matched=pos?{...lPlay,sym:`L${pos}`,label:`L${pos} Línea al ${pos}`}:lPlay;
   }
 
   // Toque de bola: desambigua bunt single vs sacrificio
