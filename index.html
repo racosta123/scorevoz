@@ -4927,6 +4927,20 @@ function refreshAllCells(){
   });
 }
 
+// Frase "deja corredores en base" a partir del estado FINAL de bases (computeBaseState):
+// {first,second,third}. Vacío → ''. Llena → casa llena. Uno → "hombre en X". Dos → "hombres
+// en X y Y" (las tres combinaciones salen del join). Solo texto, no lee ni muta gs.
+function fraseDejaCorredores(st){
+  const en=[];
+  if(st.first)  en.push('primera');
+  if(st.second) en.push('segunda');
+  if(st.third)  en.push('tercera');
+  if(en.length===0) return '';
+  if(en.length===3) return 'Deja la casa llena.';
+  if(en.length===1) return `Deja hombre en ${en[0]}.`;
+  return `Deja hombres en ${en[0]} y ${en[1]}.`;
+}
+
 function narratePlay(team,pidx,inn){
   const p=gs.plays[team]?.[pidx]?.[inn];
   if(!p||p.type==='clear') return 'Sin jugada registrada.';
@@ -4973,6 +4987,32 @@ function narratePlay(team,pidx,inn){
   });
   if(p.type==='out' && _impulsadosOut.length>0)
     parts.push(`Impulsó a ${_impulsadosOut.join(' y a ')}.`);
+  // "DEJA CORREDORES EN BASE" (#1): cuando el out DEL BATEADOR es el TERCER out y cierra la
+  // entrada dejando corredores varados, narrar cómo quedaron. Cuatro guardias: (1) es out del
+  // bateador (type==='out'; los outs de corredor viven con runnerOut/csOut y su type NO es
+  // 'out' → excluidos, fuera de alcance por ahora); (2) la entrada llegó a 3 outs; (3) ESTE
+  // out fue el ÚLTIMO evento de la entrada (mayor seq entre TODAS las columnas del inning) —
+  // así un 1er/2º out temprano de una entrada que luego llegó a 3 NO dispara la frase; (4) hay
+  // al menos un corredor vivo al final. computeBaseState da el estado FINAL (post-jugada) y ya
+  // excluye al bateador (type==='out'). BATTING-AROUND: el escaneo recorre toda columna cuya
+  // parseInt(key)===baseInn (no solo la key exacta), igual que countOutsInInning. Solo texto:
+  // no toca dibujo, estado ni conteo.
+  if(p.type==='out' && countOutsInInning(team,inn)>=3){
+    const baseInn=parseInt(inn);
+    let maxSeq=-1;
+    gs.teams[team].players.forEach((_,i)=>{
+      const plays=gs.plays[team][i]||{};
+      Object.keys(plays).forEach(k=>{
+        if(parseInt(k)!==baseInn) return;
+        const s=plays[k]&&plays[k].seq;
+        if(typeof s==='number' && s>maxSeq) maxSeq=s;
+      });
+    });
+    if(typeof p.seq==='number' && p.seq===maxSeq){
+      const f=fraseDejaCorredores(computeBaseState(team,inn));
+      if(f) parts.push(f);
+    }
+  }
   if(p.type!=='out'){
     // Narrar cada TRAMO INTERMEDIO de la travesía (2=1ª→2ª, 3=2ª→3ª) según su motivo.
     // El tramo TERMINAL (donde anotó o lo sacaron out) NO se narra aquí: lo cubren
