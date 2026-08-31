@@ -1474,7 +1474,7 @@ function drawDiamond(play){
         // anillo [~1500], que no dependen del color del tramo. Alcance ESTRECHO: solo el
         // robo (RB) y los embases por pitcheo (WP/PB/BK). El empuje por hit (verde) NO
         // entra: se repinta rojo como hoy. El resto (OR/gris/FC/OF…) también sigue rojo.
-        const LLEGADA=['RB','WP','PB','BK'];
+        const LLEGADA=['RB','WP','PB','BK','MR'];
         if(isOut && (rob==null || k>=rob) && !LLEGADA.includes(t.letra)) col=outCol;
         s+=base(a,b,col,2.5);
         if(t.letra) s+=`<text x="${mid[0]}" y="${mid[1]}" text-anchor="middle" dominant-baseline="central" font-size="6" font-weight="700" fill="${col}" stroke="#0b1420" stroke-width="1.4" paint-order="stroke" style="pointer-events:none">${t.letra}</text>`;
@@ -1883,6 +1883,7 @@ function showRunnerModal(team,pidx,inn,seqMode,correctMode){
   gAdv.appendChild(mkBtn(`🌀 Wild Pitch → ${nbN}`,  'run-btn-adv', 'wp', false));
   gAdv.appendChild(mkBtn(`🌀 Passed Ball → ${nbN}`, 'run-btn-adv', 'pb', false));
   gAdv.appendChild(mkBtn(`🌀 Balk → ${nbN}`,        'run-btn-adv', 'bk', false));
+  gAdv.appendChild(mkBtn(`🌀 Mal reviré → ${nbN}`,  'run-btn-adv', 'mrev', false));
   if(pl.bases<3) gAdv.appendChild(mkBtn('▶▶ Avanzó a 3ª','run-btn-adv','to3',  false));
   gAdv.appendChild(mkBtn('⏸ Se quedó (sin avance)',    'run-btn-back','stay',   true));
 
@@ -2111,6 +2112,23 @@ function applyRunnerMove(team,pidx,inn,action){
         pl.bases=pl.bases+1;         // 1ª→2ª o 2ª→3ª (nunca vuela a home)
         recordTramo(pl,pl.bases,L,'anaranjado');
         showToast(`Avanzó (${nombre})`);
+      }
+      break;
+    }
+    case 'mrev': {
+      // Mal reviré (#5): el pitcher revira a una base y tira mal → el corredor gana
+      // base aprovechando ese error. Clon fiel de wp/pb/bk: avanza 1 base fija, tramo
+      // 'MR' anaranjado, y desde 3ª anota. FASE 1: SOLO avance + narrativa; el conteo
+      // como ERROR del equipo defensivo (columna E) es Fase 2 — aquí NO se toca.
+      if(pl.bases>=3){
+        pl.scored=true;
+        pl.scoreNote='MR';               // motivo real, sin pisar el sym del hit
+        recordTramo(pl,4,'MR','anaranjado'); // tramo 3ª→home
+        showToast('✓ Anotó (mal reviré)');
+      } else {
+        pl.bases=pl.bases+1;             // 1ª→2ª o 2ª→3ª (nunca vuela a home)
+        recordTramo(pl,pl.bases,'MR','anaranjado');
+        showToast('Avanzó (mal reviré)');
       }
       break;
     }
@@ -5118,6 +5136,7 @@ function narratePlay(team,pidx,inn){
             else if(Lt==='WP') parts.push(`Avanzó a ${bn[k]} por wild pitch.`);
             else if(Lt==='PB') parts.push(`Avanzó a ${bn[k]} por passed ball.`);
             else if(Lt==='BK') parts.push(`Avanzó a ${bn[k]} por balk.`);
+            else if(Lt==='MR') parts.push(`Avanzó a ${bn[k]} por mal reviré.`);
           }
           k++; continue;
         }
@@ -5145,6 +5164,7 @@ function narratePlay(team,pidx,inn){
           else if(L==='WP') parts.push(`Avanzó a ${base} por wild pitch.`);
           else if(L==='PB') parts.push(`Avanzó a ${base} por passed ball.`);
           else if(L==='BK') parts.push(`Avanzó a ${base} por balk.`);
+          else if(L==='MR') parts.push(`Avanzó a ${base} por mal reviré.`);
           else if(L==='OR') parts.push(`Out en revire yendo a ${base}.`);
           else if(L==='IR'||L==='CS') parts.push(`Cogido robando en ${base}.`);
           else if(L==='TT') parts.push(`Out en tira y tira hacia ${base}.`);
@@ -5179,6 +5199,7 @@ function narratePlay(team,pidx,inn){
       else if(t4&&t4.letra==='WP') parts.push('Anotó por wild pitch.');
       else if(t4&&t4.letra==='PB') parts.push('Anotó por passed ball.');
       else if(t4&&t4.letra==='BK') parts.push('Anotó por balk.');
+      else if(t4&&t4.letra==='MR') parts.push('Anotó por mal reviré.');
       // Fase 3: anotó empujado por out/rola del bateador (pushSym+pushBy en el tramo a home).
       else if(t4&&t4.pushSym&&t4.pushBy&&rolaDir[t4.pushSym]) parts.push(`Anotó con la rola ${rolaDir[t4.pushSym]} de ${t4.pushBy}.`);
       // Cubeta A (Pieza 2): anotó por causa no-rola (SF). Mismo campo pushSym/pushBy.
