@@ -6363,6 +6363,20 @@ function n3BuildHTML(N){
     return rows;
   };
 
+  // Sub-tabla de BATEO EN SITUACIÓN (Fase 3B) — 3 columnas, un renglón por ocupante.
+  // Crece en VERTICAL (no ensancha la tabla de 17 columnas). Datos ya calculados por
+  // ocupante en N.participants (Fase 3A: abConCorr/hConCorr/abRISP/hRISP, mask-aware).
+  // Formato compacto: "H-AB .PPP" si AB>0; "0-0 —" si no le tocó la situación (sin
+  // ".000" engañoso, mismo criterio que la ficha).
+  const fmtSitCell=(h,ab)=>ab>0?`${h}-${ab} ${n3Fmt3(h/ab)}`:'0-0 —';
+  const sitTable=(t,name,cls)=>{
+    let rows=`<tr class="grp ${cls}"><td colspan="3">${name}</td></tr>`;
+    N.participants.filter(p=>p.team===t).forEach(s=>{
+      rows+=`<tr class="body"><td class="nm">${s.name.toUpperCase()} · ${s.pos}</td><td>${fmtSitCell(s.hConCorr,s.abConCorr)}</td><td>${fmtSitCell(s.hRISP,s.abRISP)}</td></tr>`;
+    });
+    return rows;
+  };
+
   // Top 3 RC / LW
   const topList=(arr,valKey,fmt)=>{
     const maxV=arr.length?Math.abs(arr[0][valKey])||1:1;
@@ -6520,6 +6534,14 @@ function n3BuildHTML(N){
             <tr><th class="nm" style="text-align:left">JUGADOR</th><th>AB</th><th>H</th><th>R</th><th>RBI</th><th>2B</th><th>3B</th><th>HR</th><th>BB</th><th>HBP</th><th>K</th><th>SB</th><th>AVG</th><th>OBP</th><th>SLG</th><th>OPS</th><th>RC</th></tr>
             ${batTable('v',vn,'v')}
             ${batTable('l',ln,'l')}
+          </table></div>
+        </div>
+        <div style="margin-top:10px">
+          <div class="bar blue">BATEO EN SITUACIÓN</div>
+          <div class="boxwrap"><table class="st-tab">
+            <tr><th class="nm" style="text-align:left">JUGADOR</th><th>CON CORREDORES</th><th>RISP</th></tr>
+            ${sitTable('v',vn,'v')}
+            ${sitTable('l',ln,'l')}
           </table></div>
         </div>
         ${miniHTML}
