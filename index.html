@@ -2118,8 +2118,14 @@ function applyRunnerMove(team,pidx,inn,action){
     case 'mrev': {
       // Mal reviré (#5): el pitcher revira a una base y tira mal → el corredor gana
       // base aprovechando ese error. Clon fiel de wp/pb/bk: avanza 1 base fija, tramo
-      // 'MR' anaranjado, y desde 3ª anota. FASE 1: SOLO avance + narrativa; el conteo
-      // como ERROR del equipo defensivo (columna E) es Fase 2 — aquí NO se toca.
+      // 'MR' anaranjado, y desde 3ª anota. FASE 2: además marca pl.errRevire — señal
+      // SEPARADA de pl.type (NO se toca el turno al bate del corredor) que el derivador
+      // de la columna E lee ADEMÁS de type==='error'. Como el corredor es de la ofensiva
+      // y ese loop cuenta los plays del OPONENTE, el error aterriza en la E del equipo
+      // DEFENSIVO. CONTADOR: cada mal reviré es un error independiente (3 mal revirés del
+      // mismo corredor = 3 errores). Reversión: 'back' DECREMENTA al deshacer un tramo 'MR'
+      // (piso 0); 'revive' NO lo toca (el mal reviré ocurrió; anular el out no lo borra).
+      pl.errRevire=(pl.errRevire||0)+1;
       if(pl.bases>=3){
         pl.scored=true;
         pl.scoreNote='MR';               // motivo real, sin pisar el sym del hit
@@ -2155,6 +2161,9 @@ function applyRunnerMove(team,pidx,inn,action){
       delete pl.runnerOut; delete pl.csOut;
       delete pl.runnerOutBase; delete pl.runnerOutSym;
       delete pl.csRoute; delete pl.dpRoute; delete pl.forceRoute;
+      // Fase 2 (#5): 'revive' NO toca pl.errRevire. Solo anula un OUT posterior; el avance
+      // por mal reviré permanece (bases y tramo 'MR' intactos) → ese error ocurrió de
+      // verdad y debe seguir contando en la E. Solo 'back' (deshacer el avance) decrementa.
       if(pl.tramos){
         Object.keys(pl.tramos).forEach(k=>{
           const t=pl.tramos[k];
@@ -2190,6 +2199,10 @@ function applyRunnerMove(team,pidx,inn,action){
           // Si el tramo que se borra era un ROBO (letra 'RB'), revierte el contador
           // dedicado pl.sb (mismo estilo manual que pl.rbi). Un avance normal no lo toca.
           if(pl.tramos[ks[0]] && pl.tramos[ks[0]].letra==='RB') pl.sb=Math.max(0,(pl.sb||0)-1);
+          // Fase 2 (#5): si el tramo que se deshace es un mal reviré ('MR'), DECREMENTAR el
+          // contador de errores (piso 0) → la E baja en 1, no se borra todo. Si tenía 3 y
+          // deshaces uno, quedan 2. Mismo estilo que RB→sb.
+          if(pl.tramos[ks[0]] && pl.tramos[ks[0]].letra==='MR') pl.errRevire=Math.max(0,(pl.errRevire||0)-1);
           delete pl.tramos[ks[0]];
         }
       }
@@ -3072,7 +3085,15 @@ function updateScores(){
       Object.values(gs.plays[t][idx]||{}).forEach(pl=>{ if(pl&&pl.h) hits++; });
     });
     gs.teams[opp].players.forEach((_,idx)=>{
-      Object.values(gs.plays[opp][idx]||{}).forEach(pl=>{ if(pl&&pl.type==='error') errors++; });
+      Object.values(gs.plays[opp][idx]||{}).forEach(pl=>{
+        if(pl&&pl.type==='error') errors++;
+        // Fase 2 (#5): avance por mal reviré = error del equipo DEFENSIVO. Señal separada
+        // de pl.type (el corredor conserva su turno al bate). CONTADOR: se suma el NÚMERO
+        // de mal revirés (cada mal tiro es un error distinto). Cuenta SOLO en el marcador
+        // (columna E), no en el reporte de Numeritos (~4060, fuera de alcance). Un turno
+        // que YA es type==='error' no lleva errRevire → sin doble conteo.
+        if(pl&&pl.errRevire) errors+=pl.errRevire;
+      });
     });
     document.getElementById(`sc${t}`).textContent=total;
     const r=document.getElementById(`ls${t==='v'?'v':'l'}R`); if(r) r.textContent=total;
