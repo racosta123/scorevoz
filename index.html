@@ -4069,7 +4069,12 @@ function computeNumeritosData(){
       .filter(occ=>hasParticipation(t,idx,occ.from,occ.to))
       .map(occ=>{
         const s=getBat(t,idx,occ.from,occ.to,occ.mask);
-        return{team:t,tName:gs.teams[t].name,name:occ.name,pos:occ.pos,...s,lw:getLW(t,idx,occ.from,occ.to,occ.mask)};
+        // Fase 3A (#bateo situacional): calcular abConCorr/hConCorr/abRISP/hRISP por
+        // ocupante reusando computeSituationalBat con el MISMO gate/mask que getBat →
+        // respeta sustituciones (no mezcla el bateo situacional de dos que comparten
+        // slot). SOLO cálculo: los campos quedan en el objeto; el render es Fase 3B.
+        const sit=computeSituationalBat(t,idx,occ.from,occ.to,occ.mask);
+        return{team:t,tName:gs.teams[t].name,name:occ.name,pos:occ.pos,...s,...sit,lw:getLW(t,idx,occ.from,occ.to,occ.mask)};
       })
   ));
 
