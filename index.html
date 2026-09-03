@@ -2482,6 +2482,46 @@ function forceAdvanceRunners(team,pidx,inn,target,pushSym){
   return moved.join(' · ');
 }
 
+// ─── CARRERA EN PISA Y CORRE (tag up) — ACREDITACIÓN (FASE 1, solo lógica) ──
+// El corredor de 3ª anota tras la atrapada de un elevado (tag up) → ES un elevado de
+// sacrificio: el bateador del fly recibe el RBI y NO se le carga AB (protege el average).
+// Este helper REPLICA el bloque SF de advanceRunners (~2523-2534) para poder acreditarlo
+// DESDE el menú del corredor (Fase 2/3 lo llamará; aquí solo existe la lógica):
+//   • Corredor (runnerPidx@inn): scored/earned=true, rbiCreditPidx/Inn = bateador del fly
+//     (backref que back/undo YA usan para revertir la carrera y el RBI).
+//   • Tramo a home gris + pushSym='SF' + pushBy = nombre del bateador → la narrativa lo lee
+//     vía pushFrase['SF'] → "Anotó con elevado de sacrificio de {bateador}." (línea ~5320).
+//   • Bateador (batterPidx@inn): +1 rbi y su turno se convierte a SF (sym='SF', ab:false),
+//     clonando el path de voz (~3505/2547) y limpiando el runNote "F{n} SF" si aplica.
+// IDEMPOTENTE: si el corredor YA trae rbiCreditPidx (ya acreditado — doble clic, o SF por
+// voz + tag-up por menú) NO vuelve a sumar. No toca el marcador (updateScores deriva la
+// carrera de pl.scored, ya puesto aquí). Devuelve un resumen o '' si no aplicó.
+function creditTagUpRun(team,runnerPidx,inn,batterPidx){
+  const nm=i=>gs.teams[team].players[i].name;
+  const pl=(gs.plays[team][runnerPidx]||{})[inn];
+  if(!pl) return '';
+  // IDEMPOTENCIA: ya acreditado → no re-sumar (evita doble RBI).
+  if(pl.rbiCreditPidx!=null) return '';
+  // Corredor anota (carrera limpia) con backref al bateador para la reversión.
+  pl.bases=Math.max(pl.bases||3,3);
+  pl.scored=true; pl.earned=true;
+  pl.rbiCreditPidx=batterPidx; pl.rbiCreditInn=inn;
+  pl.runNote='anota en pisa y corre';
+  // Tramo a home: dibujo gris + causa en campos separados (misma Cubeta A que el SF).
+  recordTramo(pl,4,'','gris');
+  if(pl.tramos && pl.tramos[4]){ pl.tramos[4].pushSym='SF'; pl.tramos[4].pushBy=nm(batterPidx); }
+  refreshCell(team,runnerPidx,inn);
+  // Bateador: +1 RBI y convertir su turno a elevado de sacrificio (sin AB).
+  const bp=(gs.plays[team][batterPidx]||{})[inn];
+  if(bp){
+    bp.rbi=(bp.rbi||0)+1;
+    bp.sym='SF'; bp.ab=false;
+    if(bp.runNote && /^F\d+\s*SF$/.test(bp.runNote)) delete bp.runNote;
+    refreshCell(team,batterPidx,inn);
+  }
+  return nm(runnerPidx)+' anotó (pisa y corre) — RBI para '+nm(batterPidx);
+}
+
 // ─── AVANCE AUTOMÁTICO DE CORREDORES EN HITS ─────────────
 function advanceRunners(team,pidx,inn,play){
   const nm=i=>gs.teams[team].players[i].name;
