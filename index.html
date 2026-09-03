@@ -3843,6 +3843,79 @@ function computeSituationalBat(team,pidx,from=1,to=Infinity,mask=null){
   return {abConCorr,hConCorr,abRISP,hRISP};
 }
 
+// ─── DEJADOS EN BASE POR EL BATEADOR (LOB) — FASE A (SOLO CÁLCULO) ─────────
+// Cuántos corredores deja embasados el bateador en sus turnos con OUT (dejados) y cuántos
+// de ellos estaban en posición de anotar (dejadosRISP, base 2 ó 3). Derivado puro: solo
+// lee gs, no muta nada ni guarda contadores. Para cada OUT del bateador con corredores
+// (foto _preState presente y no vacía) compara el ANTES (su propio _preState) contra el
+// DESPUÉS. El "después" NO se lee de la celda viva —la contaminan los bateadores
+// posteriores— sino de la FOTO DEL SIGUIENTE TURNO de la media-entrada: el _preState de la
+// celda con seq inmediatamente mayor. Para el ÚLTIMO turno de la entrada (sin siguiente por
+// seq) se usa computeBaseState al cierre —ahí la celda viva SÍ es el estado final. Se casa
+// por pidx cada corredor del _preState de ESTE turno contra el "después":
+//   • mismo pidx a la MISMA base   → DEJADO   (+dejados; base 2/3 → +dejadosRISP).
+//   • a base mayor                 → avanzó   → no cuenta.
+//   • ausente                      → anotó/out→ no cuenta.
+// Respeta el gate from/to/mask de getBat (scoredOnly → type 'advance' → no es out → se
+// salta; battingOnly → conserva el out). SOLO turnos con _preState: los viejos sin foto
+// (este turno O el siguiente) se excluyen —degradación limpia. Los outs de corredor
+// (CS/PO/RD) y avances por menú van por applyRunnerMove: sin _preState ni seq → nunca
+// cuentan como turno ni como "siguiente". El robo entre turnos queda como sub-cuenta
+// conservadora aceptada (el "siguiente" con seq puede ser un avance que ya movió gente).
+function computeLOBBatter(team,pidx,from=1,to=Infinity,mask=null){
+  const plays=gs.plays[team]?.[pidx]||{};
+  let dejados=0,dejadosRISP=0;
+  Object.entries(plays).forEach(([inn,p])=>{
+    if(!p) return;
+    const i=parseInt(inn);
+    if(i<from||i>to) return;
+    if(!('_preState' in p)) return;                 // turno viejo sin foto → excluir
+    const ps=p._preState;
+    if(!Array.isArray(ps)||ps.length===0) return;   // sin corredores → nada que dejar
+    if(typeof p.seq!=='number') return;             // sin seq no hay "siguiente turno" fiable
+    const mode=mask&&mask[i];
+    const pp = mode==='battingOnly' ? {...p,scored:false}
+             : mode==='scoredOnly'  ? {sym:'R',type:'advance',scored:true,ab:false,h:false}
+             : p;
+    if(pp.type!=='out') return;                     // SOLO turnos con OUT del bateador
+
+    // "Después": foto del SIGUIENTE turno de la media-entrada (seq inmediatamente mayor,
+    // escaneando todas las celdas de ESA entrada de cualquier bateador).
+    let nextCell=null, nextSeq=Infinity;
+    gs.teams[team].players.forEach((_,j)=>{
+      const cells=gs.plays[team][j]||{};
+      Object.entries(cells).forEach(([k,c])=>{
+        if(!c||parseInt(k)!==i) return;
+        if(typeof c.seq!=='number'||c.seq<=p.seq) return;
+        if(c.seq<nextSeq){ nextSeq=c.seq; nextCell=c; }
+      });
+    });
+
+    // Mapa pidx→base del estado "después".
+    const afterBase={};
+    if(nextCell){
+      if(!('_preState' in nextCell)||!Array.isArray(nextCell._preState)) return; // siguiente viejo sin foto → excluir
+      nextCell._preState.forEach(e=>{ if(e) afterBase[e.pidx]=e.base; });
+    } else {
+      const st=computeBaseState(team,i);            // último turno → estado al cierre
+      if(st.first)  afterBase[st.first.pidx]=1;
+      if(st.second) afterBase[st.second.pidx]=2;
+      if(st.third)  afterBase[st.third.pidx]=3;
+    }
+
+    // Casar cada corredor de ESTE turno contra el "después".
+    ps.forEach(r=>{
+      if(!r) return;
+      const ab=afterBase[r.pidx];
+      if(ab===undefined) return;                    // ausente → anotó/out
+      if(ab>r.base) return;                          // avanzó → no cuenta
+      if(ab===r.base){ dejados++; if(r.base===2||r.base===3) dejadosRISP++; }
+      // ab<r.base (no debería ocurrir) → no cuenta
+    });
+  });
+  return {dejados,dejadosRISP};
+}
+
 // ─── NUMERITOS: CAPA DE DATOS COMPARTIDA (FASE 1) ──────────
 // Única fuente de verdad para renderNumeritosFinal() (plantilla HTML +
 // html2canvas). No duplicar este cálculo en ningún otro lado.
