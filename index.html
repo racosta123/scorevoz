@@ -2062,6 +2062,31 @@ function applyRunnerMove(team,pidx,inn,action){
     case 'score':         pl.bases=Math.max(pl.bases,3); pl.scored=true; showToast('✓ Corredor anotó'); break;
     case 'score-earned':  pl.bases=Math.max(pl.bases,3); pl.scored=true; pl.earned=true;  showToast('✓ Carrera limpia'); break;
     case 'score-unearned':pl.bases=Math.max(pl.bases,3); pl.scored=true; pl.earned=false; showToast('✓ Carrera sucia');  break;
+    // CARRERA EN PISA Y CORRE (tag up) — FASE 2: el corredor anota tras un elevado y el
+    // RBI va al bateador del fly (elevado de sacrificio). Resuelve el bateador candidato
+    // (la secuencia activa, o el último turno de ESTA media-entrada) y solo ACREDITA si ese
+    // turno es de verdad un fly out (type 'out' + sym que empieza con F o P) — así nunca
+    // convierte un rodado en SF ni acredita al bateador equivocado. El crédito, la
+    // conversión a SF (ab:false), la narrativa y la idempotencia viven en creditTagUpRun
+    // (Fase 1). Sin elevado válido → DEGRADACIÓN LIMPIA: anota sin RBI (como 'score'), con
+    // aviso. No toca 'score'/'score-earned'/'score-unearned'.
+    case 'score-tagup': {
+      let bPidx = (_runnerSeq && _runnerSeq.batterPidx!=null) ? _runnerSeq.batterPidx : null;
+      if(bPidx==null){
+        const last=gs.playHistory[gs.playHistory.length-1];
+        if(last && last.team===team && String(last.inn)===String(inn)) bPidx=last.pidx;
+      }
+      const bp = bPidx!=null ? (gs.plays[team][bPidx]||{})[inn] : null;
+      const esFlyOut = !!(bp && bp.type==='out' && /^[FP]/.test(bp.sym||''));
+      if(esFlyOut){
+        creditTagUpRun(team,pidx,inn,bPidx);
+        showToast('✓ Anotó en pisa y corre — RBI para '+gs.teams[team].players[bPidx].name);
+      } else {
+        pl.bases=Math.max(pl.bases,3); pl.scored=true;
+        showToast('✓ Anotó (sin elevado que acreditar)');
+      }
+      break;
+    }
     case 'out2': pl.runnerOut=true; pl.runnerOutBase=2; showToast('Out en 2ª'); break;
     case 'out3': pl.runnerOut=true; pl.runnerOutBase=3; showToast('Out en 3ª'); break;
     case 'outH': pl.runnerOut=true; pl.runnerOutBase=4; showToast('Out en Home'); break;
