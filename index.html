@@ -4147,7 +4147,11 @@ function computeNumeritosData(){
         // respeta sustituciones (no mezcla el bateo situacional de dos que comparten
         // slot). SOLO cálculo: los campos quedan en el objeto; el render es Fase 3B.
         const sit=computeSituationalBat(t,idx,occ.from,occ.to,occ.mask);
-        return{team:t,tName:gs.teams[t].name,name:occ.name,pos:occ.pos,...s,...sit,lw:getLW(t,idx,occ.from,occ.to,occ.mask)};
+        // Fase B (#dejados en base): dejados/dejadosRISP por ocupante con el MISMO gate/mask
+        // (respeta sustituciones). Cálculo ya vive en computeLOBBatter (Fase A) — aquí solo
+        // se adjunta al participant para que el render (sitTable) lo consuma.
+        const lob=computeLOBBatter(t,idx,occ.from,occ.to,occ.mask);
+        return{team:t,tName:gs.teams[t].name,name:occ.name,pos:occ.pos,...s,...sit,...lob,lw:getLW(t,idx,occ.from,occ.to,occ.mask)};
       })
   ));
 
@@ -4770,6 +4774,9 @@ function showPlayerFicha(team,pidx){
     : `0 de 0 <span style="color:var(--text-dim)">· sin turnos</span>`;
   const sitCorrStr=fmtSit(sit.hConCorr,sit.abConCorr);
   const sitRispStr=fmtSit(sit.hRISP,sit.abRISP);
+  // Dejados en base (Fase B): SIN mask ni gate, igual que el resto de la ficha (todo el
+  // slot). Números CRUDOS; el 0 es un dato real (no dejó a nadie varado) → se muestra.
+  const lob=computeLOBBatter(team,pidx);
 
   // ── Calificación OPS ──────────────────────────────────────
   const opsRating=ops>=1.0?{lbl:'EXCELENTE', col:'var(--green)',   bg:'rgba(0,229,153,.08)',  bc:'rgba(0,229,153,.25)'}:
@@ -4854,6 +4861,14 @@ function showPlayerFicha(team,pidx){
       <div style="display:flex;justify-content:space-between;align-items:baseline;background:rgba(255,255,255,.03);border-radius:9px;padding:8px 12px">
         <span style="font-family:'Oswald',sans-serif;font-size:.72rem;color:var(--text-dim)">En posición de anotar <span style="color:var(--amber)">RISP</span></span>
         <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:#fff;letter-spacing:.5px">${sitRispStr}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;background:rgba(255,255,255,.03);border-radius:9px;padding:8px 12px">
+        <span style="font-family:'Oswald',sans-serif;font-size:.72rem;color:var(--text-dim)">Dejados en base</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:#fff;letter-spacing:.5px">${lob.dejados}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;background:rgba(255,255,255,.03);border-radius:9px;padding:8px 12px">
+        <span style="font-family:'Oswald',sans-serif;font-size:.72rem;color:var(--text-dim)">Dejados en posición de anotar</span>
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:#fff;letter-spacing:.5px">${lob.dejadosRISP}</span>
       </div>
     </div>
     ${ratingHTML}
@@ -6436,16 +6451,18 @@ function n3BuildHTML(N){
     return rows;
   };
 
-  // Sub-tabla de BATEO EN SITUACIÓN (Fase 3B) — 3 columnas, un renglón por ocupante.
-  // Crece en VERTICAL (no ensancha la tabla de 17 columnas). Datos ya calculados por
-  // ocupante en N.participants (Fase 3A: abConCorr/hConCorr/abRISP/hRISP, mask-aware).
-  // Formato compacto: "H-AB .PPP" si AB>0; "0-0 —" si no le tocó la situación (sin
-  // ".000" engañoso, mismo criterio que la ficha).
+  // Sub-tabla de BATEO EN SITUACIÓN (Fase 3B + Fase B dejados) — 5 columnas, un renglón por
+  // ocupante. Crece en VERTICAL (no ensancha la tabla de 17 columnas). Datos ya calculados
+  // por ocupante en N.participants (Fase 3A: abConCorr/hConCorr/abRISP/hRISP; Fase B:
+  // dejados/dejadosRISP — todo mask-aware).
+  // Bateo situacional: formato "H-AB .PPP" si AB>0; "0-0 —" si no le tocó la situación (sin
+  // ".000" engañoso, mismo criterio que la ficha). Dejados: número CRUDO — el 0 se muestra
+  // ("0" = no dejó a nadie varado, dato real y bueno), nunca "—".
   const fmtSitCell=(h,ab)=>ab>0?`${h}-${ab} ${n3Fmt3(h/ab)}`:'0-0 —';
   const sitTable=(t,name,cls)=>{
-    let rows=`<tr class="grp ${cls}"><td colspan="3">${name}</td></tr>`;
+    let rows=`<tr class="grp ${cls}"><td colspan="5">${name}</td></tr>`;
     N.participants.filter(p=>p.team===t).forEach(s=>{
-      rows+=`<tr class="body"><td class="nm">${s.name.toUpperCase()} · ${s.pos}</td><td>${fmtSitCell(s.hConCorr,s.abConCorr)}</td><td>${fmtSitCell(s.hRISP,s.abRISP)}</td></tr>`;
+      rows+=`<tr class="body"><td class="nm">${s.name.toUpperCase()} · ${s.pos}</td><td>${fmtSitCell(s.hConCorr,s.abConCorr)}</td><td>${fmtSitCell(s.hRISP,s.abRISP)}</td><td>${s.dejados??0}</td><td>${s.dejadosRISP??0}</td></tr>`;
     });
     return rows;
   };
@@ -6612,7 +6629,7 @@ function n3BuildHTML(N){
         <div style="margin-top:10px">
           <div class="bar blue">BATEO EN SITUACIÓN</div>
           <div class="boxwrap"><table class="st-tab">
-            <tr><th class="nm" style="text-align:left">JUGADOR</th><th>CON CORREDORES</th><th>RISP</th></tr>
+            <tr><th class="nm" style="text-align:left">JUGADOR</th><th>CON CORREDORES</th><th>RISP</th><th>DEJADOS EN BASE</th><th>DEJ. POS. ANOTAR</th></tr>
             ${sitTable('v',vn,'v')}
             ${sitTable('l',ln,'l')}
           </table></div>
