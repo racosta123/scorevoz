@@ -1896,6 +1896,23 @@ function showRunnerModal(team,pidx,inn,seqMode,correctMode){
   } else {
     const sa=mkBtn('🏠 Anotó','run-btn-score','score',true); gScr.appendChild(sa);
   }
+  // CARRERA EN PISA Y CORRE (tag up) — FASE 3: botón que dispara score-tagup (Fase 2).
+  // Solo se ofrece EN CONTEXTO: corredor en 3ª (pl.bases>=3) Y el último turno de ESTA
+  // media-entrada es un fly out válido — el MISMO criterio que score-tagup usa para
+  // acreditar (candidato = secuencia activa o playHistory[last] del mismo team/inn;
+  // type 'out' + sym que empieza con F o P). Así el botón nunca aparece cuando no habría
+  // a quién acreditar (fuera de esos casos siguen los botones de anotar normales).
+  if(pl.bases>=3){
+    let bPidx = (_runnerSeq && _runnerSeq.batterPidx!=null) ? _runnerSeq.batterPidx : null;
+    if(bPidx==null){
+      const last=gs.playHistory[gs.playHistory.length-1];
+      if(last && last.team===team && String(last.inn)===String(inn)) bPidx=last.pidx;
+    }
+    const bp = bPidx!=null ? (gs.plays[team][bPidx]||{})[inn] : null;
+    if(bp && bp.type==='out' && /^[FP]/.test(bp.sym||'')){
+      gScr.appendChild(mkBtn('🏠 Anotó en pisa y corre','run-btn-score','score-tagup',true));
+    }
+  }
 
   // ── OUTS ─────────────────────────────────────────────────
   body.appendChild(sec('OUTS'));
