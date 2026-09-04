@@ -5271,7 +5271,16 @@ function narratePlay(team,pidx,inn){
   const jardFrase={7:'al jardinero izquierdo',8:'al jardinero central',9:'al jardinero derecho'};
   // Posición defensiva (1..9) → frase en español, para elevados/líneas/foul flies numerados.
   const posDe={1:'al pitcher',2:'al catcher',3:'a primera',4:'a segunda',5:'a tercera',6:'al short',7:'al jardinero izquierdo',8:'al jardinero central',9:'al jardinero derecho'};
+  // Nombre COMPLETO de la posición por número defensivo (1-9), para el infield hit. Mismos
+  // nombres que el mapa posVoz del asistente de voz (~3439), re-indexados por número — posVoz
+  // va por abreviatura (P/C/1B/2B/SS…) y es local a esa función, no alcanzable desde aquí.
+  const posInf={1:'pitcher',2:'catcher',3:'primera base',4:'segunda base',5:'tercera base',6:'short',7:'jardinero izquierdo',8:'jardinero central',9:'jardinero derecho'};
   if(p.runNote==='FC')   parts.push(rolaDir[sym]?`Rola ${rolaDir[sym]}, se embasó en bola ocupada (FC).`:`Se embasó en bola ocupada (FC).`);
+  // Infield hit (Fase 3): un 1B con el flag infieldPos (posición 1-9 del batazo de cuadro)
+  // se narra con la posición ("por el {posInf}") en vez de "Bateó sencillo". Va ANTES de
+  // hitNarr['1B']; un 1B SIN infieldPos cae al genérico y narra como hoy.
+  else if(sym==='1B' && p.infieldPos && posInf[p.infieldPos])
+                         parts.push(`Infield hit por el ${posInf[p.infieldPos]}, llegó a primera.`);
   else if(hitNarr[sym])  parts.push(hitNarr[sym]);
   else if(outNarr[sym])  parts.push(outNarr[sym]);
   else if(walkNarr[sym]) parts.push(walkNarr[sym]);
