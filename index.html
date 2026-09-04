@@ -2960,6 +2960,13 @@ function applyPlay(team,pidx,inn,play){
   if(play.flyPos && gs.plays[team][pidx][inn]){
     gs.plays[team][pidx][inn].runNote=`F${play.flyPos} SF`;
   }
+  // Infield hit (Fase 2): el guardado del bateador solo copia campos fijos, así que
+  // el flag infieldPos (posición 1-9 del batazo de cuadro) se persiste aquí, igual que
+  // flyPos→runNote. Solo si existe → un sencillo normal NO gana un infieldPos basura.
+  // El sym sigue '1B' (stats/linear weights intactos); la narrativa lo usará en Fase 3.
+  if(play.infieldPos && gs.plays[team][pidx][inn]){
+    gs.plays[team][pidx][inn].infieldPos=play.infieldPos;
+  }
   // Embasada por HIT (#4 Fase B): rayitas verdes hasta la base alcanzada; la
   // letra (1B/2B/3B) va en la rayita de destino, las intermedias solo verde.
   const _plHit=gs.plays[team][pidx][inn];
