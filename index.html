@@ -1777,6 +1777,16 @@ function showModal(team,pidx,inn){
       btn.onclick=()=>{ applyPlay(team,pidx,inn,pl); closeModal(); };
       grid.appendChild(btn);
     });
+    // Infield hit (Fase 4): botón extra al final de HITS que abre el sub-menú de posición
+    // (patrón hermano de showKCorridoMenu). NO es una entrada de PLAY_CATALOG — al elegir la
+    // posición aplica un 1B con el flag infieldPos (sym sigue '1B'; stats/Linear Weights intactos).
+    if(sec.title==='HITS'){
+      const ihBtn=document.createElement('button');
+      ihBtn.className='play-btn hit-btn';
+      ihBtn.textContent='🏃 Infield Hit';
+      ihBtn.onclick=()=>showInfieldHitMenu(team,pidx,inn);
+      grid.appendChild(ihBtn);
+    }
     body.appendChild(grid);
   });
   document.getElementById('modal').classList.add('show');
@@ -4620,6 +4630,37 @@ function showKCorridoMenu(team,pidx,inn){
     {id:'KC',  sym:'KC',     bases:1, type:'reach', ab:true, h:false, label:'K corrido → 1ª'});
   mk('❌ Out en 1ª (2-3)','out-btn',
     {id:'KC23',sym:'KC 2-3', bases:0, type:'out',   ab:true, h:false, label:'K corrido 2-3'});
+}
+
+// ─── SUB-MENÚ INFIELD HIT (Fase 4) ───────────────────────────
+// Patrón hermano de showKCorridoMenu: reemplaza #mbody con "← Volver" + grilla de las 6
+// posiciones de CUADRO. Al elegir la posición n aplica el 1B inyectando infieldPos=n — el
+// MISMO objeto que produce la voz ({...play1B, infieldPos:n}, ver ~3626): sym sigue '1B'
+// (stats y Linear Weights intactos), bases:1/type:'hit' → empuja corredores como un sencillo.
+// La voz sigue aceptando 7/8/9; el botón solo ofrece 1-6 porque el infield hit es al cuadro.
+function showInfieldHitMenu(team,pidx,inn){
+  const p=gs.teams[team].players[pidx];
+  const oneB=PLAY_CATALOG.hits.find(pl=>pl.id==='1B');
+  setModalForceChoice(false);
+  document.getElementById('mtitle').textContent=`INFIELD HIT — ${p.name} · E${inn}`;
+  const body=document.getElementById('mbody'); body.innerHTML='';
+  const back=document.createElement('button');
+  back.className='play-btn'; back.textContent='← Volver';
+  back.style.marginBottom='8px';
+  back.onclick=()=>showModal(team,pidx,inn);
+  body.appendChild(back);
+  const sec=document.createElement('div'); sec.className='modal-section';
+  sec.textContent='POSICIÓN (CUADRO)'; body.appendChild(sec);
+  const grid=document.createElement('div'); grid.className='play-buttons'; body.appendChild(grid);
+  const mk=(text,n)=>{
+    const b=document.createElement('button');
+    b.className='play-btn hit-btn'; b.textContent=text;
+    b.onclick=()=>{ closeModal(); applyPlay(team,pidx,inn,{...oneB, infieldPos:n}); };
+    grid.appendChild(b);
+  };
+  mk('Pitcher',1); mk('Catcher',2); mk('Primera',3);
+  mk('Segunda',4); mk('Tercera',5); mk('Short',6);
+  document.getElementById('modal').classList.add('show');
 }
 
 function getCurrentPitcherName(team){
