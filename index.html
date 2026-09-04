@@ -3604,6 +3604,22 @@ function interpretVoice(text){
     }
   }
 
+  // ── INFIELD HIT (hit de cuadro) — FASE 1: solo voz ──────────
+  // Sencillo (1B) normal para TODA la estadística: sym sigue '1B', bases:1,
+  // type:'hit', ab:true, h:true → AB/H/AVG/singles/TB/SLG y los 3 Linear Weights
+  // (que buscan sym exacto) cuentan idéntico a un sencillo. La única diferencia es
+  // el flag infieldPos (posición 1-9 vía posFromText/POS_WORD_MAP), que la narrativa
+  // usará en una fase posterior. Va ANTES del bucle genérico porque el voice de 1B ya
+  // matchea "infield hit"; esta rama lo intercepta para capturar la posición. Sin
+  // posición → 1B pelado (degradación limpia, igual que hoy).
+  if(!matched && /infield hit|hit infield|hit al cuadro/.test(text)){
+    const play1B=PLAY_CATALOG.hits.find(p=>p.id==='1B');
+    if(play1B){
+      const pos=posFromText(text);
+      matched=pos?{...play1B, infieldPos:Number(pos), label:`1B Infield hit por el ${pos}`}:play1B;
+    }
+  }
+
   // Busca en el catálogo completo por palabras clave de voz
   if(!matched){
     for(const play of ALL_PLAYS){
