@@ -1206,6 +1206,16 @@ window.rehydrateGame = function(gsString){
   if(gs.matchPitchLimit===undefined){
     gs.matchPitchLimit = gs.pitcherLimits?.v?.[0] ?? gs.pitcherLimits?.l?.[0] ?? null;
   }
+  // COMPAT PUNTERO DE BATEADOR (bug 3er out): guardados viejos podían venir sin gs.currentBatter
+  // o con una clave (v/l) ausente/inválida. Sin sanear, autoAdvance leería un índice roto al
+  // cambiar de lado y dejaría la selección en "SIN SELECCIÓN". Normalizar AMBAS claves a entero
+  // válido (0..lineup-1); si falta o es inválida → 0 (leadoff). No pisa valores sanos.
+  if(!gs.currentBatter || typeof gs.currentBatter!=='object') gs.currentBatter={v:0,l:0};
+  ['v','l'].forEach(t=>{
+    const n=(gs.teams?.[t]?.players?.length)||9;
+    const v=gs.currentBatter[t];
+    gs.currentBatter[t]=(Number.isInteger(v) && v>=0 && v<n) ? v : 0;
+  });
   INNINGS = gs.scores.v.length;          // LA TRAMPA: restaurar ANTES de build*()
   resetLineScoreDOM();
   document.getElementById('setup-screen').style.display='none';
@@ -2421,7 +2431,12 @@ function startRunnerMic(team,pidx,inn){
   _runnerRecog.onresult=e=>{
     const txt=e.results[0][0].transcript.toLowerCase();
     const a=parseRunnerVoice(txt);
-    if(a){ applyRunnerMove(team,pidx,inn,a); closeModal(); checkRunnerOutAdvance(team,pidx,inn,a); }
+    if(a){ applyRunnerMove(team,pidx,inn,a); closeModal();
+      // BUG 3 (corredor por voz dejaba la secuencia huérfana → "SIN SELECCIÓN"): igual que el
+      // botón (1858), dentro de una secuencia de rodado hay que AVANZAR la cola (_seqAdvance),
+      // no ir por checkRunnerOutAdvance (que llamaría returnToActiveBatter sin bateador activo y
+      // dejaría _runnerSeq a medias, sin llegar nunca al autoAdvance final).
+      if(_runnerSeq) _seqAdvance(); else checkRunnerOutAdvance(team,pidx,inn,a); }
     else showToast('No reconocí: '+txt);
   };
   _runnerRecog.start();
@@ -3114,6 +3129,15 @@ function autoAdvance(team,pidx,inn){
       if(nextInn>INNINGS) return;
     }
     nextPidx=gs.currentBatter[nextTeam];
+    // BLINDAJE PUNTERO ROTO (bug 3er out): si gs.currentBatter[nextTeam] viene inválido
+    // (save viejo sin la clave, o índice sin celda), NO rendirse dejando "SIN SELECCIÓN".
+    // La salida legítima por fin de juego ya ocurrió arriba (nextInn>INNINGS return). Pasado
+    // ese guard, un puntero que no resuelve a una celda = corrupción, NO fin de juego →
+    // recuperar al leadoff del equipo que entra a batear (findFirstEmptyBatter, 3100; si no,0).
+    if(!Number.isInteger(nextPidx) || !document.getElementById(`c-${nextTeam}-${nextPidx}-${nextInn}`)){
+      const lead=findFirstEmptyBatter(nextTeam,nextInn);
+      nextPidx=Number.isInteger(lead)?lead:0;
+    }
     if(nextInn!==baseInn){
       // Cambiar a la nueva entrada en la nav
       const ib=document.getElementById(`ib${nextInn}`);
@@ -3315,7 +3339,9 @@ function confirmYes(){
       }
     }
     document.getElementById('vrs').textContent=`✓ ${a.sym||''}`;
-    checkRunnerOutAdvance(a.team,a.pidx,a.inn,a.action);
+    // BUG 3 (voz vía banner): misma bifurcación que el botón (1858) y el mic (2434) — si hay
+    // una secuencia de corredores activa, avanzar la cola en vez de checkRunnerOutAdvance.
+    if(_runnerSeq) _seqAdvance(); else checkRunnerOutAdvance(a.team,a.pidx,a.inn,a.action);
   } else if(a.type==='sub'){
     applySubstitution(a.team,a.pidx,a.inName,a.inPos);
   }
