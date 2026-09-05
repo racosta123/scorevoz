@@ -956,8 +956,23 @@ function pitcherStopUI(team){
   pitcherListeningTeam=null;
 }
 
+// Quita CUALQUIER DH marcado del equipo (desmarca la pastilla y restaura su POS previa). Base de la
+// exclusión mutua DH ↔ "¿BATEA?": no pueden coexistir (cubrirían el turno del pitcher dos veces).
+function clearAllDH(team){
+  for(let i=1;i<=9;i++){
+    const dh=document.getElementById(`dh-${team}-${i}`);
+    if(dh&&dh.classList.contains('active')){
+      dh.classList.remove('active');
+      const posInput=document.getElementById(`o-${team}-${i}`);
+      if(posInput){ posInput.value=posInput.dataset.prev||''; posInput.style.color=''; }
+    }
+  }
+}
+
 function togglePitcherBatea(team,btn){
   btn.classList.toggle('active');
+  // Exclusión mutua: si el pitcher pasa a batear, no puede haber DH en ese equipo.
+  if(btn.classList.contains('active')) clearAllDH(team);
 }
 
 function parsePitcherVoice(text,team){
@@ -974,6 +989,7 @@ function parsePitcherVoice(text,team){
   if(batea){
     const btn=document.getElementById(`pitbt-${team}`);
     if(btn&&!btn.classList.contains('active')) btn.classList.add('active');
+    clearAllDH(team); // exclusión mutua (mismo criterio que togglePitcherBatea)
   }
   return `✓ Pitcher: ${fmt}${batea?' · BATEA':''}`;
 }
@@ -999,6 +1015,9 @@ function toggleDH(team, row, btn){
     posInput.dataset.prev=posInput.value!=='DH'?posInput.value:'';
     posInput.value='DH';
     posInput.style.color='var(--amber)';
+    // Exclusión mutua: al poner un DH, el pitcher NO batea → apaga "¿BATEA?" de ese equipo.
+    const pitbt=document.getElementById(`pitbt-${team}`);
+    if(pitbt&&pitbt.classList.contains('active')) pitbt.classList.remove('active');
   }
 }
 
@@ -1155,6 +1174,17 @@ buildSetup('v'); buildSetup('l');
 })();
 
 function startGame(){
+  // GUARDA DE EXCLUSIÓN MUTUA (red de seguridad): DH y "¿BATEA?" no pueden coexistir — cubrirían el
+  // turno del pitcher dos veces (lineup inválido de 10). Si por cualquier vía quedaran ambos activos,
+  // NO arrancar: avisar y salir sin mutar nada. No se adivina cuál gana; el usuario corrige.
+  for(const t of ['v','l']){
+    const pitBatea=document.getElementById(`pitbt-${t}`).classList.contains('active');
+    if(pitBatea && hasDH(t,0)){
+      const tn=(document.getElementById(`tn-${t}`).value.trim())||(t==='v'?'VISITANTE':'LOCAL');
+      showToast(`⚠️ ${tn}: no puedes tener bateador designado y pitcher que batea a la vez; elige uno`,true);
+      return;
+    }
+  }
   ['v','l'].forEach(t=>{
     gs.teams[t].name = (document.getElementById(`tn-${t}`).value.trim()||( t==='v'?'VISITANTE':'LOCAL')).toUpperCase();
     const pl=[];
@@ -5684,7 +5714,8 @@ function posPttStart(team,row,e){
     const btn=document.getElementById(`posmb-${team}-${row}`);
     if(posLabel){
       if(posLabel==='DH'){ if(hasDH(team,row)){ showToast('⚠️ Ya hay un DH en este equipo',true); }
-        else { const dh=document.getElementById(`dh-${team}-${row}`); if(dh&&!dh.classList.contains('active')) dh.classList.add('active'); document.getElementById(`o-${team}-${row}`).style.color='var(--amber)'; } }
+        else { const dh=document.getElementById(`dh-${team}-${row}`); if(dh&&!dh.classList.contains('active')) dh.classList.add('active'); document.getElementById(`o-${team}-${row}`).style.color='var(--amber)';
+          const pitbt=document.getElementById(`pitbt-${team}`); if(pitbt&&pitbt.classList.contains('active')) pitbt.classList.remove('active'); } } // exclusión mutua: DH por voz apaga "¿BATEA?"
       document.getElementById(`o-${team}-${row}`).value=posLabel;
       if(btn){ btn.textContent='✓'; setTimeout(()=>{ btn.textContent='P'; },1500); }
     } else { if(btn){ btn.textContent='⚠'; setTimeout(()=>{ btn.textContent='P'; },1500); } showToast('⚠️ Di: pitcher, catcher, primera, segunda, short, left, center, right',true); }
