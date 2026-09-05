@@ -1247,6 +1247,14 @@ window.rehydrateGame = function(gsString){
   }
   // COMPAT UNDO DE SWAPS: guardados previos a esta versión no traen el stack → default a [].
   if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
+  // COMPAT HISTORIAL DE POSICIÓN: guardados viejos traen .posChange (objeto único, solo el último
+  // cambio) y no .posHistory (arreglo ordenado). Normalizar a posHistory=[posChange] una sola vez,
+  // en ambos equipos, y limpiar la clave vieja. Los registros viejos de gs.cambiosSwapUndo con
+  // prevPosChange los tolera el undo nuevo (ignora ese campo: ahora hace pop del historial).
+  ['v','l'].forEach(t=>{ (gs.teams?.[t]?.players||[]).forEach(p=>{
+    if(!Array.isArray(p.posHistory) && p.posChange) p.posHistory=[{...p.posChange}];
+    if('posChange' in p) delete p.posChange;
+  }); });
   // COMPAT FECHA DEL PARTIDO: guardados viejos no traen gs.gameDate → default seguro '' (vacío),
   // sin romper. rehydrateGame no recibe savedAt (metadato de la nube), así que se deja vacío.
   if(typeof gs.gameDate!=='string') gs.gameDate='';
@@ -4261,22 +4269,25 @@ function applyCambiosSwap(){
   // ¿Cambia de manos la posición 1? (llega alguien nuevo a pitcher)
   const newPitMove=plan.find(m=>m.to===1);
   const outPitName=newPitMove?getCurrentPitcherName(team):null; // capturar saliente ANTES de tocar nada
-  // 2) UNDO: capturar el estado PREVIO (pos + posChange por jugador, y si sincronizó el pitcher)
-  //    ANTES de mutar, y apilarlo en gs.cambiosSwapUndo (LIFO, se serializa con gs → sobrevive
-  //    al reload). prevPosChange se copia (o null) para restaurar un cambio anterior, no borrarlo.
+  // 2) UNDO: capturar el estado PREVIO (pos por jugador, y si sincronizó el pitcher) ANTES de mutar
+  //    y apilarlo en gs.cambiosSwapUndo (LIFO, se serializa con gs → sobrevive al reload). La
+  //    etiqueta se revierte con pop() del historial (un push ⇄ un pop), no restaurando un objeto.
   if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
   gs.cambiosSwapUndo.push({
     team, inn, pitcherSynced:!!newPitMove,
     moves: plan.map(m=>{
       const p=gs.teams[team].players[m.pidx];
-      return { pidx:m.pidx, prevPos:p.pos, prevPosChange:p.posChange?{...p.posChange}:null };
+      return { pidx:m.pidx, prevPos:p.pos };  // el undo hace pop() del historial (un push ⇄ un pop)
     })
   });
-  // Aplicar nuevas posiciones + etiqueta de cambio (solo la MÁS reciente por jugador).
+  // Aplicar nuevas posiciones + APPEND al historial de posición (no sobrescribir). El "from" real
+  // previo es la última "to" del historial si existe (self-heal), si no la posición actual capturada.
   plan.forEach(m=>{
     const p=gs.teams[team].players[m.pidx];
+    if(!Array.isArray(p.posHistory)) p.posHistory=[];
+    const realFrom = p.posHistory.length ? p.posHistory[p.posHistory.length-1].to : POS_ABBR[m.from-1];
     p.pos=POS_ABBR[m.to-1];
-    p.posChange={from:POS_ABBR[m.from-1],to:POS_ABBR[m.to-1],inn};
+    p.posHistory.push({from:realFrom, to:POS_ABBR[m.to-1], inn});
   });
   // 3) Sincronizar pitcher si la pos 1 cambió de manos (mismo patrón que applyCambioPitcher).
   if(newPitMove){
@@ -4299,7 +4310,7 @@ function applyCambiosSwap(){
   showToast(`✓ E${inn}: cambio de posiciones (${resumenTxt})${newPitMove?' — nuevo pitcher '+gs.teams[team].players[newPitMove.pidx].name:''}`);
 }
 
-// DESHACER el swap de posición MÁS RECIENTE (LIFO). Restaura .pos/.posChange de cada jugador
+// DESHACER el swap de posición MÁS RECIENTE (LIFO). Restaura .pos y hace pop() de .posHistory de cada jugador
 // SIEMPRE (inocuo). La parte del pitcher solo se revierte si el swap SIGUE siendo el último
 // cambio de pitcher (última entrada de gs.pitcherChanges[team] con fromSwap:true); si hubo un
 // cambio de pitcher DESPUÉS, se rechaza el undo completo y no se toca nada (evita corromper
@@ -4337,7 +4348,8 @@ function undoLastCambiosSwap(){
     const p=gs.teams[team].players[m.pidx];
     if(!p) return;
     p.pos=m.prevPos;
-    if(m.prevPosChange) p.posChange={...m.prevPosChange}; else delete p.posChange;
+    // Un push por jugador en cada apply → un pop por jugador en el undo (revive la última entrada).
+    if(Array.isArray(p.posHistory)){ p.posHistory.pop(); if(!p.posHistory.length) delete p.posHistory; }
     rebuildPlayerCell(team,m.pidx);
   });
   closeModal();
@@ -5163,11 +5175,14 @@ function getPlayerCellInnerHTML(team,pidx){
   const btnHtml=canMore
     ?`<button class="sub-btn-new" id="cb-${team}-${pidx}" onclick="openSubModal('${team}',${pidx})" title="Cambio de jugador">⇄</button>`
     :`<button class="sub-btn-new" id="cb-${team}-${pidx}" disabled style="border-color:var(--green);color:var(--green)" title="Máx cambios alcanzados">✓</button>`;
-  // Etiqueta discreta de cambio de POSICIÓN (Cambios Paso 2). Solo el MÁS RECIENTE (p.posChange
-  // se sobrescribe en cada swap), con posiciones reales e inning, sin encimar nombres. Ej "P→SS (3ª)".
-  const pcLabel=p.posChange
-    ?`<div class="ph-poschg" style="font-size:0.52rem;color:var(--amber);opacity:.92;margin-top:1px;white-space:nowrap" title="Cambio de posición en E${p.posChange.inn}">${p.posChange.from}→${p.posChange.to} (${p.posChange.inn}ª)</div>`
-    :'';
+  // Historial COMPLETO de cambios de POSICIÓN (Cambios Paso 2), una línea por entrada en orden,
+  // sin encimar nombres. Color por orden: 1º verde, 2º ámbar, 3º+ rojo. Titular sin etiqueta.
+  // Fallback a .posChange por si una partida no pasó por el shim de migración. Ej "P→SS (3ª)".
+  const PCLVL=['var(--green)','var(--amber)','var(--red)'];
+  const posHist=Array.isArray(p.posHistory)?p.posHistory:(p.posChange?[p.posChange]:[]);
+  const pcLabel=posHist.map((c,i)=>
+    `<div class="ph-poschg" style="font-size:0.52rem;color:${PCLVL[Math.min(i,2)]};opacity:.92;margin-top:1px;white-space:nowrap" title="Cambio de posición en E${c.inn}">${c.from}→${c.to} (${c.inn}ª)</div>`
+  ).join('');
   return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:3px"><span class="ord-chip">${pidx+1}</span><div style="flex:1;min-width:0">${entriesHTML}${pcLabel}</div>${btnHtml}</div>`;
 }
 
@@ -6864,7 +6879,12 @@ function ssPlayerColHTML(t,pidx){
     const col=LVL[Math.min(i+1,3)];
     body+=`<div class="ss-pl-sub" style="color:${col}">↑ ${ssEsc(s.inName)} <span class="ss-pl-pos">(${ssEsc(s.inPos||'')} · entró ${s.inn}ª)</span></div>`;
   });
-  if(p.posChange) body+=`<div class="ss-pl-pchg">↔ ${ssEsc(p.posChange.from)}→${ssEsc(p.posChange.to)} (${p.posChange.inn}ª)</div>`;
+  // Historial COMPLETO de cambios de posición, apilado con la MISMA escala de color por orden que
+  // los subs de esta columna (LVL: 1º verde, 2º ámbar, 3º+ rojo). Fallback a .posChange si aplica.
+  const posHist=Array.isArray(p.posHistory)?p.posHistory:(p.posChange?[p.posChange]:[]);
+  posHist.forEach((c,i)=>{
+    body+=`<div class="ss-pl-pchg" style="color:${LVL[Math.min(i+1,3)]}">↔ ${ssEsc(c.from)}→${ssEsc(c.to)} (${ssEsc(String(c.inn))}ª)</div>`;
+  });
   return `<div class="ss-pl"><div class="ss-pl-order">${pidx+1}</div><div class="ss-pl-body">${body}</div></div>`;
 }
 // Diamante(s) de una celda (inning i, 1-based). Incluye turnos "bat around" del
