@@ -449,6 +449,7 @@
     </div>
     <button id="numeritos-btn" onclick="renderNumeritosFinal()" style="display:none;background:var(--amber);color:#000;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(255,184,0,0.3)">📊 NUMERITOS</button>
     <button id="hoja-btn" onclick="renderScoresheetPrint()" style="display:none;background:#fff;color:#0b2350;border:1px solid #0b2350;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(11,35,80,0.25)">🖨 HOJA</button>
+    <button id="guia-btn" onclick="openGuia()" style="display:none;background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.22);border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer">📖 GUÍA</button>
     <button id="cambio-pit-btn" onclick="openCambioPitcher()" style="display:none;background:var(--navy);color:#fff;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(0,48,135,0.4)">🔄 PITCHER</button>
     <button id="cambios-btn" onclick="openCambiosMenu()" style="display:none;background:var(--green);color:#071018;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(0,229,153,0.3)">🔀 CAMBIOS</button>
     <button id="jugador-btn" onclick="openJugadorModal()" style="display:none;background:var(--cyan);color:#071018;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(0,191,255,0.3)">👤 JUGADOR</button>
@@ -1190,6 +1191,7 @@ function startGame(){
   document.getElementById('lang-toggle').style.display='block';
   document.getElementById('numeritos-btn').style.display='block';
   document.getElementById('hoja-btn').style.display='block';
+  document.getElementById('guia-btn').style.display='block';
   document.getElementById('cambio-pit-btn').style.display='block';
   document.getElementById('cambios-btn').style.display='block';
   document.getElementById('jugador-btn').style.display='block';
@@ -1254,6 +1256,7 @@ window.rehydrateGame = function(gsString){
   document.getElementById('lang-toggle').style.display='block';
   document.getElementById('numeritos-btn').style.display='block';
   document.getElementById('hoja-btn').style.display='block';
+  document.getElementById('guia-btn').style.display='block';
   document.getElementById('cambio-pit-btn').style.display='block';
   document.getElementById('cambios-btn').style.display='block';
   document.getElementById('jugador-btn').style.display='block';
@@ -6718,8 +6721,9 @@ function stopChatMic(e){
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       <button id="ss-btn-img" class="ss-dl-btn" onclick="downloadScoresheetImage()" style="background:#0d9f6e;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:2px;padding:9px 16px;cursor:pointer">⬇️ DESCARGAR IMAGEN</button>
       <button id="ss-btn-pdf" class="ss-dl-btn" onclick="downloadScoresheetPDF()" style="background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:2px;padding:9px 16px;cursor:pointer">⬇️ DESCARGAR PDF</button>
+      <button onclick="openGuia()" style="background:rgba(255,255,255,.10);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:2px;padding:9px 16px;cursor:pointer">📖 ¿CÓMO LEER?</button>
     </div>
-    <button onclick="document.getElementById('scoresheet-print-overlay').style.display='none'" style="background:#DC2626;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:2px;padding:9px 14px;cursor:pointer">✕ CERRAR</button>
+    <button onclick="closeScoresheetPrint()" style="background:#DC2626;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:2px;padding:9px 14px;cursor:pointer">✕ CERRAR</button>
   </div>
   <div id="scoresheet-print"></div>
 </div>
@@ -6900,7 +6904,7 @@ function ssBuildPage(t){
       <span class="lg"><span class="sw" style="border-top-color:#0b8f5a"></span>avance / embasado</span>
       <span class="lg" style="color:#0b8f5a">◑ anotó</span>
       <span class="lg" style="color:#c2153a">◯ out</span>
-      <span class="lg">IFH = hit interior · SQ = toque</span>
+      <span class="lg">B = bunt hit (toque) · SQ = squeeze</span>
     </div>`;
   return `<div class="ss-page">${head}${grid}${legend}</div>`;
 }
@@ -6908,7 +6912,15 @@ function renderScoresheetPrint(){
   const cont=document.getElementById('scoresheet-print');
   cont.innerHTML=ssBuildPage('v')+ssBuildPage('l');
   document.getElementById('scoresheet-print-overlay').style.display='flex';
+  // Oculta el header sticky mientras el overlay está abierto: su fondo es translúcido
+  // (.85) y dejaba asomar el botón BÁSICO/PRO por detrás. No afecta la captura del PDF
+  // (que solo toma los .ss-page). Se restaura al cerrar.
+  const hdr=document.querySelector('header'); if(hdr) hdr.style.display='none';
   ssPrepareDownloads(); // pre-captura en segundo plano (mismo patrón que Numeritos)
+}
+function closeScoresheetPrint(){
+  document.getElementById('scoresheet-print-overlay').style.display='none';
+  const hdr=document.querySelector('header'); if(hdr) hdr.style.display=''; // restaura (CSS: flex)
 }
 
 // ── Pre-captura para descargas confiables (idéntico patrón a n3PrepareDownloads) ──
@@ -6973,6 +6985,111 @@ async function downloadScoresheetPDF(){
     setTimeout(()=>URL.revokeObjectURL(url),40000);
     showToast('✅ PDF descargado');
   }catch(e){ showToast('⚠️ Error al generar PDF',true); console.error(e); }
+}
+</script>
+
+<!-- ════════════════════════════════════════════════════════════════
+     GUÍA "¿CÓMO LEER LA HOJA?" — panel de símbolos, solo lectura (no toca gs).
+     Abreviaturas tomadas de PLAY_CATALOG (sym reales) y POS_ABBR.
+     ════════════════════════════════════════════════════════════════ -->
+<div id="guia-overlay" style="display:none;flex-direction:column;align-items:center;position:fixed;inset:0;z-index:10001;background:#081120;overflow-y:auto;padding:24px 16px;">
+  <div style="width:760px;max-width:100%;margin:0 auto 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+    <div style="font-family:'Bebas Neue','Oswald',sans-serif;font-size:1.15rem;letter-spacing:2px;color:#fff">📖 ¿CÓMO LEER LA HOJA?</div>
+    <button onclick="document.getElementById('guia-overlay').style.display='none'" style="background:#DC2626;color:#fff;border:none;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:2px;padding:9px 14px;cursor:pointer">✕ CERRAR</button>
+  </div>
+  <div id="guia-body"></div>
+</div>
+
+<style>
+#guia-body{width:760px;max-width:100%;background:#0c1a2e;border:1px solid rgba(255,255,255,.10);border-radius:14px;padding:20px 22px 26px;
+  font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#dbe4ee}
+#guia-body .g-sec{font-family:'Bebas Neue','Oswald',sans-serif;letter-spacing:2px;font-size:0.98rem;color:#00e599;margin:18px 0 8px;padding-bottom:4px;border-bottom:1px solid rgba(0,229,153,.25)}
+#guia-body .g-sec:first-child{margin-top:2px}
+#guia-body .g-intro{font-size:0.8rem;color:#9fb0c2;line-height:1.5;margin-bottom:4px}
+#guia-body .g-row{display:flex;align-items:flex-start;gap:10px;padding:4px 0;font-size:0.82rem;line-height:1.4}
+#guia-body .g-chip{flex-shrink:0;min-width:46px;text-align:center;font-family:'Oswald',monospace;font-weight:700;font-size:0.78rem;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.20);border-radius:6px;padding:3px 7px;color:#fff}
+#guia-body .g-desc{flex:1;color:#c7d2de}
+#guia-body .g-desc b{color:#fff;font-weight:600}
+#guia-body .g-sw{flex-shrink:0;width:44px;height:0;border-top:4px solid #000;border-radius:2px;margin-top:8px}
+#guia-body .g-note{font-size:0.72rem;color:#8aa;background:rgba(0,191,255,.08);border-left:3px solid #00bfff;padding:7px 10px;border-radius:4px;margin-top:6px;line-height:1.45}
+</style>
+
+<script>
+// Guía de símbolos — contenido estático con las abreviaturas REALES de la app.
+function buildGuiaHTML(){
+  const row=(chip,desc,chipColor)=>`<div class="g-row"><span class="g-chip"${chipColor?` style="color:${chipColor};border-color:${chipColor}66"`:''}>${chip}</span><span class="g-desc">${desc}</span></div>`;
+  const swatch=(color,label)=>`<div class="g-row"><span class="g-sw" style="border-top-color:${color}"></span><span class="g-desc">${label}</span></div>`;
+  let h='';
+  h+=`<div class="g-intro">Cada celda del diamante resume el turno de un bateador. Aquí está qué significa cada símbolo, tal como los usa VozScore.</div>`;
+
+  h+=`<div class="g-sec">⚾ OUTS (dentro de un círculo)</div>`;
+  h+=`<div class="g-intro" style="margin:2px 0 6px">Ponches:</div>`;
+  h+=row('KS','<b>Ponche abanicando</b> — el bateador le tiró (swing).');
+  h+=row('KL','<b>Ponche cantado</b> — sin tirarle, se lo cantaron (mirando).');
+  h+=row('KBF','Ponche por <b>foul de toque</b> con dos strikes.');
+  h+=row('KC','<b>Ponche corrido</b> — el bateador llega a 1ª (bola escapada / wild).');
+  h+=`<div class="g-intro" style="margin:8px 0 6px">Elevados y líneas:</div>`;
+  h+=row('F2…F9','<b>Elevado (fly) atrapado</b> por esa posición (2=cátcher … 9=right field).');
+  h+=row('P','<b>Globito / palomita</b> al cuadro (pop fly).');
+  h+=row('FF','<b>Foul fly</b> — elevado de foul atrapado.');
+  h+=row('L','<b>Línea atrapada</b> (line drive out).');
+  h+=row('IF','<b>Infield fly</b> — out por regla en elevado al cuadro.');
+  h+=`<div class="g-intro" style="margin:8px 0 6px">Rodados (los números = por dónde viajó la bola):</div>`;
+  h+=row('6-3','Rodado a las <b>paradas cortas</b> (SS) y tiro a 1ª. Igual: 4-3, 5-3, 1-3, 2-3, 3-3.');
+  h+=row('6-4-3','<b>Doble play</b> (dos outs). Igual: 5-4-3.');
+  h+=`<div class="g-intro" style="margin:8px 0 6px">Sacrificios y otros outs:</div>`;
+  h+=row('SH','<b>Toque de sacrificio</b> (no cuenta como turno / VB).');
+  h+=row('SF','<b>Elevado de sacrificio</b> — anota corredor (no cuenta VB, sí CI).');
+  h+=row('SQ','<b>Squeeze</b> — toque apretado para anotar de 3ª.');
+  h+=row('CS','<b>Out robando</b> (cogido robando).');
+  h+=row('PO','Out en <b>reviré / pickoff</b>.');
+  h+=row('RD','<b>Tira y tira</b> (rundown) — corredor atrapado entre bases.');
+  h+=row('GDP · TP','Bateado para doble play · <b>Triple play</b>. OR = out por regla.');
+
+  h+=`<div class="g-sec">💥 HITS</div>`;
+  h+=row('1B','<b>Sencillo</b> (incluye el hit de cuadro / infield hit).');
+  h+=row('2B','<b>Doble</b>.');
+  h+=row('3B','<b>Triple</b>.');
+  h+=row('HR','<b>Jonrón</b>. IHR = jonrón dentro del parque.');
+  h+=row('B','<b>Bunt hit</b> — toque de hit (se embasa).');
+  h+=row('TX','<b>Texas leaguer</b> — palomita que cae de hit.');
+
+  h+=`<div class="g-sec">🚶 EMBASADO SIN BATAZO</div>`;
+  h+=row('BB','<b>Base por bolas</b> (cuatro bolas). BBI = intencional.');
+  h+=row('BG','<b>Base por golpe</b> — pelotazo / HBP.');
+  h+=row('FC','<b>Bola ocupada</b> (fielder\'s choice) — sacan a otro corredor y el bateador llega safe.');
+  h+=row('INT · OB','Interferencia · Obstrucción.');
+
+  h+=`<div class="g-sec">🧤 ERRORES</div>`;
+  h+=row('E1…E9','<b>Error</b> de esa posición (1=pitcher, 2=cátcher, 3=1ª, 4=2ª, 5=3ª, 6=SS, 7=LF, 8=CF, 9=RF).');
+
+  h+=`<div class="g-sec">🏃 AVANCES / EVENTOS EN BASE</div>`;
+  h+=row('SB','<b>Robo</b> de base. SBH = robo de home.');
+  h+=row('WP','<b>Wild pitch</b> — lanzamiento descontrolado.');
+  h+=row('PB','<b>Passed ball</b> — bola pasada del cátcher.');
+  h+=row('BK','<b>Balk</b> — falta del lanzador.');
+  h+=row('T · PC','Avance por tiro · Pisa y corre. H&R = hit and run.');
+
+  h+=`<div class="g-sec">🎨 COLOR DE LOS CAMBIOS (columna del jugador)</div>`;
+  h+=swatch('#111827','<b>Titular</b> — negro.');
+  h+=swatch('#0b8f5a','<b>1er cambio</b> — verde.');
+  h+=swatch('#b26a00','<b>2º cambio</b> — ámbar.');
+  h+=swatch('#c2153a','<b>3er cambio</b> — rojo.');
+  h+=row('↔','<b>Cambio de posición</b> — ej. «↔ P→SS (4ª)»: pasó de P a SS en la 4ª entrada.','#b26a00');
+
+  h+=`<div class="g-sec">🔷 SÍMBOLOS DEL DIAMANTE</div>`;
+  h+=swatch('#0b8f5a','<b>Línea verde</b> por las bases — avance / embasado del corredor.');
+  h+=row('◆','<b>Diamante lleno</b> (relleno) — el corredor <b>anotó carrera</b>.','#0b8f5a');
+  h+=row('◯','<b>Círculo rojo</b> con número/ruta — <b>out</b> (con la jugada que lo produjo).','#c2153a');
+  h+=row('•','Punto de <b>carrera impulsada</b> (CI) del bateador productor.','#ffb648');
+
+  h+=`<div class="g-note"><b>Nota:</b> las posiciones se abrevian P, C, 1B, 2B, 3B, SS, LF, CF, RF (1 a 9). Los ponches KS/KL en VozScore son: <b>KS = le tiró</b> (swing) y <b>KL = cantado</b> (mirando).</div>`;
+  return h;
+}
+function openGuia(){
+  document.getElementById('guia-body').innerHTML=buildGuiaHTML();
+  document.getElementById('guia-overlay').style.display='flex';
 }
 </script>
 
