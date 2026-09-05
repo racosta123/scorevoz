@@ -4010,7 +4010,7 @@ function renderCambiosEditor(){
   const sec=document.createElement('div'); sec.className='modal-section'; sec.textContent=`INTERCAMBIOS — ${teamName}`; body.appendChild(sec);
   const hint=document.createElement('div');
   hint.style.cssText='font-size:0.62rem;color:var(--text-dim);margin:2px 0 8px;line-height:1.4';
-  hint.textContent='Cada fila: de qué posición sale un jugador (Origen) y a cuál va (Destino). Usa "Banca" como origen para meter a alguien nuevo; el jugador que quede sin destino sale del juego.';
+  hint.textContent='Cada fila: de qué posición sale un jugador (Origen) y a cuál va (Destino). Usa "Banca" como Origen para meter a alguien nuevo, y "Sale de juego" como Destino para mandar a alguien a la banca. Si alguien entra, alguien tiene que salir.';
   body.appendChild(hint);
   const rowsWrap=document.createElement('div'); rowsWrap.id='cambios-rows'; body.appendChild(rowsWrap);
   cambiosRows.forEach((r,i)=>rowsWrap.appendChild(buildCambioRow(r,i)));
@@ -4040,7 +4040,7 @@ function buildCambioRow(r,idx){
   oSel.value=r.origin||'';
   const arrow=document.createElement('span'); arrow.textContent='→'; arrow.style.cssText='color:var(--text-dim);font-size:0.95rem;flex:0 0 auto';
   const dSel=document.createElement('select'); dSel.className='cambios-dest'; dSel.style.cssText=selStyle;
-  dSel.innerHTML=`<option value="">Destino…</option>${posOpts}`;
+  dSel.innerHTML=`<option value="">Destino…</option><option value="X">🚪 Sale de juego</option>${posOpts}`;
   dSel.value=r.dest||'';
   const rm=document.createElement('button'); rm.className='play-btn'; rm.textContent='✕';
   rm.title='Quitar fila'; rm.style.cssText='border-color:var(--red);color:var(--red);padding:6px 11px;flex:0 0 auto';
@@ -4072,47 +4072,51 @@ function syncCambiosRowsFromDOM(){
 
 function cambiosError(msg){ const e=document.getElementById('cambios-err'); if(e) e.textContent='⚠ '+msg; }
 
-// Valida la cadena y, si pasa, muestra el resumen. Definiciones:
-//   realOrigins = posiciones usadas como Origen (no banca)
-//   dests       = posiciones usadas como Destino
-//   vacatedNotRefilled = realOrigins \ dests  → alguien salió y nadie ocupa esa posición
-//   filledNotVacated   = dests \ realOrigins  → llega alguien a una posición de la que
-//                        NADIE salió por una fila → el ocupante previo queda desplazado.
-// Sin banca: la cadena debe cerrar (ambos conjuntos vacíos = permutación pura).
-// Con banca: filledNotVacated debe ser exactamente 1 → esa es la posición del jugador
-//            que sale del juego (reemplazado, vía la cadena, por el de banca).
+// Valida la cadena con el modelo EXPLÍCITO (Banca como Origen = entra; "Sale de juego"
+// como Destino = sale). Definiciones:
+//   realOrigins = posiciones 1-9 usadas como Origen (NO Banca)  → se desocupan
+//   realDests   = posiciones 1-9 usadas como Destino (NO "Sale")→ se re-ocupan
+//   entran      = # filas con Origen "Banca"
+//   salen       = # filas con Destino "Sale de juego"
+// Reglas: (a) ningún Origen real repetido, ningún Destino real repetido;
+//         (b) conjunto(realOrigins) === conjunto(realDests) → cada posición que se
+//             desocupa se vuelve a ocupar exactamente una vez y viceversa (campo con 9);
+//         (c) entran === salen (por ahora máx 1 de cada uno).
 function verCambiosResumen(){
   const rows=cambiosRows;
   for(let i=0;i<rows.length;i++){
     const r=rows[i];
     if(!r.origin||!r.dest){ cambiosError(`Fila ${i+1}: elige origen y destino.`); return; }
     if(r.origin==='B' && !r.benchName){ cambiosError(`Fila ${i+1}: escribe el nombre del jugador de banca.`); return; }
-    if(r.origin!=='B' && +r.origin===+r.dest){ cambiosError(`Fila ${i+1}: el origen y el destino no pueden ser la misma posición.`); return; }
+    if(r.origin==='B' && r.dest==='X'){ cambiosError(`Fila ${i+1}: un jugador no puede entrar de banca y salir del juego a la vez.`); return; }
+    if(r.origin!=='B' && r.dest!=='X' && +r.origin===+r.dest){ cambiosError(`Fila ${i+1}: el origen y el destino no pueden ser la misma posición.`); return; }
   }
-  const benchRows=rows.filter(r=>r.origin==='B');
-  if(benchRows.length>1){ cambiosError('Solo se permite UNA fila con origen "Banca".'); return; }
-  const hasBench=benchRows.length===1;
-  const realOrigins=rows.filter(r=>r.origin!=='B').map(r=>+r.origin);
-  const dests=rows.map(r=>+r.dest);
+  const realOrigins=rows.filter(r=>r.origin!=='B').map(r=>+r.origin);   // posiciones desocupadas
+  const realDests  =rows.filter(r=>r.dest!=='X').map(r=>+r.dest);       // posiciones re-ocupadas
+  const entran=rows.filter(r=>r.origin==='B').length;
+  const salen =rows.filter(r=>r.dest==='X').length;
+  // Límite por pantalla (por ahora)
+  if(entran>1){ cambiosError('Por ahora solo se permite UNA entrada desde "Banca" por pantalla.'); return; }
+  if(salen>1){ cambiosError('Por ahora solo se permite UNA salida ("Sale de juego") por pantalla.'); return; }
+  // (a) sin posiciones reales repetidas
   const dupO=realOrigins.find((n,i)=>realOrigins.indexOf(n)!==i);
   if(dupO){ cambiosError(`La posición ${cambiosPosLabel(dupO)} está como Origen en dos filas.`); return; }
-  const dupD=dests.find((n,i)=>dests.indexOf(n)!==i);
+  const dupD=realDests.find((n,i)=>realDests.indexOf(n)!==i);
   if(dupD){ cambiosError(`La posición ${cambiosPosLabel(dupD)} está como Destino en dos filas.`); return; }
-  const oSet=new Set(realOrigins), dSet=new Set(dests);
+  // (c) entran == salen
+  if(entran>salen){ cambiosError('Entra un jugador desde la banca pero nadie sale del juego → el equipo quedaría con 10. Marca "Sale de juego" en la fila del jugador que sale.'); return; }
+  if(salen>entran){ cambiosError('Sale un jugador del juego pero nadie entra desde la banca → quedaría una posición sin cubrir. Agrega una fila con Origen "Banca".'); return; }
+  // (b) conjunto de orígenes reales == conjunto de destinos reales
+  const oSet=new Set(realOrigins), dSet=new Set(realDests);
   const vacatedNotRefilled=[...oSet].filter(n=>!dSet.has(n));
-  const filledNotVacated=[...dSet].filter(n=>!oSet.has(n));
-  if(!hasBench){
-    if(vacatedNotRefilled.length>0){ cambiosError(`La cadena no cierra: ${cambiosPosLabel(vacatedNotRefilled[0])} no tiene destino. Si alguien sale del juego, agrega una fila de Banca.`); return; }
-    if(filledNotVacated.length>0){ cambiosError(`La cadena no cierra: llega un jugador a ${cambiosPosLabel(filledNotVacated[0])} pero nadie sale de ahí. Si alguien sale del juego, agrega una fila de Banca.`); return; }
-  } else {
-    if(vacatedNotRefilled.length>0){ cambiosError(`La cadena no cierra: ${cambiosPosLabel(vacatedNotRefilled[0])} no tiene quién la ocupe. Revisa las filas.`); return; }
-    if(filledNotVacated.length!==1){ cambiosError(`Con una entrada desde Banca debe salir del juego exactamente un jugador, pero la cadena deja ${filledNotVacated.length} posición(es) sin vincular. No se puede determinar automáticamente quién sale: revisa las filas.`); return; }
-  }
-  showCambiosResumen({rows, hasBench, leavingPos:hasBench?filledNotVacated[0]:null});
+  const filledNotVacated  =[...dSet].filter(n=>!oSet.has(n));
+  if(vacatedNotRefilled.length>0){ cambiosError(`La cadena no cierra: ${cambiosPosLabel(vacatedNotRefilled[0])} queda desocupada y nadie la vuelve a ocupar.`); return; }
+  if(filledNotVacated.length>0){ cambiosError(`La cadena no cierra: llega un jugador a ${cambiosPosLabel(filledNotVacated[0])} pero de esa posición no salió nadie.`); return; }
+  showCambiosResumen({rows});
 }
 
 function showCambiosResumen(ctx){
-  const {rows,hasBench,leavingPos}=ctx;
+  const {rows}=ctx;
   const team=cambiosTeam;
   const body=document.getElementById('mbody'); body.innerHTML='';
   const back=document.createElement('button');
@@ -4124,13 +4128,12 @@ function showCambiosResumen(ctx){
   rows.forEach(r=>{
     if(r.origin==='B'){
       lines.push({c:'var(--green)',t:`<strong>${r.benchName}</strong> (nuevo, de banca): entra a ${cambiosPosLabel(+r.dest)}`});
+    } else if(r.dest==='X'){
+      lines.push({c:'var(--red)',t:`<strong>${cambiosPlayerAtPos(team,+r.origin)}</strong>: sale del juego (era ${CAMBIOS_POS_NAME[+r.origin]})`});
     } else {
       lines.push({c:'#fff',t:`<strong>${cambiosPlayerAtPos(team,+r.origin)}</strong>: pasa de ${cambiosPosLabel(+r.origin)} a ${cambiosPosLabel(+r.dest)}`});
     }
   });
-  if(hasBench && leavingPos){
-    lines.push({c:'var(--red)',t:`<strong>${cambiosPlayerAtPos(team,leavingPos)}</strong>: sale del juego (era ${CAMBIOS_POS_NAME[leavingPos]})`});
-  }
   const list=document.createElement('div'); list.style.cssText='padding:4px 0 6px';
   list.innerHTML=lines.map(l=>`<div style="padding:5px 0;font-size:0.8rem;line-height:1.4;color:${l.c};border-bottom:1px solid rgba(255,255,255,.06)">${l.t}</div>`).join('');
   body.appendChild(list);
