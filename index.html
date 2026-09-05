@@ -3983,6 +3983,16 @@ function cambiosPlayerAtPos(team,n){
   return pl?pl.name:`(jugador en ${CAMBIOS_POS_NAME[n]})`;
 }
 
+// Índice (pidx) del jugador de la alineación que ocupa la posición n (para APLICAR el swap:
+// necesitamos el índice, no solo el nombre). Resuelve por .pos === POS_ABBR[n-1] (pos 1='P').
+// Devuelve -1 si no hay jugador de la alineación con esa posición (sin .pos capturado, o un
+// pitcher relevista fuera de la alineación — ese caso queda fuera del Paso 2).
+function cambiosPlayerIdxAtPos(team,n){
+  const abbr=POS_ABBR[n-1];
+  const players=(gs.teams[team]&&gs.teams[team].players)||[];
+  return players.findIndex(p=>String(p.pos||'').toUpperCase()===abbr);
+}
+
 function openCambiosMenu(){
   cambiosTeam=null;
   cambiosRows=[{origin:'',dest:'',benchName:''}];
@@ -4150,16 +4160,78 @@ function showCambiosResumen(ctx){
     warn.innerHTML=`⚠ Esto también registrará un cambio de pitcher: nuevo pitcher = <strong>${newPit}</strong>.`;
     body.appendChild(warn);
   }
-  // Aplicar — DESHABILITADO en Fase 1 (no toca ningún estado del juego).
+  // APLICAR — Paso 2: habilitado SOLO para cadenas de solo-posiciones (sin Banca ni "Sale
+  // de juego"). Con banca o salida sigue deshabilitado (eso es el Paso 3).
+  const posOnly=!rows.some(r=>r.origin==='B'||r.dest==='X');
   const applyBtn=document.createElement('button');
-  applyBtn.className='play-btn'; applyBtn.textContent='Aplicar cambio (Fase 2 pendiente)';
-  applyBtn.disabled=true;
-  applyBtn.style.cssText='width:100%;margin-top:12px;border-color:var(--text-dim);color:var(--text-dim);opacity:.55;cursor:not-allowed';
+  applyBtn.className='play-btn';
+  if(posOnly){
+    applyBtn.textContent='Aplicar cambio';
+    applyBtn.style.cssText='width:100%;margin-top:12px;border-color:var(--green);color:var(--green)';
+    applyBtn.onclick=()=>applyCambiosSwap();
+  } else {
+    applyBtn.textContent='Aplicar cambio (Paso 3 pendiente)';
+    applyBtn.disabled=true;
+    applyBtn.style.cssText='width:100%;margin-top:12px;border-color:var(--text-dim);color:var(--text-dim);opacity:.55;cursor:not-allowed';
+  }
   body.appendChild(applyBtn);
   const note=document.createElement('div');
   note.style.cssText='margin-top:6px;font-size:0.62rem;color:var(--text-dim);text-align:center;line-height:1.4';
-  note.textContent='Fase 1: solo verificación y resumen. No se aplicó ningún cambio.';
+  note.textContent=posOnly
+    ?'Intercambio de posiciones: se aplica al confirmar. Con banca/salida, "Aplicar" se habilita en el Paso 3.'
+    :'Incluye banca/salida: eso se aplica en el Paso 3. Por ahora solo verificación.';
   body.appendChild(note);
+}
+
+// APLICA una cadena de SOLO POSICIONES (sin Banca, sin "Sale de juego") — Cambios Paso 2.
+// Intercambio de posiciones entre jugadores de la alineación: nadie entra ni sale, solo
+// cambia el .pos. Si la posición 1 (pitcher) cambia de manos, sincroniza el estado del
+// pitcher igual que applyCambioPitcher (archiva el conteo del saliente en gs.pitcherChanges,
+// resetea el conteo live, deja al nuevo como pitcher actual) — PERO el saliente NO se elimina:
+// se queda en el juego con su nueva posición (solo cambia .pos). NO toca gs.subs.
+function applyCambiosSwap(){
+  const team=cambiosTeam;
+  const rows=cambiosRows;
+  // Doble candado: solo posiciones (el botón ya se habilita únicamente en ese caso).
+  if(rows.some(r=>r.origin==='B'||r.dest==='X')){ showToast('⚠️ Este cambio incluye banca/salida (Paso 3)',true); return; }
+  const inn=gs.currentInning||1;
+  // 1) Resolver TODOS los pidx de origen ANTES de mutar .pos (al cambiar uno se corrompería
+  //    la búsqueda por .pos de los siguientes).
+  const plan=[];
+  for(const r of rows){
+    const from=+r.origin, to=+r.dest;
+    const pidx=cambiosPlayerIdxAtPos(team,from);
+    if(pidx<0){ showToast(`⚠️ No encuentro al jugador en ${CAMBIOS_POS_NAME[from]} — revisa las posiciones de la alineación`,true); return; }
+    plan.push({pidx,from,to});
+  }
+  // ¿Cambia de manos la posición 1? (llega alguien nuevo a pitcher)
+  const newPitMove=plan.find(m=>m.to===1);
+  const outPitName=newPitMove?getCurrentPitcherName(team):null; // capturar saliente ANTES de tocar nada
+  // 2) Aplicar nuevas posiciones + etiqueta de cambio (solo la MÁS reciente por jugador).
+  plan.forEach(m=>{
+    const p=gs.teams[team].players[m.pidx];
+    p.pos=POS_ABBR[m.to-1];
+    p.posChange={from:POS_ABBR[m.from-1],to:POS_ABBR[m.to-1],inn};
+  });
+  // 3) Sincronizar pitcher si la pos 1 cambió de manos (mismo patrón que applyCambioPitcher).
+  if(newPitMove){
+    const inName=gs.teams[team].players[newPitMove.pidx].name;
+    const battingSide=team==='v'?'l':'v'; // el conteo se acumula bajo el equipo que BATEA
+    const pc=gs.pitchCount[battingSide];
+    gs.pitcherChanges[team].push({
+      inn, inName, outName:outPitName,
+      outsAtChange:countOutsInInning(battingSide,inn), seqAtChange:gs.seq||0,
+      pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},
+      inningLog:{...pc.inningLog}, fromSwap:true
+    });
+    gs.pitchCount[battingSide]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
+    updatePitchCounterUI();
+  }
+  // 4) Redibujar las celdas de los jugadores afectados (nombre + nueva pos + etiqueta).
+  plan.forEach(m=>rebuildPlayerCell(team,m.pidx));
+  closeModal();
+  const resumenTxt=plan.map(m=>`${POS_ABBR[m.from-1]}→${POS_ABBR[m.to-1]}`).join(', ');
+  showToast(`✓ E${inn}: cambio de posiciones (${resumenTxt})${newPitMove?' — nuevo pitcher '+gs.teams[team].players[newPitMove.pidx].name:''}`);
 }
 
 // ─── BATEO CON CORREDORES EN BASE (derivado) ───────────────
@@ -4980,7 +5052,12 @@ function getPlayerCellInnerHTML(team,pidx){
   const btnHtml=canMore
     ?`<button class="sub-btn-new" id="cb-${team}-${pidx}" onclick="openSubModal('${team}',${pidx})" title="Cambio de jugador">⇄</button>`
     :`<button class="sub-btn-new" id="cb-${team}-${pidx}" disabled style="border-color:var(--green);color:var(--green)" title="Máx cambios alcanzados">✓</button>`;
-  return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:3px"><span class="ord-chip">${pidx+1}</span><div style="flex:1;min-width:0">${entriesHTML}</div>${btnHtml}</div>`;
+  // Etiqueta discreta de cambio de POSICIÓN (Cambios Paso 2). Solo el MÁS RECIENTE (p.posChange
+  // se sobrescribe en cada swap), con posiciones reales e inning, sin encimar nombres. Ej "P→SS (3ª)".
+  const pcLabel=p.posChange
+    ?`<div class="ph-poschg" style="font-size:0.52rem;color:var(--amber);opacity:.92;margin-top:1px;white-space:nowrap" title="Cambio de posición en E${p.posChange.inn}">${p.posChange.from}→${p.posChange.to} (${p.posChange.inn}ª)</div>`
+    :'';
+  return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:3px"><span class="ord-chip">${pidx+1}</span><div style="flex:1;min-width:0">${entriesHTML}${pcLabel}</div>${btnHtml}</div>`;
 }
 
 function rebuildPlayerCell(team,pidx){
