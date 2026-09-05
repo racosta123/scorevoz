@@ -449,6 +449,7 @@
     </div>
     <button id="numeritos-btn" onclick="renderNumeritosFinal()" style="display:none;background:var(--amber);color:#000;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(255,184,0,0.3)">📊 NUMERITOS</button>
     <button id="cambio-pit-btn" onclick="openCambioPitcher()" style="display:none;background:var(--navy);color:#fff;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(0,48,135,0.4)">🔄 PITCHER</button>
+    <button id="cambios-btn" onclick="openCambiosMenu()" style="display:none;background:var(--green);color:#071018;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(0,229,153,0.3)">🔀 CAMBIOS</button>
     <button id="jugador-btn" onclick="openJugadorModal()" style="display:none;background:var(--cyan);color:#071018;border:none;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer;box-shadow:0 2px 10px rgba(0,191,255,0.3)">👤 JUGADOR</button>
     <div id="lang-toggle" style="display:none" onclick="toggleLang()">🎤 ES</div>
     <button id="save-cloud-btn" onclick="window.fbSaveGame && window.fbSaveGame()" style="display:none;background:rgba(0,229,153,.12);color:#00e599;border:1px solid #00e599;border-radius:7px;font-family:'Bebas Neue',sans-serif;font-size:0.88rem;letter-spacing:2px;padding:6px 13px;cursor:pointer">☁️ GUARDAR</button>
@@ -1168,6 +1169,7 @@ function startGame(){
   document.getElementById('lang-toggle').style.display='block';
   document.getElementById('numeritos-btn').style.display='block';
   document.getElementById('cambio-pit-btn').style.display='block';
+  document.getElementById('cambios-btn').style.display='block';
   document.getElementById('jugador-btn').style.display='block';
   document.getElementById('pitch-bar').style.display='flex';
   buildLineScore(); buildInningNav(); buildScoresheets(); updateScores();
@@ -1225,6 +1227,7 @@ window.rehydrateGame = function(gsString){
   document.getElementById('lang-toggle').style.display='block';
   document.getElementById('numeritos-btn').style.display='block';
   document.getElementById('cambio-pit-btn').style.display='block';
+  document.getElementById('cambios-btn').style.display='block';
   document.getElementById('jugador-btn').style.display='block';
   document.getElementById('pitch-bar').style.display='flex';
   buildLineScore(); buildInningNav(); buildScoresheets();
@@ -3949,6 +3952,208 @@ function applyCambioPitcher(inn){
   updatePitchCounterUI();
   closeModal();
   showToast(`✓ E${inn}: sale ${outName} (${pc.total} lanz) — entra ${inName}`);
+}
+
+// ─── CAMBIOS (INTERCAMBIO DE POSICIONES EN EL CAMPO) — FASE 1 ─────────────────
+// SOLO interfaz + validación + resumen. NO aplica nada: no toca gs.teams, gs.pitcher,
+// gs.pitcherChanges ni gs.subs (eso es Fase 2). Reusa el modal genérico (#modal/#mbody/
+// #mtitle) con el mismo patrón "← Volver" + modal-section + grilla que showKCorridoMenu
+// (4610) y showInfieldHitMenu (4641). Modela una cadena de movimientos Origen→Destino
+// (musical chairs): quien sale de una posición debe entrar a otra; si alguien entra de
+// banca, exactamente un jugador queda desplazado y sale del juego.
+let cambiosTeam=null;
+let cambiosRows=[]; // [{origin:'B'|'1'..'9'|'', dest:'1'..'9'|'', benchName:string}]
+
+// Nombre completo de la posición 1-9 (local a este módulo; los mapas de narrativa/voz
+// son locales a sus funciones y no son alcanzables desde aquí).
+const CAMBIOS_POS_NAME={1:'Pitcher',2:'Catcher',3:'Primera',4:'Segunda',5:'Tercera',6:'Short',7:'Jardín Izquierdo',8:'Jardín Central',9:'Jardín Derecho'};
+function cambiosPosLabel(n){ return `${CAMBIOS_POS_NAME[n]} (${n})`; }
+
+// Ocupante ACTUAL (pre-cambio) de la posición n. Pos 1 = pitcher actual
+// (getCurrentPitcherName, 4666). Resto: primer jugador de gs.teams cuyo .pos coincide
+// con POS_ABBR[n-1] (828). Si no se identifica, devuelve una etiqueta genérica (Fase 1
+// es solo verificación: nunca truena, aunque el .pos escrito a mano no case).
+function cambiosPlayerAtPos(team,n){
+  if(n===1) return getCurrentPitcherName(team)||'(pitcher actual)';
+  const abbr=POS_ABBR[n-1];
+  const pl=(gs.teams[team]&&gs.teams[team].players||[]).find(p=>String(p.pos||'').toUpperCase()===abbr);
+  return pl?pl.name:`(jugador en ${CAMBIOS_POS_NAME[n]})`;
+}
+
+function openCambiosMenu(){
+  cambiosTeam=null;
+  cambiosRows=[{origin:'',dest:'',benchName:''}];
+  setModalForceChoice(false);
+  document.getElementById('mtitle').textContent='CAMBIOS (POSICIONES)';
+  const body=document.getElementById('mbody'); body.innerHTML='';
+  const sec=document.createElement('div'); sec.className='modal-section'; sec.textContent='¿QUÉ EQUIPO CAMBIA?'; body.appendChild(sec);
+  const tGrid=document.createElement('div'); tGrid.className='play-buttons';
+  ['v','l'].forEach(t=>{
+    const b=document.createElement('button'); b.className='play-btn';
+    b.style.borderColor=t==='v'?'var(--blue)':'var(--amber)';
+    b.style.color=t==='v'?'var(--blue)':'var(--amber)';
+    b.textContent=gs.teams[t].name||(t==='v'?'VISITANTE':'LOCAL');
+    b.onclick=()=>{ cambiosTeam=t; renderCambiosEditor(); };
+    tGrid.appendChild(b);
+  });
+  body.appendChild(tGrid);
+  document.getElementById('modal').classList.add('show');
+}
+
+function renderCambiosEditor(){
+  const body=document.getElementById('mbody'); body.innerHTML='';
+  const back=document.createElement('button');
+  back.className='play-btn'; back.textContent='← Volver'; back.style.marginBottom='8px';
+  back.onclick=()=>openCambiosMenu();
+  body.appendChild(back);
+  const teamName=gs.teams[cambiosTeam].name||(cambiosTeam==='v'?'VISITANTE':'LOCAL');
+  const sec=document.createElement('div'); sec.className='modal-section'; sec.textContent=`INTERCAMBIOS — ${teamName}`; body.appendChild(sec);
+  const hint=document.createElement('div');
+  hint.style.cssText='font-size:0.62rem;color:var(--text-dim);margin:2px 0 8px;line-height:1.4';
+  hint.textContent='Cada fila: de qué posición sale un jugador (Origen) y a cuál va (Destino). Usa "Banca" como origen para meter a alguien nuevo; el jugador que quede sin destino sale del juego.';
+  body.appendChild(hint);
+  const rowsWrap=document.createElement('div'); rowsWrap.id='cambios-rows'; body.appendChild(rowsWrap);
+  cambiosRows.forEach((r,i)=>rowsWrap.appendChild(buildCambioRow(r,i)));
+  const addBtn=document.createElement('button');
+  addBtn.className='play-btn'; addBtn.textContent='+ Agregar fila';
+  addBtn.style.cssText='width:100%;margin-top:8px;border-color:var(--cyan);color:var(--cyan)';
+  addBtn.onclick=()=>{ syncCambiosRowsFromDOM(); cambiosRows.push({origin:'',dest:'',benchName:''}); renderCambiosEditor(); };
+  body.appendChild(addBtn);
+  const goBtn=document.createElement('button');
+  goBtn.className='play-btn'; goBtn.textContent='Ver resumen';
+  goBtn.style.cssText='width:100%;margin-top:10px;border-color:var(--green);color:var(--green)';
+  goBtn.onclick=()=>{ syncCambiosRowsFromDOM(); verCambiosResumen(); };
+  body.appendChild(goBtn);
+  const err=document.createElement('div'); err.id='cambios-err';
+  err.style.cssText='margin-top:8px;font-size:0.72rem;color:var(--red);line-height:1.4';
+  body.appendChild(err);
+}
+
+function buildCambioRow(r,idx){
+  const wrap=document.createElement('div');
+  wrap.className='cambios-row';
+  wrap.style.cssText='display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px;margin-bottom:6px';
+  const selStyle='background:#0d1b2a;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:6px;font-size:0.72rem;font-family:inherit;flex:1;min-width:96px';
+  const posOpts=[1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}">${CAMBIOS_POS_NAME[n]} (${n})</option>`).join('');
+  const oSel=document.createElement('select'); oSel.className='cambios-origin'; oSel.style.cssText=selStyle;
+  oSel.innerHTML=`<option value="">Origen…</option><option value="B">🪑 Banca</option>${posOpts}`;
+  oSel.value=r.origin||'';
+  const arrow=document.createElement('span'); arrow.textContent='→'; arrow.style.cssText='color:var(--text-dim);font-size:0.95rem;flex:0 0 auto';
+  const dSel=document.createElement('select'); dSel.className='cambios-dest'; dSel.style.cssText=selStyle;
+  dSel.innerHTML=`<option value="">Destino…</option>${posOpts}`;
+  dSel.value=r.dest||'';
+  const rm=document.createElement('button'); rm.className='play-btn'; rm.textContent='✕';
+  rm.title='Quitar fila'; rm.style.cssText='border-color:var(--red);color:var(--red);padding:6px 11px;flex:0 0 auto';
+  rm.onclick=()=>{ syncCambiosRowsFromDOM(); if(cambiosRows.length>1) cambiosRows.splice(idx,1); else cambiosRows=[{origin:'',dest:'',benchName:''}]; renderCambiosEditor(); };
+  const nameInp=document.createElement('input'); nameInp.className='cambios-bench-name';
+  nameInp.placeholder='Nombre del jugador de banca'; nameInp.maxLength=25;
+  nameInp.style.cssText='flex-basis:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:6px;padding:7px;color:#fff;font-size:0.74rem;font-family:inherit';
+  nameInp.value=r.benchName||'';
+  nameInp.style.display=r.origin==='B'?'':'none';
+  oSel.onchange=()=>{ nameInp.style.display=oSel.value==='B'?'':'none'; };
+  wrap.appendChild(oSel); wrap.appendChild(arrow); wrap.appendChild(dSel); wrap.appendChild(rm); wrap.appendChild(nameInp);
+  return wrap;
+}
+
+// Vuelca los valores de los <select>/<input> vivos al estado cambiosRows (antes de
+// re-renderizar o validar, para no perder lo que el usuario ya eligió).
+function syncCambiosRowsFromDOM(){
+  const rowsWrap=document.getElementById('cambios-rows'); if(!rowsWrap) return;
+  const arr=[];
+  rowsWrap.querySelectorAll('.cambios-row').forEach(w=>{
+    arr.push({
+      origin:w.querySelector('.cambios-origin').value,
+      dest:w.querySelector('.cambios-dest').value,
+      benchName:(w.querySelector('.cambios-bench-name').value||'').trim()
+    });
+  });
+  if(arr.length) cambiosRows=arr;
+}
+
+function cambiosError(msg){ const e=document.getElementById('cambios-err'); if(e) e.textContent='⚠ '+msg; }
+
+// Valida la cadena y, si pasa, muestra el resumen. Definiciones:
+//   realOrigins = posiciones usadas como Origen (no banca)
+//   dests       = posiciones usadas como Destino
+//   vacatedNotRefilled = realOrigins \ dests  → alguien salió y nadie ocupa esa posición
+//   filledNotVacated   = dests \ realOrigins  → llega alguien a una posición de la que
+//                        NADIE salió por una fila → el ocupante previo queda desplazado.
+// Sin banca: la cadena debe cerrar (ambos conjuntos vacíos = permutación pura).
+// Con banca: filledNotVacated debe ser exactamente 1 → esa es la posición del jugador
+//            que sale del juego (reemplazado, vía la cadena, por el de banca).
+function verCambiosResumen(){
+  const rows=cambiosRows;
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    if(!r.origin||!r.dest){ cambiosError(`Fila ${i+1}: elige origen y destino.`); return; }
+    if(r.origin==='B' && !r.benchName){ cambiosError(`Fila ${i+1}: escribe el nombre del jugador de banca.`); return; }
+    if(r.origin!=='B' && +r.origin===+r.dest){ cambiosError(`Fila ${i+1}: el origen y el destino no pueden ser la misma posición.`); return; }
+  }
+  const benchRows=rows.filter(r=>r.origin==='B');
+  if(benchRows.length>1){ cambiosError('Solo se permite UNA fila con origen "Banca".'); return; }
+  const hasBench=benchRows.length===1;
+  const realOrigins=rows.filter(r=>r.origin!=='B').map(r=>+r.origin);
+  const dests=rows.map(r=>+r.dest);
+  const dupO=realOrigins.find((n,i)=>realOrigins.indexOf(n)!==i);
+  if(dupO){ cambiosError(`La posición ${cambiosPosLabel(dupO)} está como Origen en dos filas.`); return; }
+  const dupD=dests.find((n,i)=>dests.indexOf(n)!==i);
+  if(dupD){ cambiosError(`La posición ${cambiosPosLabel(dupD)} está como Destino en dos filas.`); return; }
+  const oSet=new Set(realOrigins), dSet=new Set(dests);
+  const vacatedNotRefilled=[...oSet].filter(n=>!dSet.has(n));
+  const filledNotVacated=[...dSet].filter(n=>!oSet.has(n));
+  if(!hasBench){
+    if(vacatedNotRefilled.length>0){ cambiosError(`La cadena no cierra: ${cambiosPosLabel(vacatedNotRefilled[0])} no tiene destino. Si alguien sale del juego, agrega una fila de Banca.`); return; }
+    if(filledNotVacated.length>0){ cambiosError(`La cadena no cierra: llega un jugador a ${cambiosPosLabel(filledNotVacated[0])} pero nadie sale de ahí. Si alguien sale del juego, agrega una fila de Banca.`); return; }
+  } else {
+    if(vacatedNotRefilled.length>0){ cambiosError(`La cadena no cierra: ${cambiosPosLabel(vacatedNotRefilled[0])} no tiene quién la ocupe. Revisa las filas.`); return; }
+    if(filledNotVacated.length!==1){ cambiosError(`Con una entrada desde Banca debe salir del juego exactamente un jugador, pero la cadena deja ${filledNotVacated.length} posición(es) sin vincular. No se puede determinar automáticamente quién sale: revisa las filas.`); return; }
+  }
+  showCambiosResumen({rows, hasBench, leavingPos:hasBench?filledNotVacated[0]:null});
+}
+
+function showCambiosResumen(ctx){
+  const {rows,hasBench,leavingPos}=ctx;
+  const team=cambiosTeam;
+  const body=document.getElementById('mbody'); body.innerHTML='';
+  const back=document.createElement('button');
+  back.className='play-btn'; back.textContent='← Volver'; back.style.marginBottom='8px';
+  back.onclick=()=>renderCambiosEditor();
+  body.appendChild(back);
+  const sec=document.createElement('div'); sec.className='modal-section'; sec.textContent='RESUMEN DEL CAMBIO'; body.appendChild(sec);
+  const lines=[];
+  rows.forEach(r=>{
+    if(r.origin==='B'){
+      lines.push({c:'var(--green)',t:`<strong>${r.benchName}</strong> (nuevo, de banca): entra a ${cambiosPosLabel(+r.dest)}`});
+    } else {
+      lines.push({c:'#fff',t:`<strong>${cambiosPlayerAtPos(team,+r.origin)}</strong>: pasa de ${cambiosPosLabel(+r.origin)} a ${cambiosPosLabel(+r.dest)}`});
+    }
+  });
+  if(hasBench && leavingPos){
+    lines.push({c:'var(--red)',t:`<strong>${cambiosPlayerAtPos(team,leavingPos)}</strong>: sale del juego (era ${CAMBIOS_POS_NAME[leavingPos]})`});
+  }
+  const list=document.createElement('div'); list.style.cssText='padding:4px 0 6px';
+  list.innerHTML=lines.map(l=>`<div style="padding:5px 0;font-size:0.8rem;line-height:1.4;color:${l.c};border-bottom:1px solid rgba(255,255,255,.06)">${l.t}</div>`).join('');
+  body.appendChild(list);
+  // Advertencia de pitcher: la posición 1 aparece como origen o destino en la cadena.
+  const involves1=rows.some(r=>(r.origin!=='B'&&+r.origin===1)|| +r.dest===1);
+  if(involves1){
+    const inRow=rows.find(r=>+r.dest===1);
+    const newPit=inRow?(inRow.origin==='B'?inRow.benchName:cambiosPlayerAtPos(team,+inRow.origin)):'—';
+    const warn=document.createElement('div');
+    warn.style.cssText='margin-top:8px;padding:8px 10px;border:1px solid var(--amber);border-radius:8px;background:rgba(255,184,28,.08);color:var(--amber);font-size:0.74rem;line-height:1.4';
+    warn.innerHTML=`⚠ Esto también registrará un cambio de pitcher: nuevo pitcher = <strong>${newPit}</strong>.`;
+    body.appendChild(warn);
+  }
+  // Aplicar — DESHABILITADO en Fase 1 (no toca ningún estado del juego).
+  const applyBtn=document.createElement('button');
+  applyBtn.className='play-btn'; applyBtn.textContent='Aplicar cambio (Fase 2 pendiente)';
+  applyBtn.disabled=true;
+  applyBtn.style.cssText='width:100%;margin-top:12px;border-color:var(--text-dim);color:var(--text-dim);opacity:.55;cursor:not-allowed';
+  body.appendChild(applyBtn);
+  const note=document.createElement('div');
+  note.style.cssText='margin-top:6px;font-size:0.62rem;color:var(--text-dim);text-align:center;line-height:1.4';
+  note.textContent='Fase 1: solo verificación y resumen. No se aplicó ningún cambio.';
+  body.appendChild(note);
 }
 
 // ─── BATEO CON CORREDORES EN BASE (derivado) ───────────────
