@@ -27,6 +27,10 @@
      press y release. No aplica a inputs/selects (no son <button>) ni a deshabilitados. */
   button:active:not(:disabled) { transform: scale(.96) translateY(1px); filter: brightness(.9); }
   @media (prefers-reduced-motion: reduce){ button:active:not(:disabled){ transform:translateY(1px); } }
+  /* Estado "presionado" manejado por JS (clase .vs-pressed): determinista en táctil y
+     dentro de overlays con scroll, donde :active es poco confiable. Mismo efecto visual. */
+  button.vs-pressed:not(:disabled) { transform: scale(.96) translateY(1px); filter: brightness(.9); }
+  @media (prefers-reduced-motion: reduce){ button.vs-pressed:not(:disabled){ transform:translateY(1px); } }
   /* ── BASE ───────────────────────────────────────────────── */
   body { background:#060d1e; background-image:radial-gradient(ellipse at 50% -10%,rgba(10,100,240,.22) 0%,transparent 58%),radial-gradient(ellipse at 50% 105%,rgba(0,229,153,.05) 0%,transparent 50%); color:#fff; font-family:'Inter',sans-serif; min-height:100vh; }
   /* ── HEADER ─────────────────────────────────────────────── */
@@ -253,7 +257,8 @@
   .jug-player-item:hover { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.1); }
   /* Efecto "hundido" al oprimir la fila de selección de jugador (mismo estilo que los botones). */
   .jug-player-item:active { transform: scale(.96) translateY(1px); filter: brightness(.9); }
-  @media (prefers-reduced-motion: reduce){ .jug-player-item:active { transform:translateY(1px); } }
+  .jug-player-item.vs-pressed { transform: scale(.96) translateY(1px); filter: brightness(.9); }
+  @media (prefers-reduced-motion: reduce){ .jug-player-item:active, .jug-player-item.vs-pressed { transform:translateY(1px); } }
   .jug-bat-num { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:#ff4d67; min-width:22px; text-align:center; }
   .jug-name { font-size:0.82rem; font-weight:600; color:#fff; flex:1; }
   .jug-pos { font-size:0.68rem; color:#ffb648; }
@@ -8321,19 +8326,40 @@ async function downloadPitcherFichaPDF(){
   }catch(e){ showToast('⚠️ Error al generar PDF',true); console.error(e); }
 }
 </script>
-<!-- Haptic GLOBAL: vibración corta al oprimir cualquier botón. Puramente aditivo:
-     listener delegado en 'pointerdown', sin preventDefault/stopPropagation, no toca
-     ningún handler ni la lógica de juego. Solo <button> (no inputs ni selects). En
-     navegadores sin soporte (p.ej. iOS Safari) navigator.vibrate no existe -> no hace
-     nada, sin error, sin workarounds. -->
+<!-- Feedback táctil GLOBAL: efecto "hundido" + vibración al oprimir cualquier botón
+     (y la fila de selección de jugador). Puramente aditivo: listeners delegados en
+     fase de captura, SIN preventDefault/stopPropagation -> no toca ningún handler ni la
+     lógica de juego/descarga. Solo <button> y .jug-player-item (no inputs ni selects).
+     El hundido se maneja con la clase .vs-pressed (no solo :active), porque en táctil y
+     dentro de overlays con scroll :active es poco confiable. La vibración va SOLO si
+     'vibrate' existe (iOS Safari no lo tiene -> no vibra, sin error ni workarounds). -->
 <script>
 (function(){
-  if(!('vibrate' in navigator)) return;   // iOS Safari u otros sin soporte: no-op
-  document.addEventListener('pointerdown', function(e){
-    var btn = e.target && e.target.closest ? e.target.closest('button, .jug-player-item') : null;
-    if(!btn || btn.disabled) return;
-    try { navigator.vibrate(15); } catch(_){ /* no romper si el navegador lo bloquea */ }
-  }, true);   // fase de captura: nunca interfiere con los onclick existentes
+  var SEL = 'button, .jug-player-item';
+  var pressed = null;
+  function release(){ if(pressed){ pressed.classList.remove('vs-pressed'); pressed = null; } }
+  function press(e){
+    var el = e.target && e.target.closest ? e.target.closest(SEL) : null;
+    if(!el || el.disabled) return;
+    if(pressed && pressed !== el) release();
+    el.classList.add('vs-pressed');          // hundido determinista (no depende de :active)
+    pressed = el;
+    if('vibrate' in navigator){ try { navigator.vibrate(15); } catch(_){} }
+  }
+  if('PointerEvent' in window){
+    document.addEventListener('pointerdown', press, true);
+    document.addEventListener('pointerup', release, true);
+    document.addEventListener('pointercancel', release, true);
+  } else {
+    document.addEventListener('touchstart', press, true);
+    document.addEventListener('touchend', release, true);
+    document.addEventListener('touchcancel', release, true);
+    document.addEventListener('mousedown', press, true);
+    document.addEventListener('mouseup', release, true);
+  }
+  // Seguridad: nunca dejar un botón "hundido" si se pierde el pointer o hay scroll.
+  window.addEventListener('blur', release, true);
+  document.addEventListener('scroll', release, true);
 })();
 </script>
 </body>
