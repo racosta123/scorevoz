@@ -478,6 +478,11 @@
       <option value="105">105</option>
     </select>
   </div>
+  <!-- FECHA DEL PARTIDO (P1 hoja imprimible): dato del juego, no de la anotación. Default = hoy. -->
+  <div class="match-limit-row" style="display:flex;align-items:center;gap:10px;justify-content:center;background:rgba(0,191,255,.06);border:1px solid rgba(0,191,255,.22);border-radius:12px;padding:11px 16px;margin:0 auto 14px;max-width:520px;flex-wrap:wrap">
+    <label for="game-date" style="font-family:'Oswald',sans-serif;font-size:0.82rem;letter-spacing:1px;color:var(--cyan)">📅 FECHA DEL PARTIDO</label>
+    <input type="date" id="game-date" title="Fecha del partido (para la hoja imprimible)" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.8rem;padding:6px 10px;flex-shrink:0">
+  </div>
   <div class="team-setup">
     <h3><span style="color:var(--blue)">▶ VISITANTE</span></h3>
     <div class="team-name-row">
@@ -678,6 +683,7 @@ let gs = {
     A:[{name:'Carlos'},{name:'Miguel'},{name:'Juan'},{name:'Diego'},{name:'Pedro'},{name:'Fernando'},{name:'Roberto'},{name:'Luis'},{name:'Andrés'}],
     B:[{name:'Alberto'},{name:'Javier'},{name:'Ricardo'},{name:'Sergio'},{name:'Raúl'},{name:'Enrique'},{name:'Gustavo'},{name:'Héctor'},{name:'Óscar'}]
   },
+  gameDate:'', // fecha del partido (ISO YYYY-MM-DD), capturada en el setup — para la hoja imprimible
   currentBatter:{ v:0, l:0 },
   playHistory:[],
   cambiosSwapUndo:[], // stack LIFO de swaps de posición aplicados (undo). Se serializa con gs
@@ -1126,6 +1132,12 @@ function buildSetup(t) {
   }
 }
 buildSetup('v'); buildSetup('l');
+// FECHA DEL PARTIDO: default = hoy (local, sin corrimiento de zona horaria) en el input de setup.
+(function initGameDate(){
+  const el=document.getElementById('game-date'); if(!el) return;
+  const d=new Date();
+  el.value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+})();
 
 function startGame(){
   ['v','l'].forEach(t=>{
@@ -1159,6 +1171,10 @@ function startGame(){
   // y todos los pitchers. Vacío = null (sin límite, adultos).
   const _mpl=document.getElementById('match-limit');
   gs.matchPitchLimit = (_mpl && _mpl.value!=='') ? parseInt(_mpl.value,10) : null;
+  // FECHA DEL PARTIDO (P1 hoja imprimible): ISO YYYY-MM-DD del input; si está vacío, hoy (local).
+  const _gd=document.getElementById('game-date');
+  if(_gd && _gd.value){ gs.gameDate=_gd.value; }
+  else { const d=new Date(); gs.gameDate=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
   // Fase 3-B (Paso 1): desbloquear el audio DENTRO de este gesto (click de "Iniciar
   // juego") para que la sirena pueda sonar el resto de la sesión sin trabas de autoplay.
   wakeSirenAudio();
@@ -1214,6 +1230,9 @@ window.rehydrateGame = function(gsString){
   }
   // COMPAT UNDO DE SWAPS: guardados previos a esta versión no traen el stack → default a [].
   if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
+  // COMPAT FECHA DEL PARTIDO: guardados viejos no traen gs.gameDate → default seguro '' (vacío),
+  // sin romper. rehydrateGame no recibe savedAt (metadato de la nube), así que se deja vacío.
+  if(typeof gs.gameDate!=='string') gs.gameDate='';
   // COMPAT PUNTERO DE BATEADOR (bug 3er out): guardados viejos podían venir sin gs.currentBatter
   // o con una clave (v/l) ausente/inválida. Sin sanear, autoAdvance leería un índice roto al
   // cambiar de lado y dejaría la selección en "SIN SELECCIÓN". Normalizar AMBAS claves a entero
