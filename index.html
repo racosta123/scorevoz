@@ -680,6 +680,9 @@ let gs = {
   },
   currentBatter:{ v:0, l:0 },
   playHistory:[],
+  cambiosSwapUndo:[], // stack LIFO de swaps de posición aplicados (undo). Se serializa con gs
+                      // (sobrevive al reload). Vive a nivel TOP de gs — NUNCA dentro de _preState
+                      // por jugada, así que no entra al deep-copy que causó el crecimiento exponencial.
   seq:0, // contador global de orden de registro (applyPlay/applySubstitution) — ver getOccupants
   activeBatter:null,
   alBate:null
@@ -1161,6 +1164,7 @@ function startGame(){
   wakeSirenAudio();
   gs.currentBatter = { v:0, l:0 };
   gs.playHistory = [];
+  gs.cambiosSwapUndo = [];
   gs.seq = 0;
   document.getElementById('setup-screen').style.display='none';
   document.getElementById('game-screen').style.display='block';
@@ -1208,6 +1212,8 @@ window.rehydrateGame = function(gsString){
   if(gs.matchPitchLimit===undefined){
     gs.matchPitchLimit = gs.pitcherLimits?.v?.[0] ?? gs.pitcherLimits?.l?.[0] ?? null;
   }
+  // COMPAT UNDO DE SWAPS: guardados previos a esta versión no traen el stack → default a [].
+  if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
   // COMPAT PUNTERO DE BATEADOR (bug 3er out): guardados viejos podían venir sin gs.currentBatter
   // o con una clave (v/l) ausente/inválida. Sin sanear, autoAdvance leería un índice roto al
   // cambiar de lado y dejaría la selección en "SIN SELECCIÓN". Normalizar AMBAS claves a entero
@@ -4010,6 +4016,16 @@ function openCambiosMenu(){
     tGrid.appendChild(b);
   });
   body.appendChild(tGrid);
+  // Deshacer el último swap de posición aplicado (solo si hay algo en el stack). Botón DEDICADO
+  // — el DESHACER global de bateo no se toca. Patrón hermano de undoLastPitcherChange.
+  if(Array.isArray(gs.cambiosSwapUndo) && gs.cambiosSwapUndo.length){
+    const undoBtn=document.createElement('button');
+    undoBtn.className='play-btn';
+    undoBtn.style.cssText='width:100%;margin-top:12px;border-color:var(--red);color:var(--red)';
+    undoBtn.textContent='↩ Deshacer último cambio de posición';
+    undoBtn.onclick=()=>undoLastCambiosSwap();
+    body.appendChild(undoBtn);
+  }
   document.getElementById('modal').classList.add('show');
 }
 
@@ -4207,7 +4223,18 @@ function applyCambiosSwap(){
   // ¿Cambia de manos la posición 1? (llega alguien nuevo a pitcher)
   const newPitMove=plan.find(m=>m.to===1);
   const outPitName=newPitMove?getCurrentPitcherName(team):null; // capturar saliente ANTES de tocar nada
-  // 2) Aplicar nuevas posiciones + etiqueta de cambio (solo la MÁS reciente por jugador).
+  // 2) UNDO: capturar el estado PREVIO (pos + posChange por jugador, y si sincronizó el pitcher)
+  //    ANTES de mutar, y apilarlo en gs.cambiosSwapUndo (LIFO, se serializa con gs → sobrevive
+  //    al reload). prevPosChange se copia (o null) para restaurar un cambio anterior, no borrarlo.
+  if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
+  gs.cambiosSwapUndo.push({
+    team, inn, pitcherSynced:!!newPitMove,
+    moves: plan.map(m=>{
+      const p=gs.teams[team].players[m.pidx];
+      return { pidx:m.pidx, prevPos:p.pos, prevPosChange:p.posChange?{...p.posChange}:null };
+    })
+  });
+  // Aplicar nuevas posiciones + etiqueta de cambio (solo la MÁS reciente por jugador).
   plan.forEach(m=>{
     const p=gs.teams[team].players[m.pidx];
     p.pos=POS_ABBR[m.to-1];
@@ -4232,6 +4259,52 @@ function applyCambiosSwap(){
   closeModal();
   const resumenTxt=plan.map(m=>`${POS_ABBR[m.from-1]}→${POS_ABBR[m.to-1]}`).join(', ');
   showToast(`✓ E${inn}: cambio de posiciones (${resumenTxt})${newPitMove?' — nuevo pitcher '+gs.teams[team].players[newPitMove.pidx].name:''}`);
+}
+
+// DESHACER el swap de posición MÁS RECIENTE (LIFO). Restaura .pos/.posChange de cada jugador
+// SIEMPRE (inocuo). La parte del pitcher solo se revierte si el swap SIGUE siendo el último
+// cambio de pitcher (última entrada de gs.pitcherChanges[team] con fromSwap:true); si hubo un
+// cambio de pitcher DESPUÉS, se rechaza el undo completo y no se toca nada (evita corromper
+// pitcherChanges/contador). Al revertir el pitcher, avisa que se descartan los lanzamientos
+// posteriores al swap (mismo patrón que undoLastPitcherChange).
+function undoLastCambiosSwap(){
+  if(!Array.isArray(gs.cambiosSwapUndo)||!gs.cambiosSwapUndo.length){
+    showToast('No hay cambios de posición que deshacer',true); return;
+  }
+  const rec=gs.cambiosSwapUndo[gs.cambiosSwapUndo.length-1]; // peek (no pop aún: puede rechazarse)
+  const team=rec.team;
+  // Parte pitcher: validar ANTES de tocar nada.
+  if(rec.pitcherSynced){
+    const changes=gs.pitcherChanges[team]||[];
+    const lastCh=changes[changes.length-1];
+    if(!lastCh||!lastCh.fromSwap){
+      showToast('Hubo un cambio de pitcher después de este swap; no se puede deshacer de forma segura',true);
+      return; // NO se deshace nada (ni .pos) — el usuario debe deshacer primero el cambio de pitcher
+    }
+    const battingSide=team==='v'?'l':'v';
+    const teamName=gs.teams[team]?.name||(team==='v'?'Visitante':'Local');
+    if(!confirm(`¿Deshacer el último cambio de posición de ${teamName}? Involucra al pitcher: se descartarán los lanzamientos posteriores al swap.`)) return;
+    // Revertir pitcher: pop de la entrada del swap y restaurar el contador live archivado.
+    const removed=changes.pop();
+    const rp=removed.pitches||{};
+    gs.pitchCount[battingSide]={
+      total:rp.total||0, strikes:rp.strikes||0, balls:rp.balls||0, fouls:rp.fouls||0,
+      inningLog:{...(removed.inningLog||{})}
+    };
+    updatePitchCounterUI();
+  }
+  // Ya validado (o sin pitcher): consumir el registro y restaurar posiciones.
+  gs.cambiosSwapUndo.pop();
+  rec.moves.forEach(m=>{
+    const p=gs.teams[team].players[m.pidx];
+    if(!p) return;
+    p.pos=m.prevPos;
+    if(m.prevPosChange) p.posChange={...m.prevPosChange}; else delete p.posChange;
+    rebuildPlayerCell(team,m.pidx);
+  });
+  closeModal();
+  const txt=rec.moves.map(m=>`${gs.teams[team].players[m.pidx]?.name||('#'+(m.pidx+1))}→${m.prevPos}`).join(', ');
+  showToast(`↩ Deshecho el cambio de posición (${txt})`);
 }
 
 // ─── BATEO CON CORREDORES EN BASE (derivado) ───────────────
