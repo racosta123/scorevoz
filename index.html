@@ -1787,7 +1787,7 @@ function showModal(team,pidx,inn){
       const btn=document.createElement('button');
       btn.className=`play-btn ${pl.type==='out'?'out-btn':pl.type==='hit'?'hit-btn':pl.type==='walk'?'walk-btn':''}`;
       btn.textContent=pl.label;
-      btn.onclick=()=>{ applyPlay(team,pidx,inn,pl); closeModal(); };
+      btn.onclick=()=>{ const opened=applyPlay(team,pidx,inn,pl); if(!opened) closeModal(); };
       grid.appendChild(btn);
     });
     // Infield hit (Fase 4): botón extra al final de HITS que abre el sub-menú de posición
@@ -3034,7 +3034,10 @@ function applyPlay(team,pidx,inn,play){
   if(play.type==='out' && ['R63','R43','R53','R13','R23','R33'].includes(play.id)){
     const stR=computeBaseState(team,inn,pidx);
     const qR=[stR.third,stR.second,stR.first].filter(Boolean);
-    if(qR.length){ askBatterFateThenRunners(team,pidx,inn,qR); return; }
+    // Abre el submenú "DESTINO DEL BATEADOR" (askBatterFateThenRunners) sobre #modal y difiere
+    // autoAdvance. DEVUELVE true para avisar al caller que YA hay un submenú abierto y NO debe
+    // cerrar el modal (si lo cierra, el submenú muere y la selección queda congelada).
+    if(qR.length){ askBatterFateThenRunners(team,pidx,inn,qR); return true; }
   }
   // Auto-avanzar solo cuando es turno al bate real (no movimiento de corredor)
   if(play.type!=='score') autoAdvance(team,pidx,inn);
