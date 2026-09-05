@@ -22,6 +22,11 @@
   /* ── RESET ──────────────────────────────────────────────── */
   * { margin:0; padding:0; box-sizing:border-box; }
   button { border-radius:12px; cursor:pointer; transition:all .15s; }
+  /* Efecto "hundido" GLOBAL al oprimir cualquier botón (solo visual). El reset
+     `button{transition:all .15s}` de arriba ya anima el transform/filter suave en
+     press y release. No aplica a inputs/selects (no son <button>) ni a deshabilitados. */
+  button:active:not(:disabled) { transform: scale(.96) translateY(1px); filter: brightness(.9); }
+  @media (prefers-reduced-motion: reduce){ button:active:not(:disabled){ transform:translateY(1px); } }
   /* ── BASE ───────────────────────────────────────────────── */
   body { background:#060d1e; background-image:radial-gradient(ellipse at 50% -10%,rgba(10,100,240,.22) 0%,transparent 58%),radial-gradient(ellipse at 50% 105%,rgba(0,229,153,.05) 0%,transparent 50%); color:#fff; font-family:'Inter',sans-serif; min-height:100vh; }
   /* ── HEADER ─────────────────────────────────────────────── */
@@ -244,8 +249,11 @@
   .run-btn-back  { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); color:#8fa3b7; }
   .run-btn:hover { opacity:.75; }
   /* ── FICHA JUGADOR ──────────────────────────────────────── */
-  .jug-player-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:12px; cursor:pointer; transition:background .15s; border:1px solid transparent; }
+  .jug-player-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:12px; cursor:pointer; transition:background .15s, transform .15s, filter .15s; border:1px solid transparent; }
   .jug-player-item:hover { background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.1); }
+  /* Efecto "hundido" al oprimir la fila de selección de jugador (mismo estilo que los botones). */
+  .jug-player-item:active { transform: scale(.96) translateY(1px); filter: brightness(.9); }
+  @media (prefers-reduced-motion: reduce){ .jug-player-item:active { transform:translateY(1px); } }
   .jug-bat-num { font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:#ff4d67; min-width:22px; text-align:center; }
   .jug-name { font-size:0.82rem; font-weight:600; color:#fff; flex:1; }
   .jug-pos { font-size:0.68rem; color:#ffb648; }
@@ -8312,6 +8320,21 @@ async function downloadPitcherFichaPDF(){
     showToast('✅ PDF descargado');
   }catch(e){ showToast('⚠️ Error al generar PDF',true); console.error(e); }
 }
+</script>
+<!-- Haptic GLOBAL: vibración corta al oprimir cualquier botón. Puramente aditivo:
+     listener delegado en 'pointerdown', sin preventDefault/stopPropagation, no toca
+     ningún handler ni la lógica de juego. Solo <button> (no inputs ni selects). En
+     navegadores sin soporte (p.ej. iOS Safari) navigator.vibrate no existe -> no hace
+     nada, sin error, sin workarounds. -->
+<script>
+(function(){
+  if(!('vibrate' in navigator)) return;   // iOS Safari u otros sin soporte: no-op
+  document.addEventListener('pointerdown', function(e){
+    var btn = e.target && e.target.closest ? e.target.closest('button, .jug-player-item') : null;
+    if(!btn || btn.disabled) return;
+    try { navigator.vibrate(15); } catch(_){ /* no romper si el navegador lo bloquea */ }
+  }, true);   // fase de captura: nunca interfiere con los onclick existentes
+})();
 </script>
 </body>
 </html>
