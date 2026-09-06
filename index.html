@@ -149,6 +149,13 @@
   .btn-register { background:rgba(0,229,153,.1); border:1px solid #00e599; border-radius:10px; color:#00e599; font-family:'Oswald',sans-serif; font-size:0.68rem; letter-spacing:1px; padding:6px 10px; cursor:pointer; transition:all .15s; white-space:nowrap; width:100%; }
   .btn-register:hover:not(:disabled) { background:rgba(0,229,153,.2); }
   .btn-register:disabled { border-color:rgba(255,255,255,.08); color:#8fa3b7; cursor:default; background:transparent; }
+  /* Orden al bate variable (Fase 1): controles +/− de renglones bajo cada grid de alineación */
+  .setup-rows-ctrl { display:flex; gap:8px; margin-top:8px; }
+  .setup-row-btn { flex:1; background:rgba(0,229,153,.1); border:1px solid #00e599; border-radius:10px; color:#00e599; font-family:'Oswald',sans-serif; font-size:0.68rem; letter-spacing:1px; padding:8px 10px; cursor:pointer; transition:all .15s; }
+  .setup-row-btn:hover:not(:disabled) { background:rgba(0,229,153,.2); }
+  .setup-row-btn.rem { background:rgba(255,182,72,.1); border-color:var(--amber); color:var(--amber); flex:0 0 auto; }
+  .setup-row-btn.rem:hover:not(:disabled) { background:rgba(255,182,72,.2); }
+  .setup-row-btn:disabled { opacity:.35; cursor:not-allowed; border-color:rgba(255,255,255,.15); color:#8fa3b7; background:transparent; }
   /* ── SETUP MIC ──────────────────────────────────────────── */
   .setup-mic-row { background:rgba(255,77,103,.1); border:1px solid #ff4d67; border-radius:50%; width:26px; height:26px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:0.72rem; flex-shrink:0; transition:all .2s; padding:0; }
   .setup-mic-row:hover { background:rgba(255,77,103,.2); }
@@ -508,6 +515,10 @@
       <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div>
     </div>
     <div id="pl-v"></div>
+    <div class="setup-rows-ctrl">
+      <button class="setup-row-btn" id="addrow-v" onclick="addSetupRow('v')">+ AGREGAR BATEADOR</button>
+      <button class="setup-row-btn rem" id="remrow-v" onclick="removeSetupRow('v')">− QUITAR</button>
+    </div>
     <div class="pitcher-section">
       <div class="pitcher-section-label">⚾ PITCHER ABRIDOR</div>
       <div class="pitcher-row-wrap">
@@ -530,6 +541,10 @@
       <div class="col-header">#</div><div class="col-header">JUGADOR</div><div class="col-header">POS</div><div class="col-header" style="text-align:center;color:var(--amber)">DH</div><div class="col-header"></div>
     </div>
     <div id="pl-l"></div>
+    <div class="setup-rows-ctrl">
+      <button class="setup-row-btn" id="addrow-l" onclick="addSetupRow('l')">+ AGREGAR BATEADOR</button>
+      <button class="setup-row-btn rem" id="remrow-l" onclick="removeSetupRow('l')">− QUITAR</button>
+    </div>
     <div class="pitcher-section">
       <div class="pitcher-section-label">⚾ PITCHER ABRIDOR</div>
       <div class="pitcher-row-wrap">
@@ -959,7 +974,8 @@ function pitcherStopUI(team){
 // Quita CUALQUIER DH marcado del equipo (desmarca la pastilla y restaura su POS previa). Base de la
 // exclusión mutua DH ↔ "¿BATEA?": no pueden coexistir (cubrirían el turno del pitcher dos veces).
 function clearAllDH(team){
-  for(let i=1;i<=9;i++){
+  const n=document.getElementById(`pl-${team}`).children.length;  // N real (orden variable)
+  for(let i=1;i<=n;i++){
     const dh=document.getElementById(`dh-${team}-${i}`);
     if(dh&&dh.classList.contains('active')){
       dh.classList.remove('active');
@@ -995,7 +1011,8 @@ function parsePitcherVoice(text,team){
 }
 
 function hasDH(team, exceptRow){
-  for(let i=1;i<=9;i++){
+  const n=document.getElementById(`pl-${team}`).children.length;  // N real (orden variable)
+  for(let i=1;i<=n;i++){
     if(i===exceptRow) continue;
     const btn=document.getElementById(`dh-${team}-${i}`);
     if(btn&&btn.classList.contains('active')) return true;
@@ -1146,24 +1163,58 @@ function applySubstitution(team,outPidx,inName,inPos){
 }
 
 // ─── BUILD SETUP ──────────────────────────────────────────
+// ─── ORDEN AL BATE VARIABLE (Fase 1) ──────────────────────
+// N configurable en el setup: 9 (default) a 15. La FUENTE DE VERDAD es el nº de
+// renglones en #pl-v / #pl-l; nada aquí guarda N aparte. Los renglones 1..9 nunca se
+// quitan (mínimo 9), así que su pre-carga desde gs.lineups persiste.
+const SETUP_MIN_ROWS = 9, SETUP_MAX_ROWS = 15;
+function setupRowCount(t){ return document.getElementById(`pl-${t}`).children.length; }
+
+// Construye (sin insertar) un renglón de alineación para la posición i (1-based),
+// pre-cargando el nombre si gs.lineups lo trae. Reusado por buildSetup y addSetupRow.
+function setupRowNode(t,i){
+  const lineup = t==='v' ? gs.lineups.A : gs.lineups.B;
+  const d = document.createElement('div');
+  d.className = 'players-grid'; d.style.marginBottom='4px';
+  d.innerHTML = `<div class="bat-num">${i}</div>
+    <input class="player-input" id="p-${t}-${i}" placeholder="Nombre" maxlength="25">
+    <input class="pos-input" id="o-${t}-${i}" placeholder="POS" maxlength="3">
+    <button class="dh-pill" id="dh-${t}-${i}" onclick="toggleDH('${t}',${i},this)" title="Bateador Designado">DH</button>
+    <button class="setup-mic-row" id="smb-${t}-${i}"
+      onmousedown="setupRowPttStart('${t}',${i},event)" onmouseup="setupRowPttEnd(event)"
+      ontouchstart="setupRowPttStart('${t}',${i},event)" ontouchend="setupRowPttEnd(event)"
+      ontouchcancel="setupRowPttEnd(event)" title="Mantén: di nombre al número">🎤</button>`;
+  const inp = d.querySelector(`#p-${t}-${i}`);
+  if(lineup[i-1] && inp) inp.value = lineup[i-1].name;
+  return d;
+}
+
 function buildSetup(t) {
   const c = document.getElementById(`pl-${t}`);
   c.innerHTML = '';
-  const lineup = t==='v' ? gs.lineups.A : gs.lineups.B;
-  for(let i=1;i<=9;i++){
-    const d = document.createElement('div');
-    d.className = 'players-grid'; d.style.marginBottom='4px';
-    d.innerHTML = `<div class="bat-num">${i}</div>
-      <input class="player-input" id="p-${t}-${i}" placeholder="Nombre" maxlength="25">
-      <input class="pos-input" id="o-${t}-${i}" placeholder="POS" maxlength="3">
-      <button class="dh-pill" id="dh-${t}-${i}" onclick="toggleDH('${t}',${i},this)" title="Bateador Designado">DH</button>
-      <button class="setup-mic-row" id="smb-${t}-${i}"
-        onmousedown="setupRowPttStart('${t}',${i},event)" onmouseup="setupRowPttEnd(event)"
-        ontouchstart="setupRowPttStart('${t}',${i},event)" ontouchend="setupRowPttEnd(event)"
-        ontouchcancel="setupRowPttEnd(event)" title="Mantén: di nombre al número">🎤</button>`;
-    c.appendChild(d);
-    if(lineup[i-1]) document.getElementById(`p-${t}-${i}`).value = lineup[i-1].name;
-  }
+  for(let i=1;i<=SETUP_MIN_ROWS;i++) c.appendChild(setupRowNode(t,i));
+  updateSetupRowButtons(t);
+}
+
+// Agrega/quita un renglón PRESERVANDO lo ya escrito (solo append/removeChild, sin repintar).
+function addSetupRow(t){
+  const c = document.getElementById(`pl-${t}`);
+  if(c.children.length >= SETUP_MAX_ROWS) return;
+  c.appendChild(setupRowNode(t, c.children.length+1));
+  updateSetupRowButtons(t);
+}
+function removeSetupRow(t){
+  const c = document.getElementById(`pl-${t}`);
+  if(c.children.length <= SETUP_MIN_ROWS) return;
+  c.removeChild(c.lastElementChild);
+  updateSetupRowButtons(t);
+}
+function updateSetupRowButtons(t){
+  const n = setupRowCount(t);
+  const add = document.getElementById(`addrow-${t}`);
+  const rem = document.getElementById(`remrow-${t}`);
+  if(add) add.disabled = n >= SETUP_MAX_ROWS;
+  if(rem) rem.disabled = n <= SETUP_MIN_ROWS;
 }
 buildSetup('v'); buildSetup('l');
 // FECHA DEL PARTIDO: default = hoy (local, sin corrimiento de zona horaria) en el input de setup.
@@ -1189,7 +1240,8 @@ function startGame(){
     gs.teams[t].name = (document.getElementById(`tn-${t}`).value.trim()||( t==='v'?'VISITANTE':'LOCAL')).toUpperCase();
     const pl=[];
     const lineup = t==='v' ? gs.lineups.A : gs.lineups.B;
-    for(let i=1;i<=9;i++){
+    const nRows = setupRowCount(t);   // orden al bate variable: N real de renglones (9..15)
+    for(let i=1;i<=nRows;i++){
       pl.push({
         name:(document.getElementById(`p-${t}-${i}`).value.trim()||(lineup[i-1]?lineup[i-1].name:`JUGADOR ${i}`)).toUpperCase(),
         pos:(document.getElementById(`o-${t}-${i}`).value.trim()||'—').toUpperCase(),
