@@ -213,6 +213,11 @@
   .pitcher-batea-toggle { font-size:0.58rem; font-family:'Inter',sans-serif; background:transparent; border:1px solid rgba(255,255,255,.08); border-radius:8px; color:#8fa3b7; cursor:pointer; letter-spacing:1px; padding:4px 7px; white-space:nowrap; transition:all .15s; flex-shrink:0; }
   .pitcher-batea-toggle:hover  { border-color:#00bfff; color:#00bfff; }
   .pitcher-batea-toggle.active { background:#00bfff; color:#071018; border-color:#00bfff; font-weight:700; }
+  /* Selector de FORMATO (Adulto / Infantil) — capa de UI del setup */
+  .formato-toggle { display:flex; gap:6px; }
+  .formato-btn { font-family:'Bebas Neue',sans-serif; font-size:0.95rem; letter-spacing:2px; background:transparent; border:1px solid rgba(255,255,255,.18); border-radius:8px; color:#8fa3b7; cursor:pointer; padding:6px 16px; transition:all .15s; }
+  .formato-btn:hover:not(.active) { border-color:#00e599; color:#00e599; }
+  .formato-btn.active { background:#00e599; color:#071018; border-color:#00e599; font-weight:700; }
   /* ── CONFIRM BANNER ─────────────────────────────────────── */
   #confirm-banner { position:fixed; top:0; left:0; right:0; z-index:450; background:#ffb648; color:#071018; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; transform:translateY(-110%); transition:transform .25s cubic-bezier(.4,0,.2,1); box-shadow:0 6px 32px rgba(0,0,0,.7); }
   #confirm-banner.show { transform:translateY(0); }
@@ -485,9 +490,18 @@
 <div id="setup-screen">
   <div class="setup-title">⚾ NUEVA ANOTACIÓN</div>
   <div class="setup-sub">INGRESA EQUIPOS Y ALINEACIONES</div>
+  <!-- SELECTOR DE FORMATO: capa de UI. Adulto (default) = orden fijo de 9, sin límite de
+       pitcheos ni contador "quedan"/sirena. Infantil = todos batean (hasta 15) + límite. -->
+  <div class="match-limit-row" id="formato-row" style="display:flex;align-items:center;gap:12px;justify-content:center;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:11px 16px;margin:0 auto 14px;max-width:520px;flex-wrap:wrap">
+    <label style="font-family:'Oswald',sans-serif;font-size:0.82rem;letter-spacing:1px;color:#8fa3b7">🎚 FORMATO</label>
+    <div class="formato-toggle">
+      <button type="button" class="formato-btn active" id="fmt-adulto" onclick="setFormato('adulto')">ADULTO</button>
+      <button type="button" class="formato-btn" id="fmt-infantil" onclick="setFormato('infantil')">INFANTIL</button>
+    </div>
+  </div>
   <!-- LÍMITE ÚNICO DEL PARTIDO (Fase 2): un solo campo, aplica a AMBOS equipos y todos
        los pitchers. Reemplaza los dos campos por-equipo — imposible poner números distintos. -->
-  <div class="match-limit-row" style="display:flex;align-items:center;gap:10px;justify-content:center;background:rgba(0,229,153,.06);border:1px solid rgba(0,229,153,.22);border-radius:12px;padding:11px 16px;margin:0 auto 14px;max-width:520px;flex-wrap:wrap">
+  <div class="match-limit-row" id="pitchlimit-row" style="display:flex;align-items:center;gap:10px;justify-content:center;background:rgba(0,229,153,.06);border:1px solid rgba(0,229,153,.22);border-radius:12px;padding:11px 16px;margin:0 auto 14px;max-width:520px;flex-wrap:wrap">
     <label for="match-limit" style="font-family:'Oswald',sans-serif;font-size:0.82rem;letter-spacing:1px;color:var(--green)">⚾ LÍMITE DE PITCHEOS DEL PARTIDO</label>
     <select id="match-limit" title="Límite único del partido — rige para ambos equipos y todos los pitchers" style="background:#0c1928;color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:6px;font-size:.8rem;padding:6px 10px;flex-shrink:0">
       <option value="">Sin límite</option>
@@ -705,6 +719,7 @@ let gs = {
   pitcherChanges:{ v:[], l:[] },
   pitcherLimits:{ v:{}, l:{} }, // { [idx]: numero } — limite de lanzamientos por POSICION de pitcher (indice de buildPitcherReport/getPitchStints), nunca por nombre
   matchPitchLimit:null, // LIMITE UNICO DEL PARTIDO (numero) o null = sin limite. Igual para ambos equipos y todos los pitchers. Fuente unica de verdad (Fase 1+). gs.pitcherLimits queda como legado/compat hasta Fase 2-3.
+  formato:'adulto', // 'adulto' (default limpio) | 'infantil'. Capa de UI: gobierna qué controles del setup se muestran (límite de pitcheos, botones +/- de bateadores) y, en juego, si se ve el contador "quedan" y si suena la sirena. No toca el motor de anotación ni el conteo.
   pitchCount:{ v:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}}, l:{total:0,strikes:0,balls:0,fouls:0,inningLog:{}} },
   pitchAB:{ v:{s:0,b:0,f:0,history:[],undoCount:0}, l:{s:0,b:0,f:0,history:[],undoCount:0} },
   selected:null,
@@ -1217,6 +1232,33 @@ function updateSetupRowButtons(t){
   if(rem) rem.disabled = n <= SETUP_MIN_ROWS;
 }
 buildSetup('v'); buildSetup('l');
+
+// ─── FORMATO (Adulto / Infantil) — capa de UI ─────────────
+// Gobierna SOLO visibilidad de controles y si suena la sirena; jamás toca el motor de
+// anotación, stats ni el conteo de pitcheos. Estado en gs.formato (se serializa/rehidrata).
+function setFormato(f){
+  gs.formato = (f==='infantil') ? 'infantil' : 'adulto';
+  if(gs.formato==='adulto'){
+    // Adulto = orden fijo de 9: descarta cualquier renglón extra que viniera de Infantil.
+    ['v','l'].forEach(t=>{ while(setupRowCount(t)>SETUP_MIN_ROWS) removeSetupRow(t); });
+  }
+  applyFormatoUI();
+}
+function applyFormatoUI(){
+  const inf = gs.formato==='infantil';
+  const a=document.getElementById('fmt-adulto'), n=document.getElementById('fmt-infantil');
+  if(a) a.classList.toggle('active', !inf);
+  if(n) n.classList.toggle('active', inf);
+  // Límite de pitcheos: solo Infantil (la fila conserva display:flex al mostrarse).
+  const lim=document.getElementById('pitchlimit-row');
+  if(lim) lim.style.display = inf ? 'flex' : 'none';
+  // Botones +/- de bateadores: solo Infantil (Adulto = orden fijo de 9).
+  document.querySelectorAll('.setup-rows-ctrl').forEach(el=> el.style.display = inf ? 'flex' : 'none');
+  // DH múltiple/movible: aún no existe control aparte; la pastilla DH por renglón (DH único
+  // estándar, con su candado ↔"¿BATEA?") sigue disponible en ambos formatos. Cuando se
+  // construya el multi-DH se ocultará aquí para Adulto.
+}
+applyFormatoUI(); // estado inicial (default Adulto): oculta límite y botones +/-
 // FECHA DEL PARTIDO: default = hoy (local, sin corrimiento de zona horaria) en el input de setup.
 (function initGameDate(){
   const el=document.getElementById('game-date'); if(!el) return;
@@ -1327,6 +1369,11 @@ window.rehydrateGame = function(gsString){
   if(gs.matchPitchLimit===undefined){
     gs.matchPitchLimit = gs.pitcherLimits?.v?.[0] ?? gs.pitcherLimits?.l?.[0] ?? null;
   }
+  // COMPAT FORMATO: guardados viejos no traen gs.formato. Default = 'infantil' a propósito:
+  // el formato solo afecta, en un juego YA cargado, si se ve "quedan" y si suena la sirena;
+  // 'infantil' = comportamiento de hoy, así que preserva exactamente lo que el usuario veía
+  // (con o sin límite). Un valor inválido cualquiera también cae a 'infantil'.
+  if(gs.formato!=='adulto' && gs.formato!=='infantil') gs.formato='infantil';
   // COMPAT UNDO DE SWAPS: guardados previos a esta versión no traen el stack → default a [].
   if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
   // COMPAT HISTORIAL DE POSICIÓN: guardados viejos traen .posChange (objeto único, solo el último
@@ -4965,6 +5012,7 @@ function stopSirena(){
 
 // Reproduce un "wee-ooo" suave. Requiere sirenCtx ya despierto (startGame).
 function playSirena(){
+  if(gs.formato==='adulto') return;                   // Adulto: sin sirena de límite (solo acumulado)
   if(!sirenCtx || sirenCtx.state!=='running') return; // sin gesto previo: no suena
   stopSirena();                                       // cortar la anterior antes de sonar
   try{
@@ -5197,7 +5245,9 @@ function updatePitchCounterUI(){
     const limit=gs.matchPitchLimit;
     const rem=document.getElementById(`pc-remain-${t}`);
     if(rem){
-      if(limit===undefined||limit===null){
+      // Formato Adulto: NUNCA se muestra "quedan" (solo el acumulado "lleva"). El conteo
+      // en sí no cambia — solo se oculta el descendente. Infantil = comportamiento de hoy.
+      if(gs.formato==='adulto'||limit===undefined||limit===null){
         rem.style.display='none';
         rem.textContent='';
         rem.classList.remove('pr-amber','pr-red','pr-flash');
