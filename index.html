@@ -1472,8 +1472,11 @@ function buildLineScore(){
 // ─── INNING NAV ───────────────────────────────────────────
 function buildInningNav(){
   const nav=document.getElementById('innav'); nav.innerHTML='';
-  for(let i=1;i<=INNINGS;i++) addInnBtn(nav,i);
+  // "+ EXTRA" PRIMERO: addInnBtn inserta cada entrada antes del último hijo (el ancla). Si el
+  // loop corre antes de crear "+ EXTRA", el ancla es E1 y todas las demás se apilan delante de
+  // ella → E1 quedaría al final. Con "+ EXTRA" ya presente, el orden natural 1..N sale correcto.
   const ex=document.createElement('button'); ex.className='inn-btn'; ex.textContent='+ EXTRA'; ex.onclick=addExtra; nav.appendChild(ex);
+  for(let i=1;i<=INNINGS;i++) addInnBtn(nav,i);
 }
 function addInnBtn(nav,n){
   const b=document.createElement('button'); b.className='inn-btn'+(n===1?' current':'');
