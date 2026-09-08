@@ -4386,40 +4386,74 @@ function verCambiosResumen(){
   showCambiosResumen({rows});
 }
 
-// PASO 3 · FASE 1: detecta la SUSTITUCIÓN SIMPLE — exactamente una fila Banca→pos y una
-// fila pos→Sale, en la MISMA posición defensiva (1-9, NO pos 1/pitcher, NO DH), sin más filas
-// ni swaps. Devuelve {benchName, pos(1-9), entry, exit} o null si no aplica (Fase 2/3).
-function cambiosSimpleSub(rows){
-  if(!Array.isArray(rows)||rows.length!==2) return null;
-  const entry=rows.find(r=>r.origin==='B' && r.dest!=='X');   // Banca→pos
-  const exit =rows.find(r=>r.dest==='X'   && r.origin!=='B'); // pos→Sale
-  if(!entry||!exit) return null;
-  const ePos=entry.dest, xPos=exit.origin;
-  if(cambiosIsDHDest(ePos)||cambiosIsDHOrigin(xPos)) return null; // DH → fuera de Fase 1
-  if(!/^[1-9]$/.test(String(ePos))||!/^[1-9]$/.test(String(xPos))) return null;
-  if(+ePos!==+xPos) return null;   // misma posición (sin swaps intermedios en Fase 1)
-  if(+ePos===1) return null;       // pos 1 = pitcher → Fase 3
-  return { benchName:entry.benchName, pos:ePos, entry, exit };
+// PASO 3 (Fase 1+2): plan de una cadena APLICABLE — EXACTAMENTE una fila Banca→pos y una
+// fila pos→Sale (posiciones que pueden diferir), más CERO o más swaps posA→posB. Todas las
+// posiciones tocadas deben ser defensivas 1-9, NO pos 1 (pitcher → Fase 3) y NO DH (fuera del
+// Paso 3). La cadena YA fue validada como cerrada por verCambiosResumen. Devuelve
+// {entryRow, exitRow, swaps} o null si no aplica todavía.
+function cambiosStep3Plan(rows){
+  if(!Array.isArray(rows)||!rows.length) return null;
+  const entries=rows.filter(r=>r.origin==='B');
+  const exits  =rows.filter(r=>r.dest==='X');
+  if(entries.length!==1||exits.length!==1) return null;   // exactamente 1 banca + 1 salida
+  const entryRow=entries[0], exitRow=exits[0];
+  const swaps=rows.filter(r=>r!==entryRow && r!==exitRow);
+  if(swaps.some(r=>r.origin==='B'||r.dest==='X')) return null; // el resto son swaps posA→posB
+  // Todas las posiciones tocadas: destino del banca, origen del que sale, y ambos lados de los swaps.
+  const posTokens=[entryRow.dest, exitRow.origin];
+  swaps.forEach(r=>{ posTokens.push(r.origin, r.dest); });
+  for(const tk of posTokens){
+    if(cambiosIsDHOrigin(tk)||cambiosIsDHDest(tk)) return null; // DH fuera del Paso 3
+    if(!/^[1-9]$/.test(String(tk))) return null;
+    if(+tk===1) return null; // pos 1 = pitcher → Fase 3
+  }
+  return { entryRow, exitRow, swaps };
 }
 
-// APLICA una sustitución simple (Paso 3 · Fase 1): entra un jugador de banca en el turno del
-// que sale, en la MISMA posición. Reusa applySubstitution (el entrante hereda el SLOT y turno
-// del saliente). Registra el undo con sub:{seq,outPidx}. NO toca pos 1/pitcher ni .pos de otros.
+// APLICA una cadena Paso 3 (Fase 1+2): el jugador de banca entra en el turno/SLOT del que SALE
+// (applySubstitution), con la posición destino del banca; los swaps intermedios reacomodan .pos
+// de jugadores que se quedan (idéntico a applyCambiosSwap). Todo en UNA operación reversible: el
+// undo combinado guarda moves (.pos previos) + sub (seq del entrante). NO toca pos 1/pitcher.
 function applyCambiosStep3(){
   const team=cambiosTeam;
-  const info=cambiosSimpleSub(cambiosRows);
-  if(!info){ showToast('⚠️ Este cambio todavía no se puede aplicar (Fase 2/3)',true); return; }
-  const benchName=(info.benchName||'').trim();
+  const plan=cambiosStep3Plan(cambiosRows);
+  if(!plan){ showToast('⚠️ Este cambio todavía no se puede aplicar (involucra al pitcher → Fase 3)',true); return; }
+  const {entryRow, exitRow, swaps}=plan;
+  const benchName=(entryRow.benchName||'').trim();
   if(!benchName){ showToast('⚠️ Escribe el nombre del jugador de banca',true); return; }
-  const outPidx=cambiosPlayerIdxAtPos(team, info.pos);
-  if(outPidx<0){ showToast(`⚠️ No encuentro al jugador en ${cambiosPosLabel(info.pos)} — revisa las posiciones de la alineación`,true); return; }
-  // Tope de 3 sustituciones por slot (mismo criterio que el botón ⇄ de la celda).
+  const inn=gs.currentInning||1;
+  // 1) Resolver TODOS los pidx ANTES de mutar .pos (al cambiar uno se corrompería la búsqueda
+  //    por .pos de los siguientes) — el que sale y cada origen de swap.
+  const outPidx=cambiosPlayerIdxAtPos(team, exitRow.origin);
+  if(outPidx<0){ showToast(`⚠️ No encuentro al jugador en ${cambiosPosLabel(exitRow.origin)} — revisa las posiciones de la alineación`,true); return; }
+  const swapPlan=[];
+  for(const r of swaps){
+    const pidx=cambiosPlayerIdxAtPos(team, r.origin);
+    if(pidx<0){ showToast(`⚠️ No encuentro al jugador en ${cambiosPosLabel(r.origin)} — revisa las posiciones de la alineación`,true); return; }
+    swapPlan.push({pidx, from:r.origin, to:r.dest});
+  }
+  // Tope de 3 sustituciones en el slot del que sale (mismo criterio que el botón ⇄ de la celda).
   const subsSlot=(gs.subs[team]||[]).filter(s=>s.outPidx===outPidx);
   if(subsSlot.length>=3){ showToast('⚠️ Ese puesto ya tiene el máximo de 3 cambios',true); return; }
-  const benchPos=POS_ABBR[(+info.pos)-1];   // posición defensiva destino (= la del que sale)
+  // 2) Capturar prevPos de los swaps ANTES de mutar (para el undo).
+  const moves=swapPlan.map(m=>({pidx:m.pidx, prevPos:gs.teams[team].players[m.pidx].pos}));
+  // 3) Aplicar swaps: .pos + APPEND a posHistory (idéntico a applyCambiosSwap, sin pos 1).
+  swapPlan.forEach(m=>{
+    const p=gs.teams[team].players[m.pidx];
+    if(!Array.isArray(p.posHistory)) p.posHistory=[];
+    const toPos=POS_ABBR[(+m.to)-1];
+    const realFrom=p.posHistory.length?p.posHistory[p.posHistory.length-1].to:POS_ABBR[(+m.from)-1];
+    p.pos=toPos;
+    p.posHistory.push({from:realFrom, to:toPos, inn});
+  });
+  // 4) Sustitución: el de banca hereda el SLOT/turno del que sale, con pos = destino del banca.
+  const benchPos=POS_ABBR[(+entryRow.dest)-1];
   applySubstitution(team, outPidx, toTitleCase(benchName), benchPos); // asigna gs.seq al sub
+  // 5) Undo COMBINADO (LIFO): moves (.pos previos) + sub (seq del entrante).
   if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
-  gs.cambiosSwapUndo.push({ team, inn:(gs.currentInning||1), pitcherSynced:false, moves:[], sub:{seq:gs.seq, outPidx} });
+  gs.cambiosSwapUndo.push({ team, inn, pitcherSynced:false, moves, sub:{seq:gs.seq, outPidx} });
+  // 6) Redibujar celdas de los swaps (el slot del sub ya lo redibujó applySubstitution).
+  swapPlan.forEach(m=>rebuildPlayerCell(team,m.pidx));
   closeModal();
 }
 
@@ -4459,8 +4493,8 @@ function showCambiosResumen(ctx){
   // ADEMÁS, la sustitución simple (una Banca + una Sale en la MISMA posición, sin pos 1/pitcher).
   // El resto (banca+swaps, o pos 1) sigue deshabilitado (Fases 2 y 3).
   const posOnly=!rows.some(r=>r.origin==='B'||r.dest==='X');
-  const simpleSub=cambiosSimpleSub(rows);
-  const canApply=posOnly||!!simpleSub;
+  const step3=posOnly?null:cambiosStep3Plan(rows); // banca+salida (+swaps), sin pos 1/DH
+  const canApply=posOnly||!!step3;
   const applyBtn=document.createElement('button');
   applyBtn.className='play-btn';
   if(canApply){
@@ -4477,8 +4511,10 @@ function showCambiosResumen(ctx){
   note.style.cssText='margin-top:6px;font-size:0.62rem;color:var(--text-dim);text-align:center;line-height:1.4';
   note.textContent=canApply
     ?(posOnly?'Intercambio de posiciones: se aplica al confirmar.'
-             :'Sustitución: entra el jugador de banca en el turno del que sale. Se aplica al confirmar.')
-    :'Incluye banca/salida con reacomodo o pitcher: eso se aplica en un paso siguiente. Por ahora solo verificación.';
+             :(step3&&step3.swaps.length
+                ?'Sustitución con reacomodo: entra el de banca en el turno del que sale y otros cambian de posición. Se aplica al confirmar.'
+                :'Sustitución: entra el jugador de banca en el turno del que sale. Se aplica al confirmar.'))
+    :'Involucra al pitcher (posición 1): eso se aplica en un paso siguiente. Por ahora solo verificación.';
   body.appendChild(note);
 }
 
