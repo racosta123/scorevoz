@@ -1315,6 +1315,29 @@ function startGame(){
       gs.plays[t][idx]={};
     }
   });
+  // FASE C (SOLO Infantil): aviso NO bloqueante de validez del campo. Las 9 posiciones defensivas
+  // deben estar cubiertas EXACTAMENTE UNA VEZ entre los jugadores; el resto son DH. El pitcher
+  // (aunque no batee, no esté en la alineación) cubre la posición 1. Solo informa por toast —
+  // NUNCA aborta ni bloquea la anotación. En Adulto no aplica (queda como hoy).
+  if(gs.formato==='infantil'){
+    const POS9=['P','C','1B','2B','3B','SS','LF','CF','RF'];
+    const msgs=[];
+    ['v','l'].forEach(t=>{
+      const count={}; POS9.forEach(p=>count[p]=0);
+      gs.teams[t].players.forEach(p=>{ const pos=String(p.pos||'').toUpperCase(); if(pos in count) count[pos]++; });
+      if(count['P']===0 && gs.pitcher[t] && gs.pitcher[t].name) count['P']=1; // el abridor ocupa la 1
+      const missing=POS9.filter(p=>count[p]===0);
+      const dup=POS9.filter(p=>count[p]>1);
+      if(missing.length||dup.length){
+        const tn=gs.teams[t].name||(t==='v'?'VISITANTE':'LOCAL');
+        const parts=[];
+        if(missing.length) parts.push(`faltan ${missing.join(', ')}`);
+        if(dup.length) parts.push(`duplicadas ${dup.join(', ')}`);
+        msgs.push(`${tn}: ${parts.join(' · ')}`);
+      }
+    });
+    if(msgs.length) showToast(`⚠ Revisa el campo — ${msgs.join(' | ')}`,true);
+  }
   // LÍMITE ÚNICO DEL PARTIDO (Fase 2): un solo campo del lineup, aplica a ambos equipos
   // y todos los pitchers. Vacío = null (sin límite, adultos).
   const _mpl=document.getElementById('match-limit');
