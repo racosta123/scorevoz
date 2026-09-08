@@ -4386,6 +4386,43 @@ function verCambiosResumen(){
   showCambiosResumen({rows});
 }
 
+// PASO 3 · FASE 1: detecta la SUSTITUCIÓN SIMPLE — exactamente una fila Banca→pos y una
+// fila pos→Sale, en la MISMA posición defensiva (1-9, NO pos 1/pitcher, NO DH), sin más filas
+// ni swaps. Devuelve {benchName, pos(1-9), entry, exit} o null si no aplica (Fase 2/3).
+function cambiosSimpleSub(rows){
+  if(!Array.isArray(rows)||rows.length!==2) return null;
+  const entry=rows.find(r=>r.origin==='B' && r.dest!=='X');   // Banca→pos
+  const exit =rows.find(r=>r.dest==='X'   && r.origin!=='B'); // pos→Sale
+  if(!entry||!exit) return null;
+  const ePos=entry.dest, xPos=exit.origin;
+  if(cambiosIsDHDest(ePos)||cambiosIsDHOrigin(xPos)) return null; // DH → fuera de Fase 1
+  if(!/^[1-9]$/.test(String(ePos))||!/^[1-9]$/.test(String(xPos))) return null;
+  if(+ePos!==+xPos) return null;   // misma posición (sin swaps intermedios en Fase 1)
+  if(+ePos===1) return null;       // pos 1 = pitcher → Fase 3
+  return { benchName:entry.benchName, pos:ePos, entry, exit };
+}
+
+// APLICA una sustitución simple (Paso 3 · Fase 1): entra un jugador de banca en el turno del
+// que sale, en la MISMA posición. Reusa applySubstitution (el entrante hereda el SLOT y turno
+// del saliente). Registra el undo con sub:{seq,outPidx}. NO toca pos 1/pitcher ni .pos de otros.
+function applyCambiosStep3(){
+  const team=cambiosTeam;
+  const info=cambiosSimpleSub(cambiosRows);
+  if(!info){ showToast('⚠️ Este cambio todavía no se puede aplicar (Fase 2/3)',true); return; }
+  const benchName=(info.benchName||'').trim();
+  if(!benchName){ showToast('⚠️ Escribe el nombre del jugador de banca',true); return; }
+  const outPidx=cambiosPlayerIdxAtPos(team, info.pos);
+  if(outPidx<0){ showToast(`⚠️ No encuentro al jugador en ${cambiosPosLabel(info.pos)} — revisa las posiciones de la alineación`,true); return; }
+  // Tope de 3 sustituciones por slot (mismo criterio que el botón ⇄ de la celda).
+  const subsSlot=(gs.subs[team]||[]).filter(s=>s.outPidx===outPidx);
+  if(subsSlot.length>=3){ showToast('⚠️ Ese puesto ya tiene el máximo de 3 cambios',true); return; }
+  const benchPos=POS_ABBR[(+info.pos)-1];   // posición defensiva destino (= la del que sale)
+  applySubstitution(team, outPidx, toTitleCase(benchName), benchPos); // asigna gs.seq al sub
+  if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
+  gs.cambiosSwapUndo.push({ team, inn:(gs.currentInning||1), pitcherSynced:false, moves:[], sub:{seq:gs.seq, outPidx} });
+  closeModal();
+}
+
 function showCambiosResumen(ctx){
   const {rows}=ctx;
   const team=cambiosTeam;
@@ -4418,15 +4455,18 @@ function showCambiosResumen(ctx){
     warn.innerHTML=`⚠ Esto también registrará un cambio de pitcher: nuevo pitcher = <strong>${newPit}</strong>.`;
     body.appendChild(warn);
   }
-  // APLICAR — Paso 2: habilitado SOLO para cadenas de solo-posiciones (sin Banca ni "Sale
-  // de juego"). Con banca o salida sigue deshabilitado (eso es el Paso 3).
+  // APLICAR — Paso 2: cadenas de solo-posiciones (sin Banca ni "Sale de juego"). Paso 3 · Fase 1:
+  // ADEMÁS, la sustitución simple (una Banca + una Sale en la MISMA posición, sin pos 1/pitcher).
+  // El resto (banca+swaps, o pos 1) sigue deshabilitado (Fases 2 y 3).
   const posOnly=!rows.some(r=>r.origin==='B'||r.dest==='X');
+  const simpleSub=cambiosSimpleSub(rows);
+  const canApply=posOnly||!!simpleSub;
   const applyBtn=document.createElement('button');
   applyBtn.className='play-btn';
-  if(posOnly){
+  if(canApply){
     applyBtn.textContent='Aplicar cambio';
     applyBtn.style.cssText='width:100%;margin-top:12px;border-color:var(--green);color:var(--green)';
-    applyBtn.onclick=()=>applyCambiosSwap();
+    applyBtn.onclick=()=> posOnly ? applyCambiosSwap() : applyCambiosStep3();
   } else {
     applyBtn.textContent='Aplicar cambio (Paso 3 pendiente)';
     applyBtn.disabled=true;
@@ -4435,9 +4475,10 @@ function showCambiosResumen(ctx){
   body.appendChild(applyBtn);
   const note=document.createElement('div');
   note.style.cssText='margin-top:6px;font-size:0.62rem;color:var(--text-dim);text-align:center;line-height:1.4';
-  note.textContent=posOnly
-    ?'Intercambio de posiciones: se aplica al confirmar. Con banca/salida, "Aplicar" se habilita en el Paso 3.'
-    :'Incluye banca/salida: eso se aplica en el Paso 3. Por ahora solo verificación.';
+  note.textContent=canApply
+    ?(posOnly?'Intercambio de posiciones: se aplica al confirmar.'
+             :'Sustitución: entra el jugador de banca en el turno del que sale. Se aplica al confirmar.')
+    :'Incluye banca/salida con reacomodo o pitcher: eso se aplica en un paso siguiente. Por ahora solo verificación.';
   body.appendChild(note);
 }
 
@@ -4540,7 +4581,18 @@ function undoLastCambiosSwap(){
     };
     updatePitchCounterUI();
   }
-  // Ya validado (o sin pitcher): consumir el registro y restaurar posiciones.
+  // SUB del Paso 3 (Fase 1): validar LIFO ANTES de consumir. El sub que registramos debe seguir
+  // siendo el ÚLTIMO de su slot (nadie metió otro cambio en ese puesto después). Si no, rechazar
+  // sin tocar nada (mismo criterio de seguridad que el pitcher). Registros viejos no traen .sub.
+  let subTarget=null;
+  if(rec.sub){
+    const subs=gs.subs[team]||[];
+    subTarget=subs.find(s=>(s.seq||0)===rec.sub.seq);
+    if(!subTarget){ showToast('Esa sustitución ya no está; no hay nada que deshacer',true); return; }
+    const laterOnSlot=subs.some(s=>s.outPidx===subTarget.outPidx && (s.seq||0)>(subTarget.seq||0));
+    if(laterOnSlot){ showToast('Hubo otro cambio en ese puesto después; deshaz primero el más reciente',true); return; }
+  }
+  // Ya validado (o sin pitcher/sub): consumir el registro y restaurar posiciones.
   gs.cambiosSwapUndo.pop();
   rec.moves.forEach(m=>{
     const p=gs.teams[team].players[m.pidx];
@@ -4550,9 +4602,18 @@ function undoLastCambiosSwap(){
     if(Array.isArray(p.posHistory)){ p.posHistory.pop(); if(!p.posHistory.length) delete p.posHistory; }
     rebuildPlayerCell(team,m.pidx);
   });
+  // Quitar el sub del Paso 3 (si lo hubo) y redibujar su slot.
+  if(subTarget){
+    gs.subs[team]=(gs.subs[team]||[]).filter(s=>s!==subTarget);
+    rebuildPlayerCell(team, subTarget.outPidx);
+  }
   closeModal();
-  const txt=rec.moves.map(m=>`${gs.teams[team].players[m.pidx]?.name||('#'+(m.pidx+1))}→${m.prevPos}`).join(', ');
-  showToast(`↩ Deshecho el cambio de posición (${txt})`);
+  if(subTarget){
+    showToast(`↩ Deshecha la sustitución (sale ${subTarget.inName})`);
+  } else {
+    const txt=rec.moves.map(m=>`${gs.teams[team].players[m.pidx]?.name||('#'+(m.pidx+1))}→${m.prevPos}`).join(', ');
+    showToast(`↩ Deshecho el cambio de posición (${txt})`);
+  }
 }
 
 // ─── BATEO CON CORREDORES EN BASE (derivado) ───────────────
