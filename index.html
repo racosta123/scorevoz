@@ -4163,13 +4163,28 @@ let cambiosRows=[]; // [{origin:'B'|'1'..'9'|'', dest:'1'..'9'|'', benchName:str
 // Nombre completo de la posición 1-9 (local a este módulo; los mapas de narrativa/voz
 // son locales a sus funciones y no son alcanzables desde aquí).
 const CAMBIOS_POS_NAME={1:'Pitcher',2:'Catcher',3:'Primera',4:'Segunda',5:'Tercera',6:'Short',7:'Jardín Izquierdo',8:'Jardín Central',9:'Jardín Derecho'};
-function cambiosPosLabel(n){ return `${CAMBIOS_POS_NAME[n]} (${n})`; }
+// Tokens de Origen/Destino en Cambios: posiciones defensivas = número 1..9. DH (solo Infantil):
+//   Origen  = 'd<pidx>' → un jugador DH ESPECÍFICO (resuelto por índice, no por string 'DH',
+//             para no confundir dos DH). Destino = 'DH' → pasar a bateador designado.
+function cambiosIsDHOrigin(v){ return typeof v==='string' && /^d\d+$/.test(v); }
+function cambiosDHOriginPidx(v){ return cambiosIsDHOrigin(v) ? parseInt(v.slice(1),10) : -1; }
+function cambiosIsDHDest(v){ return v==='DH'; }
+function cambiosPosLabel(token){
+  if(cambiosIsDHDest(token)||cambiosIsDHOrigin(token)) return 'DH';
+  return `${CAMBIOS_POS_NAME[token]} (${token})`;
+}
 
 // Ocupante ACTUAL (pre-cambio) de la posición n. Pos 1 = pitcher actual
 // (getCurrentPitcherName, 4666). Resto: primer jugador de gs.teams cuyo .pos coincide
 // con POS_ABBR[n-1] (828). Si no se identifica, devuelve una etiqueta genérica (Fase 1
 // es solo verificación: nunca truena, aunque el .pos escrito a mano no case).
-function cambiosPlayerAtPos(team,n){
+function cambiosPlayerAtPos(team,token){
+  // DH por índice: devuelve el nombre de ESE jugador (no busca por .pos 'DH', que no es único).
+  if(cambiosIsDHOrigin(token)){
+    const p=(gs.teams[team]&&gs.teams[team].players||[])[cambiosDHOriginPidx(token)];
+    return p?p.name:'(DH)';
+  }
+  const n=+token;
   if(n===1) return getCurrentPitcherName(team)||'(pitcher actual)';
   const abbr=POS_ABBR[n-1];
   const pl=(gs.teams[team]&&gs.teams[team].players||[]).find(p=>String(p.pos||'').toUpperCase()===abbr);
@@ -4180,9 +4195,11 @@ function cambiosPlayerAtPos(team,n){
 // necesitamos el índice, no solo el nombre). Resuelve por .pos === POS_ABBR[n-1] (pos 1='P').
 // Devuelve -1 si no hay jugador de la alineación con esa posición (sin .pos capturado, o un
 // pitcher relevista fuera de la alineación — ese caso queda fuera del Paso 2).
-function cambiosPlayerIdxAtPos(team,n){
-  const abbr=POS_ABBR[n-1];
+function cambiosPlayerIdxAtPos(team,token){
   const players=(gs.teams[team]&&gs.teams[team].players)||[];
+  // DH por índice: el token ya trae el pidx exacto (evita la colisión de dos jugadores con pos 'DH').
+  if(cambiosIsDHOrigin(token)){ const pidx=cambiosDHOriginPidx(token); return (pidx>=0&&pidx<players.length)?pidx:-1; }
+  const abbr=POS_ABBR[(+token)-1];
   return players.findIndex(p=>String(p.pos||'').toUpperCase()===abbr);
 }
 
@@ -4251,12 +4268,19 @@ function buildCambioRow(r,idx){
   wrap.style.cssText='display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:8px;margin-bottom:6px';
   const selStyle='background:#0d1b2a;color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:6px;font-size:0.72rem;font-family:inherit;flex:1;min-width:96px';
   const posOpts=[1,2,3,4,5,6,7,8,9].map(n=>`<option value="${n}">${CAMBIOS_POS_NAME[n]} (${n})</option>`).join('');
+  // Infantil (multi-DH): Origen ofrece cada jugador DH (token d<pidx>, resuelto por índice);
+  // Destino ofrece "DH" (pasar a bateador designado). Adulto no ve estas opciones.
+  const infantil=gs.formato==='infantil';
+  const dhOriginOpts=infantil?((gs.teams[cambiosTeam]&&gs.teams[cambiosTeam].players)||[])
+    .map((p,idx)=>({p,idx})).filter(o=>String(o.p.pos||'').toUpperCase()==='DH')
+    .map(o=>`<option value="d${o.idx}">🟡 DH — ${ssEsc(o.p.name)} (${o.idx+1}º)</option>`).join(''):'';
+  const dhDestOpt=infantil?`<option value="DH">🟡 DH (bateador designado)</option>`:'';
   const oSel=document.createElement('select'); oSel.className='cambios-origin'; oSel.style.cssText=selStyle;
-  oSel.innerHTML=`<option value="">Origen…</option><option value="B">🪑 Banca</option>${posOpts}`;
+  oSel.innerHTML=`<option value="">Origen…</option><option value="B">🪑 Banca</option>${posOpts}${dhOriginOpts}`;
   oSel.value=r.origin||'';
   const arrow=document.createElement('span'); arrow.textContent='→'; arrow.style.cssText='color:var(--text-dim);font-size:0.95rem;flex:0 0 auto';
   const dSel=document.createElement('select'); dSel.className='cambios-dest'; dSel.style.cssText=selStyle;
-  dSel.innerHTML=`<option value="">Destino…</option><option value="X">🚪 Sale de juego</option>${posOpts}`;
+  dSel.innerHTML=`<option value="">Destino…</option><option value="X">🚪 Sale de juego</option>${posOpts}${dhDestOpt}`;
   dSel.value=r.dest||'';
   const rm=document.createElement('button'); rm.className='play-btn'; rm.textContent='✕';
   rm.title='Quitar fila'; rm.style.cssText='border-color:var(--red);color:var(--red);padding:6px 11px;flex:0 0 auto';
@@ -4305,10 +4329,18 @@ function verCambiosResumen(){
     if(!r.origin||!r.dest){ cambiosError(`Fila ${i+1}: elige origen y destino.`); return; }
     if(r.origin==='B' && !r.benchName){ cambiosError(`Fila ${i+1}: escribe el nombre del jugador de banca.`); return; }
     if(r.origin==='B' && r.dest==='X'){ cambiosError(`Fila ${i+1}: un jugador no puede entrar de banca y salir del juego a la vez.`); return; }
-    if(r.origin!=='B' && r.dest!=='X' && +r.origin===+r.dest){ cambiosError(`Fila ${i+1}: el origen y el destino no pueden ser la misma posición.`); return; }
+    if(cambiosIsDHOrigin(r.origin) && cambiosIsDHDest(r.dest)){ cambiosError(`Fila ${i+1}: un DH que sigue de DH no es un cambio; elige una posición defensiva como destino.`); return; }
+    if(r.origin!=='B' && r.dest!=='X' && !cambiosIsDHOrigin(r.origin) && !cambiosIsDHDest(r.dest) && +r.origin===+r.dest){ cambiosError(`Fila ${i+1}: el origen y el destino no pueden ser la misma posición.`); return; }
   }
-  const realOrigins=rows.filter(r=>r.origin!=='B').map(r=>+r.origin);   // posiciones desocupadas
-  const realDests  =rows.filter(r=>r.dest!=='X').map(r=>+r.dest);       // posiciones re-ocupadas
+  // DH (origen d<pidx> / destino 'DH') NO cuenta como posición 1-9: la cadena cerrada se valida
+  // solo sobre las defensivas. Un DH→pos obliga (por el cierre) a que esa pos se vacíe hacia DH,
+  // así el equipo conserva 9 defensores sin un chequeo de conteo aparte.
+  const realOrigins=rows.filter(r=>r.origin!=='B' && !cambiosIsDHOrigin(r.origin)).map(r=>+r.origin); // posiciones desocupadas
+  const realDests  =rows.filter(r=>r.dest!=='X'   && !cambiosIsDHDest(r.dest)  ).map(r=>+r.dest);     // posiciones re-ocupadas
+  // No repetir el MISMO jugador-DH como Origen en dos filas.
+  const dhOrig=rows.filter(r=>cambiosIsDHOrigin(r.origin)).map(r=>r.origin);
+  const dupDH=dhOrig.find((v,i)=>dhOrig.indexOf(v)!==i);
+  if(dupDH){ cambiosError(`Elegiste al mismo jugador DH (${cambiosPlayerAtPos(cambiosTeam,dupDH)}) como Origen en dos filas.`); return; }
   const entran=rows.filter(r=>r.origin==='B').length;
   const salen =rows.filter(r=>r.dest==='X').length;
   // Límite por pantalla (por ahora)
@@ -4343,11 +4375,11 @@ function showCambiosResumen(ctx){
   const lines=[];
   rows.forEach(r=>{
     if(r.origin==='B'){
-      lines.push({c:'var(--green)',t:`<strong>${r.benchName}</strong> (nuevo, de banca): entra a ${cambiosPosLabel(+r.dest)}`});
+      lines.push({c:'var(--green)',t:`<strong>${r.benchName}</strong> (nuevo, de banca): entra a ${cambiosPosLabel(r.dest)}`});
     } else if(r.dest==='X'){
-      lines.push({c:'var(--red)',t:`<strong>${cambiosPlayerAtPos(team,+r.origin)}</strong>: sale del juego (era ${CAMBIOS_POS_NAME[+r.origin]})`});
+      lines.push({c:'var(--red)',t:`<strong>${cambiosPlayerAtPos(team,r.origin)}</strong>: sale del juego (era ${cambiosPosLabel(r.origin)})`});
     } else {
-      lines.push({c:'#fff',t:`<strong>${cambiosPlayerAtPos(team,+r.origin)}</strong>: pasa de ${cambiosPosLabel(+r.origin)} a ${cambiosPosLabel(+r.dest)}`});
+      lines.push({c:'#fff',t:`<strong>${cambiosPlayerAtPos(team,r.origin)}</strong>: pasa de ${cambiosPosLabel(r.origin)} a ${cambiosPosLabel(r.dest)}`});
     }
   });
   const list=document.createElement('div'); list.style.cssText='padding:4px 0 6px';
@@ -4357,7 +4389,7 @@ function showCambiosResumen(ctx){
   const involves1=rows.some(r=>(r.origin!=='B'&&+r.origin===1)|| +r.dest===1);
   if(involves1){
     const inRow=rows.find(r=>+r.dest===1);
-    const newPit=inRow?(inRow.origin==='B'?inRow.benchName:cambiosPlayerAtPos(team,+inRow.origin)):'—';
+    const newPit=inRow?(inRow.origin==='B'?inRow.benchName:cambiosPlayerAtPos(team,inRow.origin)):'—';
     const warn=document.createElement('div');
     warn.style.cssText='margin-top:8px;padding:8px 10px;border:1px solid var(--amber);border-radius:8px;background:rgba(255,184,28,.08);color:var(--amber);font-size:0.74rem;line-height:1.4';
     warn.innerHTML=`⚠ Esto también registrará un cambio de pitcher: nuevo pitcher = <strong>${newPit}</strong>.`;
@@ -4402,13 +4434,13 @@ function applyCambiosSwap(){
   //    la búsqueda por .pos de los siguientes).
   const plan=[];
   for(const r of rows){
-    const from=+r.origin, to=+r.dest;
+    const from=r.origin, to=r.dest;   // tokens crudos: 1-9, 'd<pidx>' (origen DH) o 'DH' (destino)
     const pidx=cambiosPlayerIdxAtPos(team,from);
-    if(pidx<0){ showToast(`⚠️ No encuentro al jugador en ${CAMBIOS_POS_NAME[from]} — revisa las posiciones de la alineación`,true); return; }
+    if(pidx<0){ showToast(`⚠️ No encuentro al jugador en ${cambiosPosLabel(from)} — revisa las posiciones de la alineación`,true); return; }
     plan.push({pidx,from,to});
   }
-  // ¿Cambia de manos la posición 1? (llega alguien nuevo a pitcher)
-  const newPitMove=plan.find(m=>m.to===1);
+  // ¿Cambia de manos la posición 1? (llega alguien nuevo a pitcher). 'DH' como destino → +NaN, no es 1.
+  const newPitMove=plan.find(m=>+m.to===1);
   const outPitName=newPitMove?getCurrentPitcherName(team):null; // capturar saliente ANTES de tocar nada
   // 2) UNDO: capturar el estado PREVIO (pos por jugador, y si sincronizó el pitcher) ANTES de mutar
   //    y apilarlo en gs.cambiosSwapUndo (LIFO, se serializa con gs → sobrevive al reload). La
@@ -4426,9 +4458,11 @@ function applyCambiosSwap(){
   plan.forEach(m=>{
     const p=gs.teams[team].players[m.pidx];
     if(!Array.isArray(p.posHistory)) p.posHistory=[];
-    const realFrom = p.posHistory.length ? p.posHistory[p.posHistory.length-1].to : POS_ABBR[m.from-1];
-    p.pos=POS_ABBR[m.to-1];
-    p.posHistory.push({from:realFrom, to:POS_ABBR[m.to-1], inn});
+    const toPos = cambiosIsDHDest(m.to) ? 'DH' : POS_ABBR[(+m.to)-1];
+    const realFrom = p.posHistory.length ? p.posHistory[p.posHistory.length-1].to
+                   : (cambiosIsDHOrigin(m.from) ? 'DH' : POS_ABBR[(+m.from)-1]);
+    p.pos=toPos;
+    p.posHistory.push({from:realFrom, to:toPos, inn});
   });
   // 3) Sincronizar pitcher si la pos 1 cambió de manos (mismo patrón que applyCambioPitcher).
   if(newPitMove){
@@ -4447,7 +4481,7 @@ function applyCambiosSwap(){
   // 4) Redibujar las celdas de los jugadores afectados (nombre + nueva pos + etiqueta).
   plan.forEach(m=>rebuildPlayerCell(team,m.pidx));
   closeModal();
-  const resumenTxt=plan.map(m=>`${POS_ABBR[m.from-1]}→${POS_ABBR[m.to-1]}`).join(', ');
+  const resumenTxt=plan.map(m=>`${cambiosIsDHOrigin(m.from)?'DH':POS_ABBR[(+m.from)-1]}→${cambiosIsDHDest(m.to)?'DH':POS_ABBR[(+m.to)-1]}`).join(', ');
   showToast(`✓ E${inn}: cambio de posiciones (${resumenTxt})${newPitMove?' — nuevo pitcher '+gs.teams[team].players[newPitMove.pidx].name:''}`);
 }
 
