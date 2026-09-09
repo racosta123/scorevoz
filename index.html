@@ -4226,7 +4226,40 @@ function cambiosPlayerIdxAtPos(team,token){
   return players.findIndex(p=>String(p.pos||'').toUpperCase()===abbr);
 }
 
-function openCambiosMenu(){
+// Inverso de POS_ABBR: abreviatura de posición defensiva ('P','SS','RF'…) → token de Cambios ('1'..'9').
+// Reutiliza POS_ABBR (883) SIN mutarlo. Devuelve '' si la abreviatura no es una posición 1-9 (p.ej. 'DH').
+// Lo usa la precarga de openCambiosMenu (Paso 4.1) para sembrar el Origen desde la .pos de un jugador.
+function cambiosPosToken(abbr){
+  const i=POS_ABBR.indexOf(String(abbr||'').toUpperCase());
+  return i>=0 ? String(i+1) : '';
+}
+
+// Paso 4.1 (ADITIVO): openCambiosMenu acepta precarga OPCIONAL. Sin args = comportamiento de siempre
+// (botón suelto #cambios-btn): equipo sin fijar + una fila vacía + selector de equipo. Con `team` salta
+// el selector, fija el equipo y siembra UNA fila inicial según opts={fromPos, fromPlayerIdx, source},
+// yendo directo al editor. `source` es solo informativo (rótulo/telemetría), no cambia la lógica.
+// NOTA: los accesos ⇄ y módulo de pitcher NO usan esta firma todavía (eso es 4.2 y 4.3).
+function openCambiosMenu(team, opts){
+  opts=opts||{};
+  if(team){
+    setModalForceChoice(false);
+    document.getElementById('mtitle').textContent='CAMBIOS (POSICIONES)';
+    cambiosTeam=team;
+    // Origen inicial: desde ⇄ (fromPlayerIdx) = token de la .pos de ese jugador (DH → 'd'+idx);
+    // desde el módulo de pitcher (fromPos) = ese token tal cual (p.ej. '1'). Si no hay pista, vacío.
+    let origin='';
+    if(opts.fromPlayerIdx!=null){
+      const pl=((gs.teams[team]&&gs.teams[team].players)||[])[opts.fromPlayerIdx];
+      const abbr=String((pl&&pl.pos)||'').toUpperCase();
+      origin = abbr==='DH' ? ('d'+opts.fromPlayerIdx) : (cambiosPosToken(abbr)||'');
+    } else if(opts.fromPos!=null){
+      origin=String(opts.fromPos);
+    }
+    cambiosRows=[{origin, dest:'', benchName:''}];
+    document.getElementById('modal').classList.add('show');
+    renderCambiosEditor();
+    return;
+  }
   cambiosTeam=null;
   cambiosRows=[{origin:'',dest:'',benchName:''}];
   setModalForceChoice(false);
