@@ -4399,13 +4399,20 @@ function cambiosStep3Plan(rows){
   const entryRow=entries[0], exitRow=exits[0];
   const swaps=rows.filter(r=>r!==entryRow && r!==exitRow);
   if(swaps.some(r=>r.origin==='B'||r.dest==='X')) return null; // el resto son swaps posA→posB
+  // FASE 3 (parte 1) — RELEVO DESDE BANCA: patrón EXACTO "1→Sale" + "Banca→1" y NADA más (cero
+  // swaps). Entra un pitcher nuevo de banca, sale el anterior. Es la ÚNICA cadena con pos 1 que se
+  // habilita: un defensor que pasa a lanzar, o un relevo + swaps de campo, llevan swaps ≠ 0 (o pos 1
+  // en un swap) y caen al veto de abajo → siguen deshabilitados (parte 2 / 3c). Marca pitcherRelief.
+  if(swaps.length===0 && entryRow.dest==='1' && exitRow.origin==='1'){
+    return { entryRow, exitRow, swaps:[], pitcherRelief:true };
+  }
   // Todas las posiciones tocadas: destino del banca, origen del que sale, y ambos lados de los swaps.
   const posTokens=[entryRow.dest, exitRow.origin];
   swaps.forEach(r=>{ posTokens.push(r.origin, r.dest); });
   for(const tk of posTokens){
     if(cambiosIsDHOrigin(tk)||cambiosIsDHDest(tk)) return null; // DH fuera del Paso 3
     if(!/^[1-9]$/.test(String(tk))) return null;
-    if(+tk===1) return null; // pos 1 = pitcher → Fase 3
+    if(+tk===1) return null; // pos 1 = pitcher → Fase 3 (salvo el relevo desde banca de arriba)
   }
   return { entryRow, exitRow, swaps };
 }
@@ -4422,6 +4429,49 @@ function applyCambiosStep3(){
   const benchName=(entryRow.benchName||'').trim();
   if(!benchName){ showToast('⚠️ Escribe el nombre del jugador de banca',true); return; }
   const inn=gs.currentInning||1;
+  // FASE 3 (parte 1) — RELEVO DESDE BANCA ("1→Sale" + "Banca→1"): entra un pitcher nuevo de banca,
+  // sale el anterior. Dos casos:
+  //  · Caso A (pitcher NO batea — adulto con DH / pitcher fuera del orden): SOLO pitcherChanges +
+  //    reset del conteo. Sin sub, sin slot de bateo.
+  //  · Caso B (pitcher SÍ batea — infantil / Ohtani): ADEMÁS el de banca hereda el SLOT/turno del
+  //    pitcher saliente (applySubstitution pos 'P', tope de 3 subs) + pitcherChanges + reset.
+  // Clasificación: hay jugador con pos 'P' en el orden (cambiosPlayerIdxAtPos '1' >=0) como
+  // principal; gs.pitcher[team].batea como respaldo. Todo en UNA operación reversible.
+  if(plan.pitcherRelief){
+    const inName=toTitleCase(benchName);
+    const outName=getCurrentPitcherName(team);           // saliente ANTES de mutar
+    const outPidx=cambiosPlayerIdxAtPos(team,'1');        // >=0 sólo si el pitcher batea (pos 'P' en el orden)
+    const pitcherBats = outPidx>=0 || !!(gs.pitcher[team]&&gs.pitcher[team].batea);
+    // Caso B: tope de 3 sustituciones en el slot del pitcher (mismo criterio que el botón ⇄ de la celda).
+    if(pitcherBats && outPidx>=0){
+      const subsSlot=(gs.subs[team]||[]).filter(s=>s.outPidx===outPidx);
+      if(subsSlot.length>=3){ showToast('⚠️ Ese puesto ya tiene el máximo de 3 cambios',true); return; }
+    }
+    // Sincronizar pitcher: archiva el conteo del saliente en gs.pitcherChanges y resetea el conteo
+    // live del lado que BATEA (mismo patrón que applyCambioPitcher / applyCambiosSwap). fromSwap:true.
+    const battingSide=team==='v'?'l':'v';
+    const pc=gs.pitchCount[battingSide];
+    gs.pitcherChanges[team].push({
+      inn, inName, outName,
+      outsAtChange:countOutsInInning(battingSide,inn), seqAtChange:gs.seq||0,
+      pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},
+      inningLog:{...pc.inningLog}, fromSwap:true
+    });
+    gs.pitchCount[battingSide]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
+    updatePitchCounterUI();
+    // Caso B: el de banca hereda el SLOT/turno del pitcher saliente (celda tachada + nuevo), pos 'P'.
+    let subRec=null;
+    if(pitcherBats && outPidx>=0){
+      applySubstitution(team, outPidx, inName, 'P');       // asigna gs.seq al sub
+      subRec={seq:gs.seq, outPidx};
+    }
+    // Undo COMBINADO (LIFO): pitcher (pitcherSynced) + sub (Caso B) o sub:null (Caso A). Sin moves.
+    if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
+    gs.cambiosSwapUndo.push({ team, inn, pitcherSynced:true, moves:[], sub:subRec });
+    closeModal();
+    showToast(`✓ E${inn}: relevo — entra ${inName} a lanzar, sale ${outName}`);
+    return;
+  }
   // 1) Resolver TODOS los pidx ANTES de mutar .pos (al cambiar uno se corrompería la búsqueda
   //    por .pos de los siguientes) — el que sale y cada origen de swap.
   const outPidx=cambiosPlayerIdxAtPos(team, exitRow.origin);
@@ -4509,12 +4559,20 @@ function showCambiosResumen(ctx){
   body.appendChild(applyBtn);
   const note=document.createElement('div');
   note.style.cssText='margin-top:6px;font-size:0.62rem;color:var(--text-dim);text-align:center;line-height:1.4';
-  note.textContent=canApply
-    ?(posOnly?'Intercambio de posiciones: se aplica al confirmar.'
-             :(step3&&step3.swaps.length
-                ?'Sustitución con reacomodo: entra el de banca en el turno del que sale y otros cambian de posición. Se aplica al confirmar.'
-                :'Sustitución: entra el jugador de banca en el turno del que sale. Se aplica al confirmar.'))
-    :'Involucra al pitcher (posición 1): eso se aplica en un paso siguiente. Por ahora solo verificación.';
+  let noteTxt;
+  if(!canApply){
+    noteTxt='Involucra al pitcher (posición 1): eso se aplica en un paso siguiente. Por ahora solo verificación.';
+  } else if(posOnly){
+    noteTxt='Intercambio de posiciones: se aplica al confirmar.';
+  } else if(step3.pitcherRelief){
+    // Relevo desde banca (Fase 3 parte 1): entra un pitcher nuevo, sale el anterior.
+    noteTxt=`Relevo: entra ${step3.entryRow.benchName} a lanzar, sale ${cambiosPlayerAtPos(team,'1')}. Se aplica al confirmar.`;
+  } else if(step3.swaps.length){
+    noteTxt='Sustitución con reacomodo: entra el de banca en el turno del que sale y otros cambian de posición. Se aplica al confirmar.';
+  } else {
+    noteTxt='Sustitución: entra el jugador de banca en el turno del que sale. Se aplica al confirmar.';
+  }
+  note.textContent=noteTxt;
   body.appendChild(note);
 }
 
@@ -4597,6 +4655,18 @@ function undoLastCambiosSwap(){
   }
   const rec=gs.cambiosSwapUndo[gs.cambiosSwapUndo.length-1]; // peek (no pop aún: puede rechazarse)
   const team=rec.team;
+  // SUB del Paso 3: validar LIFO ANTES de tocar nada (se resuelve primero para que, en un registro
+  // COMBINADO pitcher+sub —el relevo desde banca Caso B de la Fase 3— ninguna de las dos partes mute
+  // si la otra va a rechazar). El sub que registramos debe seguir siendo el ÚLTIMO de su slot (nadie
+  // metió otro cambio en ese puesto después). Si no, rechazar sin tocar nada. Registros viejos no traen .sub.
+  let subTarget=null;
+  if(rec.sub){
+    const subs=gs.subs[team]||[];
+    subTarget=subs.find(s=>(s.seq||0)===rec.sub.seq);
+    if(!subTarget){ showToast('Esa sustitución ya no está; no hay nada que deshacer',true); return; }
+    const laterOnSlot=subs.some(s=>s.outPidx===subTarget.outPidx && (s.seq||0)>(subTarget.seq||0));
+    if(laterOnSlot){ showToast('Hubo otro cambio en ese puesto después; deshaz primero el más reciente',true); return; }
+  }
   // Parte pitcher: validar ANTES de tocar nada.
   if(rec.pitcherSynced){
     const changes=gs.pitcherChanges[team]||[];
@@ -4617,17 +4687,6 @@ function undoLastCambiosSwap(){
     };
     updatePitchCounterUI();
   }
-  // SUB del Paso 3 (Fase 1): validar LIFO ANTES de consumir. El sub que registramos debe seguir
-  // siendo el ÚLTIMO de su slot (nadie metió otro cambio en ese puesto después). Si no, rechazar
-  // sin tocar nada (mismo criterio de seguridad que el pitcher). Registros viejos no traen .sub.
-  let subTarget=null;
-  if(rec.sub){
-    const subs=gs.subs[team]||[];
-    subTarget=subs.find(s=>(s.seq||0)===rec.sub.seq);
-    if(!subTarget){ showToast('Esa sustitución ya no está; no hay nada que deshacer',true); return; }
-    const laterOnSlot=subs.some(s=>s.outPidx===subTarget.outPidx && (s.seq||0)>(subTarget.seq||0));
-    if(laterOnSlot){ showToast('Hubo otro cambio en ese puesto después; deshaz primero el más reciente',true); return; }
-  }
   // Ya validado (o sin pitcher/sub): consumir el registro y restaurar posiciones.
   gs.cambiosSwapUndo.pop();
   rec.moves.forEach(m=>{
@@ -4644,7 +4703,10 @@ function undoLastCambiosSwap(){
     rebuildPlayerCell(team, subTarget.outPidx);
   }
   closeModal();
-  if(subTarget){
+  if(rec.pitcherSynced && !rec.moves.length){
+    // Relevo desde banca (Fase 3 parte 1): Caso A (solo pitcher) o Caso B (pitcher + sub) → vuelve el anterior.
+    showToast('↩ Deshecho el relevo (vuelve el pitcher anterior)');
+  } else if(subTarget){
     showToast(`↩ Deshecha la sustitución (sale ${subTarget.inName})`);
   } else {
     const txt=rec.moves.map(m=>`${gs.teams[team].players[m.pidx]?.name||('#'+(m.pidx+1))}→${m.prevPos}`).join(', ');
