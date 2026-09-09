@@ -4070,20 +4070,13 @@ function renderCambioPitFields(){
     <div class="modal-section" style="margin-top:4px">ENTRA — ENTRADA ${inn}</div>
     ${histHTML}
     ${limitInfoHTML}
-    <!-- Paso 4.3 (ADITIVO): acción PRIMARIA — abre el MAPA de Cambios precargado con Origen=Pitcher (pos 1),
-         saltando el selector de equipo (firma 4.1). Permite relevo desde banca, defensor a lanzar, cadenas…
-         El "modo rápido" de abajo (input + CONFIRMAR CAMBIO → applyCambioPitcher) se mantiene vivo (retiro en 4.4). -->
-    <button class="play-btn" onclick="openCambiosMenu('${pitCambioTeam}',{fromPos:'1',source:'pitcher'})" style="width:100%;margin-top:10px;border-color:var(--green);background:rgba(0,229,153,0.12);color:var(--green);font-weight:600">🔀 REALIZAR CAMBIO (con el mapa)</button>
-    <div class="modal-section" style="margin-top:12px;opacity:.75">— O MODO RÁPIDO (solo relevo por nombre) —</div>
-    <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
-      <input class="player-input" id="pit-cambio-input" placeholder="Nombre del relevista" maxlength="25" style="flex:1">
-      <button class="setup-mic-row" id="pit-cambio-mic"
-        onmousedown="pitCambioMicStart(event)" onmouseup="pitCambioMicEnd(event)"
-        ontouchstart="pitCambioMicStart(event)" ontouchend="pitCambioMicEnd(event)"
-        title="Mantén: di nombre del pitcher">🎤</button>
-    </div>
-    <button class="play-btn" onclick="applyCambioPitcher(${inn})" style="width:100%;margin-top:10px;border-color:var(--green);color:var(--green)">✓ CONFIRMAR CAMBIO</button>
-    ${changes.length?`<button class="play-btn" onclick="undoLastPitcherChange('${pitCambioTeam}')" style="width:100%;margin-top:6px;border-color:var(--red);color:var(--red)">↩ Deshacer último cambio</button>`:''}
+    <!-- CAMBIO DE DISEÑO (McRub): este módulo YA NO hace cambios de pitcher. Todos los cambios (pitcher
+         incluido) se hacen desde el módulo CAMBIOS — botón suelto 🔀 CAMBIOS + la ⇄ de cada celda. Aquí
+         se conserva solo VER/REPORTAR/DESHACER. Retirados de la UI: botón "🔀 REALIZAR CAMBIO", label
+         "— O MODO RÁPIDO —", input #pit-cambio-input + su 🎤 (pitCambioMicStart/End) y "✓ CONFIRMAR CAMBIO"
+         (applyCambioPitcher). Esas funciones quedan DEFINIDAS pero SIN cableado en la UI (huérfanas a
+         propósito, retiro en un paso posterior). El "↩ Deshacer último cambio" se mantiene como salvaguarda. -->
+    ${changes.length?`<button class="play-btn" onclick="undoLastPitcherChange('${pitCambioTeam}')" style="width:100%;margin-top:10px;border-color:var(--red);color:var(--red)">↩ Deshacer último cambio</button>`:''}
   `;
 }
 
