@@ -4406,15 +4406,39 @@ function cambiosStep3Plan(rows){
   if(swaps.length===0 && entryRow.dest==='1' && exitRow.origin==='1'){
     return { entryRow, exitRow, swaps:[], pitcherRelief:true };
   }
-  // FASE 3.2.1 — DEFENSOR A LANZAR (forma simple): patrón EXACTO "1→Sale" + "<pos>→1" + "Banca→<pos>",
-  // con UN solo swap (el defensor que sube a la P) y CERO swaps de campo adicionales. El defensor
-  // mantiene su turno al bate (solo cambia su .pos); el pitcher anterior sale; el banca cubre la
-  // posición que quedó vacante. La cadena con pos 1 y MÁS swaps (3.2.2) tiene swaps.length>1 y cae al
-  // veto de abajo → sigue deshabilitada. Marca pitcherPromote + guarda el swap del defensor.
-  if(exitRow.origin==='1' && swaps.length===1
-     && swaps[0].dest==='1' && /^[2-9]$/.test(String(swaps[0].origin))
-     && entryRow.dest===swaps[0].origin){
-    return { entryRow, exitRow, swaps, pitcherPromote:true, promoteRow:swaps[0] };
+  // FASE 3.2 — DEFENSOR A LANZAR (forma simple 3.2.1 y encadenada 3.2.2): "1→Sale" + EXACTAMENTE UN
+  // "<pos>→1" (el ÚNICO defensor que sube a la P) + N swaps posA→posB (2–9) + "Banca→<pos vacada final>".
+  // El defensor que sube conserva su turno al bate (solo cambia su .pos); el pitcher anterior sale; el
+  // resto de la cadena reacomoda posiciones y el banca cubre el hueco que queda. Se valida el CIERRE de
+  // cadena IGUAL que la Fase 2 (verCambiosResumen), pero incluyendo la pos 1. Marca pitcherPromote +
+  // guarda promoteRow. Cualquier cadena con pos 1 que NO cumpla esto exacto cae al veto de abajo → null.
+  if(exitRow.origin==='1'){
+    const toPitch=swaps.filter(r=>r.dest==='1');       // swaps que SUBEN a lanzar
+    if(toPitch.length===1){                            // exactamente UN defensor sube a la P
+      const promoteRow=toPitch[0];
+      const others=swaps.filter(r=>r!==promoteRow);    // swaps de campo restantes (posA→posB)
+      // Todos los tokens de la cadena (sin B/X) deben ser defensivos 1–9, sin DH.
+      const chainTokens=[exitRow.origin, entryRow.dest, promoteRow.origin, promoteRow.dest];
+      others.forEach(r=>chainTokens.push(r.origin, r.dest));
+      const allDef19=chainTokens.every(tk=>!cambiosIsDHOrigin(tk)&&!cambiosIsDHDest(tk)&&/^[1-9]$/.test(String(tk)));
+      // La pos 1 SÓLO la aportan exit(origin) y promoteRow(dest); todo lo demás (defensor que sube, banca
+      // y ambos lados de los swaps de campo) debe ser 2–9 → nadie más toca la P ni intenta un 2º subir.
+      const fieldOK=/^[2-9]$/.test(String(promoteRow.origin))
+        && /^[2-9]$/.test(String(entryRow.dest))
+        && others.every(r=>/^[2-9]$/.test(String(r.origin))&&/^[2-9]$/.test(String(r.dest)));
+      if(allDef19 && fieldOK){
+        // Cierre de cadena idéntico a verCambiosResumen, con la pos 1 incluida: sin orígenes ni destinos
+        // repetidos y conjunto de posiciones vacadas == conjunto de re-ocupadas.
+        const realOrigins=[exitRow.origin, promoteRow.origin, ...others.map(r=>r.origin)].map(Number);
+        const realDests  =[entryRow.dest,  promoteRow.dest,   ...others.map(r=>r.dest)  ].map(Number);
+        const noDupO=realOrigins.every((n,i)=>realOrigins.indexOf(n)===i);
+        const noDupD=realDests.every((n,i)=>realDests.indexOf(n)===i);
+        const oSet=new Set(realOrigins), dSet=new Set(realDests);
+        const closed=noDupO && noDupD && oSet.size===dSet.size && [...oSet].every(n=>dSet.has(n));
+        if(closed) return { entryRow, exitRow, swaps, pitcherPromote:true, promoteRow };
+      }
+    }
+    // exit es pos 1 pero no cumple la forma "defensor a lanzar" → cae al veto de pos 1 de abajo (null).
   }
   // Todas las posiciones tocadas: destino del banca, origen del que sale, y ambos lados de los swaps.
   const posTokens=[entryRow.dest, exitRow.origin];
@@ -4490,12 +4514,21 @@ function applyCambiosStep3(){
   //  · Caso B (pitcher saliente SÍ batea, cambiosPlayerIdxAtPos '1' >=0): ADEMÁS el banca hereda el
   //    SLOT/turno del pitcher saliente (applySubstitution, pos = destino del banca, tope de 3 subs).
   if(plan.pitcherPromote){
-    const promoteRow=plan.promoteRow;                        // <pos>→1 (el defensor que sube)
-    const promotePidx=cambiosPlayerIdxAtPos(team, promoteRow.origin); // defensor por su posición de ORIGEN
+    const promoteRow=plan.promoteRow;                        // <pos>→1 (el ÚNICO defensor que sube)
+    const others=plan.swaps.filter(r=>r!==promoteRow);       // swaps de campo restantes (posA→posB) — 3.2.2
+    // Resolver TODOS los pidx por .pos ANTES de mutar (al cambiar un .pos se corromperían las búsquedas
+    // siguientes) — el defensor que sube y cada origen de los swaps de campo.
+    const promotePidx=cambiosPlayerIdxAtPos(team, promoteRow.origin);
     if(promotePidx<0){ showToast(`⚠️ No encuentro al jugador en ${cambiosPosLabel(promoteRow.origin)} — revisa las posiciones de la alineación`,true); return; }
+    const otherPlan=[];
+    for(const r of others){
+      const pidx=cambiosPlayerIdxAtPos(team, r.origin);
+      if(pidx<0){ showToast(`⚠️ No encuentro al jugador en ${cambiosPosLabel(r.origin)} — revisa las posiciones de la alineación`,true); return; }
+      otherPlan.push({pidx, from:r.origin, to:r.dest});
+    }
     const inName=gs.teams[team].players[promotePidx].name;   // NUEVO pitcher = el defensor que sube
     const outName=getCurrentPitcherName(team);               // saliente ANTES de mutar
-    const outPidx=cambiosPlayerIdxAtPos(team,'1');           // >=0 sólo si el pitcher saliente batea
+    const outPidx=cambiosPlayerIdxAtPos(team,'1');           // >=0 sólo si el pitcher saliente batea (aún .pos='P')
     // Caso B: tope de 3 sustituciones en el slot del pitcher saliente (mismo criterio que la celda ⇄).
     if(outPidx>=0){
       const subsSlot=(gs.subs[team]||[]).filter(s=>s.outPidx===outPidx);
@@ -4513,14 +4546,21 @@ function applyCambiosStep3(){
     });
     gs.pitchCount[battingSide]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
     updatePitchCounterUI();
-    // Mover al defensor promovido a la P (.pos + posHistory), idéntico al motor de swaps de Fase 2.
-    const dp=gs.teams[team].players[promotePidx];
-    const prevPos=dp.pos;                                    // para el undo (mismo criterio que moves de Fase 2)
-    if(!Array.isArray(dp.posHistory)) dp.posHistory=[];
-    const realFrom=dp.posHistory.length?dp.posHistory[dp.posHistory.length-1].to:POS_ABBR[(+promoteRow.origin)-1];
-    dp.pos=POS_ABBR[0];                                       // 'P'
-    dp.posHistory.push({from:realFrom, to:POS_ABBR[0], inn});
-    const moves=[{pidx:promotePidx, prevPos}];
+    // Capturar prevPos de TODOS los movimientos ANTES de mutar (para el undo — mismo criterio que Fase 2).
+    const moves=[{pidx:promotePidx, prevPos:gs.teams[team].players[promotePidx].pos}];
+    otherPlan.forEach(m=>moves.push({pidx:m.pidx, prevPos:gs.teams[team].players[m.pidx].pos}));
+    // Aplicar .pos + posHistory (motor idéntico a Fase 2): el defensor sube a la P y cada swap va a su
+    // destino. realFrom = último destino en posHistory, o el origen declarado del token si es el 1er move.
+    const applyMove=(pidx, fromTok, toTok)=>{
+      const p=gs.teams[team].players[pidx];
+      if(!Array.isArray(p.posHistory)) p.posHistory=[];
+      const toPos=POS_ABBR[(+toTok)-1];
+      const realFrom=p.posHistory.length?p.posHistory[p.posHistory.length-1].to:POS_ABBR[(+fromTok)-1];
+      p.pos=toPos;
+      p.posHistory.push({from:realFrom, to:toPos, inn});
+    };
+    applyMove(promotePidx, promoteRow.origin, '1');          // defensor → P
+    otherPlan.forEach(m=>applyMove(m.pidx, m.from, m.to));   // swaps de campo → su destino
     // Caso B: el banca hereda el SLOT/turno del pitcher saliente, con pos = posición vacada (destino banca).
     let subRec=null;
     if(outPidx>=0){
@@ -4528,10 +4568,10 @@ function applyCambiosStep3(){
       applySubstitution(team, outPidx, toTitleCase(benchName), benchPos); // asigna gs.seq al sub
       subRec={seq:gs.seq, outPidx};
     }
-    // Undo COMBINADO (LIFO): pitcher (pitcherSynced) + moves (defensor a la P) + sub (Caso B) o null (Caso A).
+    // Undo COMBINADO (LIFO): pitcher (pitcherSynced) + moves (defensor a la P + swaps) + sub (Caso B) o null (Caso A).
     if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
     gs.cambiosSwapUndo.push({ team, inn, pitcherSynced:true, moves, sub:subRec });
-    rebuildPlayerCell(team, promotePidx);                    // redibujar la celda del defensor (ahora P)
+    moves.forEach(m=>rebuildPlayerCell(team, m.pidx));       // redibujar celdas del defensor y los swaps
     closeModal();
     showToast(`✓ E${inn}: ${inName} pasa a lanzar por ${outName}`);
     return;
