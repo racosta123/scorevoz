@@ -4678,14 +4678,19 @@ function showCambiosResumen(ctx){
   // ADEMÁS, la sustitución simple (una Banca + una Sale en la MISMA posición, sin pos 1/pitcher).
   // El resto (banca+swaps, o pos 1) sigue deshabilitado (Fases 2 y 3).
   const posOnly=!rows.some(r=>r.origin==='B'||r.dest==='X');
+  // Fase A "SE PIERDE EL DH": 2-ciclo pos 1 ↔ campo con el pitcher FUERA de players[] (modo DH).
+  // Se detecta la FAMILIA (para no mandarla a applyCambiosSwap, que no resuelve la pos 1 sin jugador)
+  // y, dentro, el caso aplicable exacto (pdhPlan). Multi-DH / cadenas más largas: sin aplicar, con aviso.
+  const pdhFamily=posOnly && cambiosPierdeDHShape(rows);
+  const pdhPlan=pdhFamily ? cambiosPierdeDHPlan(rows) : null;
   const step3=posOnly?null:cambiosStep3Plan(rows); // banca+salida (+swaps), sin pos 1/DH
-  const canApply=posOnly||!!step3;
+  const canApply = pdhPlan ? true : (pdhFamily ? false : (posOnly||!!step3));
   const applyBtn=document.createElement('button');
   applyBtn.className='play-btn';
   if(canApply){
     applyBtn.textContent='Aplicar cambio';
     applyBtn.style.cssText='width:100%;margin-top:12px;border-color:var(--green);color:var(--green)';
-    applyBtn.onclick=()=> posOnly ? applyCambiosSwap() : applyCambiosStep3();
+    applyBtn.onclick=()=> pdhPlan ? applyCambiosPierdeDH() : (posOnly ? applyCambiosSwap() : applyCambiosStep3());
   } else {
     applyBtn.textContent='Aplicar cambio (Paso 3 pendiente)';
     applyBtn.disabled=true;
@@ -4695,7 +4700,20 @@ function showCambiosResumen(ctx){
   const note=document.createElement('div');
   note.style.cssText='margin-top:6px;font-size:0.62rem;color:var(--text-dim);text-align:center;line-height:1.4';
   let noteTxt;
-  if(!canApply){
+  if(pdhPlan){
+    // Fase A "se pierde el DH": nota explícita de las tres consecuencias.
+    const dhName=gs.teams[team].players[pdhPlan.dhPidx].name;
+    const pitcherName=getCurrentPitcherName(team);
+    const pitcherNewPos=POS_ABBR[(+pdhPlan.pitcherDestToken)-1];
+    const fildeadorName=gs.teams[team].players[pdhPlan.fildeadorPidx].name;
+    noteTxt=`SE PIERDE EL DH: sale ${dhName}; ${pitcherName} pasa a ${pitcherNewPos} y batea; ${fildeadorName} pasa a lanzar. Se aplica al confirmar.`;
+  } else if(pdhFamily){
+    // Familia detectada pero no aplicable en Fase A: multi-DH (o sin DH) / cadena más larga.
+    const dhCount=((gs.teams[team]&&gs.teams[team].players)||[]).filter(p=>String(p.pos||'').toUpperCase()==='DH').length;
+    noteTxt = dhCount!==1
+      ? 'Esta función requiere un único DH; en multi-DH, pendiente.'
+      : 'Por ahora solo el 2-ciclo simple pos 1 ↔ una posición de campo (cadenas más largas: Fase B, pendiente).';
+  } else if(!canApply){
     noteTxt='Involucra al pitcher (posición 1): eso se aplica en un paso siguiente. Por ahora solo verificación.';
   } else if(posOnly){
     noteTxt='Intercambio de posiciones: se aplica al confirmar.';
@@ -4781,6 +4799,94 @@ function applyCambiosSwap(){
   showToast(`✓ E${inn}: cambio de posiciones (${resumenTxt})${newPitMove?' — nuevo pitcher '+gs.teams[team].players[newPitMove.pidx].name:''}`);
 }
 
+// ─── FASE A "SE PIERDE EL DH" (adulto / 1 DH, 2-ciclo puro pos 1 ↔ campo) ───────────────
+// Caso: el pitcher NO batea (hay un DH bateando por él). Se mueve el pitcher a una posición de
+// campo y un fildeador sube a la loma (2-ciclo exacto pos 1 ↔ <campo>, ambos se quedan). Efecto:
+//  1) el DH SALE del juego; 2) el pitcher que baja OCUPA el turno al bate del DH y batea en su nueva
+//  pos de campo; 3) el fildeador que sube conserva su turno, ahora como pitcher; 4) nuevo pitcher =
+//  ese fildeador (pitcherChanges fromSwap + reset); 5) ya no hay DH. Reusa applySubstitution + el
+//  motor .pos/posHistory + el sync de pitcher + el undo combinado de gs.cambiosSwapUndo (candado LIFO).
+//  NO toca gs.pitcher[team] (el "pitcher actual" es derivado por getCurrentPitcherName).
+
+// FAMILIA (gate de ruteo): 2 filas defensivas, sin B/X ni token DH, pos 1 como ORIGEN y DESTINO, y el
+// pitcher FUERA de players[] (modo DH). Sirve para NO mandar esto a applyCambiosSwap (que no resuelve la
+// pos 1 sin jugador) y poder avisar los sub-casos no aplicables (multi-DH / cadena larga). Si el pitcher
+// SÍ batea (idx>=0) devuelve false → sigue por el swap normal (no secuestra ese flujo).
+function cambiosPierdeDHShape(rows){
+  if(!Array.isArray(rows)||!rows.length) return false;
+  if(rows.some(r=>r.origin==='B'||r.dest==='X')) return false;                       // sin banca/salida
+  if(rows.some(r=>cambiosIsDHOrigin(r.origin)||cambiosIsDHDest(r.dest))) return false; // sin token DH
+  const has1O=rows.some(r=>String(r.origin)==='1');
+  const has1D=rows.some(r=>String(r.dest)==='1');
+  if(!(has1O&&has1D)) return false;                                                  // pos 1 origen Y destino
+  return cambiosPlayerIdxAtPos(cambiosTeam,'1')<0;                                   // pitcher NO en el orden → modo DH
+}
+
+// PLAN Fase A EXACTO: null salvo que se cumplan TODAS las guardas: exactamente 2 filas, ambas defensivas
+// 1-9, pos 1 como origen (1→campo) y como destino (campo→1), 2-ciclo puro (el destino del 1 == el origen
+// del que sube a 1), pitcher fuera de players[], fildeador presente y EXACTAMENTE 1 DH. Cadenas más largas
+// o multi-DH → null (se avisan en showCambiosResumen; no aplican en Fase A).
+function cambiosPierdeDHPlan(rows){
+  if(!cambiosPierdeDHShape(rows)) return null;
+  if(rows.length!==2) return null;
+  if(!rows.every(r=>/^[1-9]$/.test(String(r.origin))&&/^[1-9]$/.test(String(r.dest)))) return null;
+  const rowOut1=rows.find(r=>String(r.origin)==='1'); // 1→campo (el pitcher baja al campo)
+  const rowIn1 =rows.find(r=>String(r.dest)==='1');   // campo→1 (el fildeador sube a la loma)
+  if(!rowOut1||!rowIn1||rowOut1===rowIn1) return null;
+  if(String(rowOut1.dest)!==String(rowIn1.origin)) return null; // 2-ciclo puro (misma pos de campo)
+  const fieldToken=String(rowOut1.dest);
+  if(fieldToken==='1') return null;
+  const team=cambiosTeam;
+  const fildeadorPidx=cambiosPlayerIdxAtPos(team, fieldToken);
+  if(fildeadorPidx<0) return null;
+  const players=(gs.teams[team]&&gs.teams[team].players)||[];
+  const dhIdxs=players.map((p,i)=>i).filter(i=>String(players[i].pos||'').toUpperCase()==='DH');
+  if(dhIdxs.length!==1) return null;
+  return { fildeadorPidx, dhPidx:dhIdxs[0], fieldToken, pitcherDestToken:fieldToken };
+}
+
+// APLICA la Fase A en UNA operación reversible. Resuelve TODOS los índices/nombres ANTES de mutar.
+function applyCambiosPierdeDH(){
+  const team=cambiosTeam;
+  const plan=cambiosPierdeDHPlan(cambiosRows);
+  if(!plan){ showToast('⚠️ Este cambio no aplica como "se pierde el DH"',true); return; }
+  const { fildeadorPidx, dhPidx, pitcherDestToken }=plan;
+  const inn=gs.currentInning||1;
+  // 1) Tope de 3 en el slot del DH (mismo criterio que el resto de los caminos).
+  const subsSlot=(gs.subs[team]||[]).filter(s=>s.outPidx===dhPidx);
+  if(subsSlot.length>=3){ showToast('⚠️ Ese puesto ya tiene el máximo de 3 cambios',true); return; }
+  const pitcherName=getCurrentPitcherName(team);          // el que baja al campo (actual), ANTES de mutar
+  const pitcherNewPos=POS_ABBR[(+pitcherDestToken)-1];    // destino del 1 (ej '3B')
+  const fildeador=gs.teams[team].players[fildeadorPidx];
+  const fildeadorName=fildeador.name;
+  const fildeadorPrevPos=fildeador.pos;                   // para el undo (ej '3B')
+  // 2) Sync del contador: archiva el conteo del saliente y resetea el live del lado que BATEA. fromSwap:true.
+  const battingSide=team==='v'?'l':'v';
+  const pc=gs.pitchCount[battingSide];
+  gs.pitcherChanges[team].push({
+    inn, inName:fildeadorName, outName:pitcherName,
+    outsAtChange:countOutsInInning(battingSide,inn), seqAtChange:gs.seq||0,
+    pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},
+    inningLog:{...pc.inningLog}, fromSwap:true
+  });
+  gs.pitchCount[battingSide]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
+  updatePitchCounterUI();
+  // 3) El fildeador sube a la P conservando su slot al bate (solo .pos + posHistory, motor de Fase 2).
+  if(!Array.isArray(fildeador.posHistory)) fildeador.posHistory=[];
+  const realFrom=fildeador.posHistory.length?fildeador.posHistory[fildeador.posHistory.length-1].to:fildeadorPrevPos;
+  fildeador.pos='P';
+  fildeador.posHistory.push({from:realFrom, to:'P', inn});
+  // 4) El DH SALE y el pitcher hereda su SLOT/turno, bateando en su nueva pos de campo (asigna gs.seq).
+  applySubstitution(team, dhPidx, pitcherName, pitcherNewPos);
+  const subRec={seq:gs.seq, outPidx:dhPidx};
+  // 5) Undo COMBINADO (LIFO): pitcher (pitcherSynced) + move del fildeador + sub del pitcher en el slot del DH.
+  if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
+  gs.cambiosSwapUndo.push({ team, inn, pitcherSynced:true, moves:[{pidx:fildeadorPidx, prevPos:fildeadorPrevPos}], sub:subRec, pierdeDH:true });
+  rebuildPlayerCell(team, fildeadorPidx);
+  closeModal();
+  showToast(`✓ E${inn}: se pierde el DH — ${pitcherName} pasa a ${pitcherNewPos} y batea; ${fildeadorName} pasa a lanzar`);
+}
+
 // DESHACER el swap de posición MÁS RECIENTE (LIFO). Restaura .pos y hace pop() de .posHistory de cada jugador
 // SIEMPRE (inocuo). La parte del pitcher solo se revierte si el swap SIGUE siendo el último
 // cambio de pitcher (última entrada de gs.pitcherChanges[team] con fromSwap:true); si hubo un
@@ -4841,7 +4947,10 @@ function undoLastCambiosSwap(){
     rebuildPlayerCell(team, subTarget.outPidx);
   }
   closeModal();
-  if(rec.pitcherSynced && rec.moves.length){
+  if(rec.pierdeDH){
+    // Fase A "se pierde el DH": vuelve el DH al orden, el pitcher regresa a la loma y el fildeador a su pos.
+    showToast('↩ Deshecho "se pierde el DH": regresa el DH y vuelve el pitcher anterior');
+  } else if(rec.pitcherSynced && rec.moves.length){
     // Defensor a lanzar (Fase 3.2.1): el defensor promovido vuelve a su posición y regresa el pitcher anterior.
     showToast('↩ Deshecho: el defensor vuelve a su posición y regresa el pitcher anterior');
   } else if(rec.pitcherSynced && !rec.moves.length){
