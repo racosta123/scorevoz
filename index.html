@@ -4406,6 +4406,16 @@ function cambiosStep3Plan(rows){
   if(swaps.length===0 && entryRow.dest==='1' && exitRow.origin==='1'){
     return { entryRow, exitRow, swaps:[], pitcherRelief:true };
   }
+  // FASE 3.2.1 — DEFENSOR A LANZAR (forma simple): patrón EXACTO "1→Sale" + "<pos>→1" + "Banca→<pos>",
+  // con UN solo swap (el defensor que sube a la P) y CERO swaps de campo adicionales. El defensor
+  // mantiene su turno al bate (solo cambia su .pos); el pitcher anterior sale; el banca cubre la
+  // posición que quedó vacante. La cadena con pos 1 y MÁS swaps (3.2.2) tiene swaps.length>1 y cae al
+  // veto de abajo → sigue deshabilitada. Marca pitcherPromote + guarda el swap del defensor.
+  if(exitRow.origin==='1' && swaps.length===1
+     && swaps[0].dest==='1' && /^[2-9]$/.test(String(swaps[0].origin))
+     && entryRow.dest===swaps[0].origin){
+    return { entryRow, exitRow, swaps, pitcherPromote:true, promoteRow:swaps[0] };
+  }
   // Todas las posiciones tocadas: destino del banca, origen del que sale, y ambos lados de los swaps.
   const posTokens=[entryRow.dest, exitRow.origin];
   swaps.forEach(r=>{ posTokens.push(r.origin, r.dest); });
@@ -4470,6 +4480,60 @@ function applyCambiosStep3(){
     gs.cambiosSwapUndo.push({ team, inn, pitcherSynced:true, moves:[], sub:subRec });
     closeModal();
     showToast(`✓ E${inn}: relevo — entra ${inName} a lanzar, sale ${outName}`);
+    return;
+  }
+  // FASE 3.2.1 — DEFENSOR A LANZAR (forma simple) "1→Sale" + "<pos>→1" + "Banca→<pos>": un defensor
+  // que YA batea sube a la P (conserva su slot de bateo, solo cambia .pos), el pitcher anterior sale y
+  // el banca cubre la posición vacada. inName del cambio de pitcher = el DEFENSOR que sube (NO el banca).
+  //  · Caso A (pitcher saliente NO batea): solo pitcherChanges + reset; el banca cubre la posición SÓLO
+  //    a la defensiva (sin slot de bateo), como el relevo Caso A.
+  //  · Caso B (pitcher saliente SÍ batea, cambiosPlayerIdxAtPos '1' >=0): ADEMÁS el banca hereda el
+  //    SLOT/turno del pitcher saliente (applySubstitution, pos = destino del banca, tope de 3 subs).
+  if(plan.pitcherPromote){
+    const promoteRow=plan.promoteRow;                        // <pos>→1 (el defensor que sube)
+    const promotePidx=cambiosPlayerIdxAtPos(team, promoteRow.origin); // defensor por su posición de ORIGEN
+    if(promotePidx<0){ showToast(`⚠️ No encuentro al jugador en ${cambiosPosLabel(promoteRow.origin)} — revisa las posiciones de la alineación`,true); return; }
+    const inName=gs.teams[team].players[promotePidx].name;   // NUEVO pitcher = el defensor que sube
+    const outName=getCurrentPitcherName(team);               // saliente ANTES de mutar
+    const outPidx=cambiosPlayerIdxAtPos(team,'1');           // >=0 sólo si el pitcher saliente batea
+    // Caso B: tope de 3 sustituciones en el slot del pitcher saliente (mismo criterio que la celda ⇄).
+    if(outPidx>=0){
+      const subsSlot=(gs.subs[team]||[]).filter(s=>s.outPidx===outPidx);
+      if(subsSlot.length>=3){ showToast('⚠️ Ese puesto ya tiene el máximo de 3 cambios',true); return; }
+    }
+    // Sync del contador: archiva el conteo del saliente en gs.pitcherChanges (inName = defensor que
+    // sube) y resetea el conteo live del lado que BATEA. fromSwap:true (idéntico a 3.1 / swap Paso 2).
+    const battingSide=team==='v'?'l':'v';
+    const pc=gs.pitchCount[battingSide];
+    gs.pitcherChanges[team].push({
+      inn, inName, outName,
+      outsAtChange:countOutsInInning(battingSide,inn), seqAtChange:gs.seq||0,
+      pitches:{total:pc.total,strikes:pc.strikes,balls:pc.balls,fouls:pc.fouls},
+      inningLog:{...pc.inningLog}, fromSwap:true
+    });
+    gs.pitchCount[battingSide]={total:0,strikes:0,balls:0,fouls:0,inningLog:{}};
+    updatePitchCounterUI();
+    // Mover al defensor promovido a la P (.pos + posHistory), idéntico al motor de swaps de Fase 2.
+    const dp=gs.teams[team].players[promotePidx];
+    const prevPos=dp.pos;                                    // para el undo (mismo criterio que moves de Fase 2)
+    if(!Array.isArray(dp.posHistory)) dp.posHistory=[];
+    const realFrom=dp.posHistory.length?dp.posHistory[dp.posHistory.length-1].to:POS_ABBR[(+promoteRow.origin)-1];
+    dp.pos=POS_ABBR[0];                                       // 'P'
+    dp.posHistory.push({from:realFrom, to:POS_ABBR[0], inn});
+    const moves=[{pidx:promotePidx, prevPos}];
+    // Caso B: el banca hereda el SLOT/turno del pitcher saliente, con pos = posición vacada (destino banca).
+    let subRec=null;
+    if(outPidx>=0){
+      const benchPos=POS_ABBR[(+entryRow.dest)-1];
+      applySubstitution(team, outPidx, toTitleCase(benchName), benchPos); // asigna gs.seq al sub
+      subRec={seq:gs.seq, outPidx};
+    }
+    // Undo COMBINADO (LIFO): pitcher (pitcherSynced) + moves (defensor a la P) + sub (Caso B) o null (Caso A).
+    if(!Array.isArray(gs.cambiosSwapUndo)) gs.cambiosSwapUndo=[];
+    gs.cambiosSwapUndo.push({ team, inn, pitcherSynced:true, moves, sub:subRec });
+    rebuildPlayerCell(team, promotePidx);                    // redibujar la celda del defensor (ahora P)
+    closeModal();
+    showToast(`✓ E${inn}: ${inName} pasa a lanzar por ${outName}`);
     return;
   }
   // 1) Resolver TODOS los pidx ANTES de mutar .pos (al cambiar uno se corrompería la búsqueda
@@ -4567,6 +4631,9 @@ function showCambiosResumen(ctx){
   } else if(step3.pitcherRelief){
     // Relevo desde banca (Fase 3 parte 1): entra un pitcher nuevo, sale el anterior.
     noteTxt=`Relevo: entra ${step3.entryRow.benchName} a lanzar, sale ${cambiosPlayerAtPos(team,'1')}. Se aplica al confirmar.`;
+  } else if(step3.pitcherPromote){
+    // Defensor a lanzar (Fase 3.2.1): un defensor sube a la P, el pitcher anterior sale, el banca cubre.
+    noteTxt=`Relevo: ${cambiosPlayerAtPos(team,step3.promoteRow.origin)} pasa a lanzar por ${cambiosPlayerAtPos(team,'1')}; entra ${step3.entryRow.benchName} a ${cambiosPosLabel(step3.entryRow.dest)}. Se aplica al confirmar.`;
   } else if(step3.swaps.length){
     noteTxt='Sustitución con reacomodo: entra el de banca en el turno del que sale y otros cambian de posición. Se aplica al confirmar.';
   } else {
@@ -4703,7 +4770,10 @@ function undoLastCambiosSwap(){
     rebuildPlayerCell(team, subTarget.outPidx);
   }
   closeModal();
-  if(rec.pitcherSynced && !rec.moves.length){
+  if(rec.pitcherSynced && rec.moves.length){
+    // Defensor a lanzar (Fase 3.2.1): el defensor promovido vuelve a su posición y regresa el pitcher anterior.
+    showToast('↩ Deshecho: el defensor vuelve a su posición y regresa el pitcher anterior');
+  } else if(rec.pitcherSynced && !rec.moves.length){
     // Relevo desde banca (Fase 3 parte 1): Caso A (solo pitcher) o Caso B (pitcher + sub) → vuelve el anterior.
     showToast('↩ Deshecho el relevo (vuelve el pitcher anterior)');
   } else if(subTarget){
