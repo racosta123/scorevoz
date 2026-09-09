@@ -5675,8 +5675,12 @@ function getPlayerCellInnerHTML(team,pidx){
     return `<div class="ph-entry" style="color:${color};text-decoration:${deco};opacity:${opacity}">${pl.name}<span class="ph-pos">${posStr}</span></div>`;
   }).join('');
   const canMore=subs.length<3;
+  // Paso 4.2: la ⇄ abre el MAPA de Cambios precargado con este jugador como Origen (su .pos actual),
+  // vía la firma de precarga del 4.1. Sustituye al submenú viejo openSubModal (que sigue DEFINIDO como
+  // red de seguridad, su retiro es 4.4). El tope de 3 subs mantiene el botón deshabilitado (✓) igual
+  // que antes: no abrimos el mapa para un slot que ya agotó sus cambios.
   const btnHtml=canMore
-    ?`<button class="sub-btn-new" id="cb-${team}-${pidx}" onclick="openSubModal('${team}',${pidx})" title="Cambio de jugador">⇄</button>`
+    ?`<button class="sub-btn-new" id="cb-${team}-${pidx}" onclick="openCambiosMenu('${team}',{fromPlayerIdx:${pidx},source:'cell'})" title="Cambio de jugador">⇄</button>`
     :`<button class="sub-btn-new" id="cb-${team}-${pidx}" disabled style="border-color:var(--green);color:var(--green)" title="Máx cambios alcanzados">✓</button>`;
   // Historial COMPLETO de cambios de POSICIÓN (Cambios Paso 2), una línea por entrada en orden,
   // sin encimar nombres. Color por orden: 1º verde, 2º ámbar, 3º+ rojo. Titular sin etiqueta.
