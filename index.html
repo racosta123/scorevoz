@@ -1367,6 +1367,7 @@ function startGame(){
   document.getElementById('pitch-bar').style.display='flex';
   buildLineScore(); buildInningNav(); buildScoresheets(); updateScores();
   updatePitchCounterUI();
+  clearAutosave(); scheduleAutosave(); // partida nueva: descarta el autosave viejo y persiste el arranque
   // Auto-seleccionar primer bateador del visitante (siempre abre al bate)
   setTimeout(()=>{
     const td=document.getElementById('c-v-0-1');
@@ -2028,7 +2029,7 @@ function setModalForceChoice(force){
   const cancelBtn=document.getElementById('modal-cancel-btn');
   if(cancelBtn) cancelBtn.style.display=force?'none':'';
 }
-function closeModal(){ setModalForceChoice(false); document.getElementById('modal').classList.remove('show'); }
+function closeModal(){ setModalForceChoice(false); document.getElementById('modal').classList.remove('show'); scheduleAutosave(); }
 // GUARD anti-congelamiento: hay un menú FORZADO de resolución de turno EN PANTALLA (clasificar
 // ponche/ponche corrido, destino de bateador/corredores…). Señal fiable = modalForceChoice===true
 // (lo ponen showStrikeoutMenu/showKCorridoMenu/las secuencias de corredores) Y el #modal visible.
@@ -2045,6 +2046,86 @@ function blockIfForcedTurn(){
   }
   return false;
 }
+// ─── AUTOSAVE LOCAL (Fase 1) — red de seguridad anti-crash, INDEPENDIENTE de Firebase ───
+// Guarda gs en localStorage tras cada mutación (debounced) para que una recarga/cierre a media
+// partida no pierda la anotación. Reusa JSON.stringify(gs) (igual que fbSaveGame) y rehydrateGame()
+// (igual que la carga en la nube). NO toca Firebase, la lógica de anotación ni el guard anterior.
+// writeAutosaveNow lee gs EN VIVO al dispararse, así que scheduleAutosave() solo arma un timer:
+// da igual desde dónde se llame, siempre persiste el estado más reciente.
+const SV_AUTOSAVE_KEY='sv_autosave';
+let _autosaveTimer=null;
+function autosaveGameActive(){
+  const g=document.getElementById('game-screen');
+  return !!(g && g.style.display==='block' && typeof gs!=='undefined' && gs && gs.teams);
+}
+function writeAutosaveNow(){
+  if(!autosaveGameActive()) return;
+  try{
+    localStorage.setItem(SV_AUTOSAVE_KEY, JSON.stringify({
+      gs: JSON.stringify(gs),
+      savedAt: Date.now(),
+      vName: (gs.teams&&gs.teams.v&&gs.teams.v.name)||'VISITANTE',
+      lName: (gs.teams&&gs.teams.l&&gs.teams.l.name)||'LOCAL',
+      inn: gs.currentInning||1
+    }));
+  }catch(e){ /* QuotaExceededError u otros: no romper la anotación */ }
+}
+function scheduleAutosave(){
+  if(!autosaveGameActive()) return;                 // en setup no guarda nada
+  clearTimeout(_autosaveTimer);
+  _autosaveTimer=setTimeout(writeAutosaveNow, 600);
+}
+function clearAutosave(){
+  clearTimeout(_autosaveTimer);
+  try{ localStorage.removeItem(SV_AUTOSAVE_KEY); }catch(e){}
+}
+// Respaldo: si se cierra/recarga antes de que dispare el debounce, persistir de inmediato.
+window.addEventListener('beforeunload', ()=>{ try{ if(autosaveGameActive()) writeAutosaveNow(); }catch(e){} });
+// Al abrir la app: si hay un autosave, OFRECER reanudar con un modal EN PÁGINA no descartable.
+// REGLA DE ORO: cancelar/cerrar/dismiss NUNCA borra la partida. El autosave SOLO se borra al
+// iniciar una partida NUEVA de verdad (startGame → clearAutosave). Por eso NO se usa confirm()
+// nativo (Escape/clic afuera lo cierran como "cancelar" y borrarían): un overlay propio sin
+// handler de cierre no se puede descartar por accidente; solo los dos botones lo cierran.
+function maybeOfferResume(){
+  let raw=null;
+  try{ raw=localStorage.getItem(SV_AUTOSAVE_KEY); }catch(e){ return; }
+  if(!raw) return;
+  let data=null;
+  // Payload corrupto/incompleto: NO ofrecer, pero tampoco borrar (solo startGame/descartar borran).
+  try{ data=JSON.parse(raw); }catch(e){ return; }
+  if(!data || !data.gs){ return; }
+  if(document.getElementById('resume-overlay')) return; // ya está abierto
+  const when=data.savedAt?new Date(data.savedAt).toLocaleString('es-MX'):'—';
+  const ov=document.createElement('div');
+  ov.id='resume-overlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:rgba(6,13,24,.92);padding:20px';
+  const card=document.createElement('div');
+  card.style.cssText='max-width:420px;width:100%;background:#0c1928;border:1px solid rgba(0,229,153,.35);border-radius:14px;padding:22px 20px;box-shadow:0 10px 40px rgba(0,0,0,.5);text-align:center;font-family:inherit';
+  card.innerHTML=
+    '<div style="font-family:\'Bebas Neue\',\'Oswald\',sans-serif;font-size:1.3rem;letter-spacing:2px;color:var(--green);margin-bottom:8px">PARTIDA SIN TERMINAR</div>'+
+    '<div style="font-size:0.9rem;color:#fff;line-height:1.5;margin-bottom:4px">Tienes una partida sin terminar:</div>'+
+    '<div style="font-size:1rem;color:#fff;font-weight:700">'+ssEsc(data.vName||'VISITANTE')+' vs '+ssEsc(data.lName||'LOCAL')+'</div>'+
+    '<div style="font-size:0.8rem;color:#8fa3b7;margin-bottom:2px">Entrada '+ssEsc(String(data.inn||1))+'</div>'+
+    '<div style="font-size:0.72rem;color:#8fa3b7;margin-bottom:16px">Último guardado: '+ssEsc(when)+'</div>';
+  const primary=document.createElement('button');
+  primary.textContent='▶ REANUDAR PARTIDA';
+  primary.style.cssText='width:100%;background:var(--green);color:#071018;border:none;border-radius:9px;font-family:\'Bebas Neue\',sans-serif;font-size:1rem;letter-spacing:2px;padding:12px;cursor:pointer;margin-bottom:8px;font-weight:700';
+  primary.onclick=()=>{
+    // REANUDAR: rehidrata. Si falla, cierra el overlay pero NO borra la clave (queda de red).
+    try{ rehydrateGame(data.gs); ov.remove(); }
+    catch(e){ ov.remove(); showToast('No se pudo reanudar la partida guardada',true); }
+  };
+  const secondary=document.createElement('button');
+  secondary.textContent='Empezar una nueva';
+  secondary.style.cssText='width:100%;background:transparent;color:#8fa3b7;border:1px solid rgba(255,255,255,.2);border-radius:9px;font-family:\'Inter\',sans-serif;font-size:0.82rem;letter-spacing:1px;padding:10px;cursor:pointer';
+  // "Empezar una nueva": solo cierra el overlay y deja el setup. NO borra el autosave por sí mismo
+  // — el borrado real ocurre cuando startGame arranca la partida nueva.
+  secondary.onclick=()=>{ ov.remove(); };
+  card.appendChild(primary); card.appendChild(secondary);
+  ov.appendChild(card);
+  document.body.appendChild(ov);
+}
+window.addEventListener('load', ()=>{ try{ maybeOfferResume(); }catch(e){} });
 // HISTORIAL (bug #8): al VER el historial de un corredor vivo, selectCell dejó gs.selected
 // apuntando a la celda del corredor. Si al cerrar la narrativa no se restaura, el siguiente
 // ponche/base/registro caería en esa celda equivocada. _narrativeOpen marca que el modal
@@ -3255,6 +3336,7 @@ function applyPlay(team,pidx,inn,play){
   document.getElementById('runner-mode-banner').style.display='none';
   document.querySelectorAll('.dc.runner-sel').forEach(c=>c.classList.remove('runner-sel'));
   renderGameState();
+  scheduleAutosave(); // autosave local tras registrar la jugada
   showToast(runSummary?`✓ ${play.label} · ${runSummary}`:`✓ ${play.label}`);
   if(play.type!=='score' && play.type!=='clear'){
     gs.playHistory.push({team, pidx, inn});
@@ -3306,6 +3388,7 @@ function undoLastPlay(){
   // flujo de corrección.
   const undoneTd=document.getElementById(`c-${team}-${pidx}-${inn}`);
   if(undoneTd) selectCell(team,pidx,inn,undoneTd,true);
+  scheduleAutosave(); // autosave local tras deshacer jugada
   showToast('↩ Jugada deshecha');
 }
 
@@ -4123,6 +4206,7 @@ function undoLastPitcherChange(team){
   updatePitchCounterUI();
   renderCambioPitFields();
   const curName=changes.length?changes[changes.length-1].inName:(gs.pitcher[team].name||'abridor');
+  scheduleAutosave(); // autosave local tras deshacer cambio de pitcher
   showToast(`↩ Deshecho el cambio (entraba ${removed.inName}) — vuelve ${curName}`);
 }
 
@@ -5568,6 +5652,7 @@ function addPitch(team,type){
   const pitcherPanel=team==='v'?'l':'v';
   if(ab.s>=3){ lockPitchButtons(pitcherPanel); showStrikeoutMenu(team); }
   else if(ab.b>=4){ lockPitchButtons(pitcherPanel); autoWalk(team); }
+  scheduleAutosave(); // autosave local tras cada pitcheo (S/B/F)
 }
 
 function undoPitch(team){
