@@ -381,7 +381,12 @@
       const r = await signInWithPopup(auth, provider);
       showToast(`Bienvenido, ${firstName(r.user.displayName)} ✅`);
     } catch (e) {
-      showToast('Error al iniciar sesión', true);
+      // Mostrar el error REAL de Firebase (código + mensaje) visible SIN consola, para diagnosticar
+      // el login (p. ej. appCheck/recaptcha-error, auth/unauthorized-domain, auth/popup-blocked…).
+      const code = (e && e.code) ? e.code : '';
+      const msg  = (e && e.message) ? e.message : String(e);
+      showToast('Error al entrar: ' + code + (code ? ' — ' : '') + msg, true);
+      console.error('fbSignIn error', e);
     }
   };
 
