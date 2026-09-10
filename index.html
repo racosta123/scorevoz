@@ -341,6 +341,40 @@
   /* ── UNDO BUTTON ────────────────────────────────────────── */
   .btn-undo-play { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.14); border-radius:10px; color:#8fa3b7; font-family:'Bebas Neue',sans-serif; font-size:0.95rem; letter-spacing:1px; padding:7px 14px; cursor:pointer; transition:all .15s; white-space:nowrap; align-self:center; }
   .btn-undo-play:hover { border-color:var(--amber); color:var(--amber); background:rgba(255,182,72,.08); }
+  /* ══════════════════════════════════════════════════════════════════════
+     MÓVIL — APP-SHELL para anotación (barra .pitch-bar SIEMPRE fija abajo)
+     Por qué: en iOS Safari los elementos position:fixed se ARRASTRAN con el
+     documento mientras dura el scroll con el dedo (solo se reanclan al soltar);
+     no hay ancestro con transform/filter/contain que rompa el fixed — es el
+     propio scroll del <body>. Solución robusta (iOS Safari + Chrome Android):
+     que el scroll ocurra DENTRO de un contenedor con overflow (las hojas), no
+     en el body. Así header, .pitch-bar y .voice-panel quedan FUERA del área que
+     scrollea y nunca se mueven. Solo móvil; escritorio queda idéntico.
+     ══════════════════════════════════════════════════════════════════════ */
+  @media (max-width:820px){
+    /* El body deja de ser el scroller: se vuelve columna de alto fijo. */
+    body{ display:flex; flex-direction:column; height:100vh; height:100dvh;
+          min-height:0; margin:0; overflow:hidden; }
+    header{ position:static; flex:0 0 auto; }        /* fila superior, altura natural */
+    /* Setup (cuando es la pantalla visible): scrollea internamente, sin recortarse */
+    #setup-screen{ flex:1 1 auto; min-height:0; overflow-y:auto;
+                   -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+    /* Juego: ocupa el espacio central entre header y barra de micrófono */
+    #game-screen{ flex:1 1 auto; min-height:0; }
+    .game-content{ height:100%; display:flex; flex-direction:column;
+                   overflow:hidden; padding-bottom:0; }   /* anula el padding-bottom:300px */
+    .line-score-bar, #innav, #outs-indicator{ flex:0 0 auto; }   /* fijas arriba */
+    /* ÚNICA zona que scrollea con el dedo: las hojas de anotación */
+    .game-layout{ order:5; flex:1 1 auto; min-height:0; overflow-y:auto;
+                  -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+                  margin:0; padding:12px 12px 20px; }
+    /* Barra de anotación: estática, anclada al fondo del shell, JUSTO encima
+       del micrófono. Sin position:fixed → no se arrastra con el scroll. */
+    #pitch-bar{ order:6; position:static; bottom:auto; flex:0 0 auto; }
+    /* Micrófono: última fila en flujo, pegada al fondo real + notch (safe-area) */
+    .voice-panel{ position:static; flex:0 0 auto;
+                  padding-bottom:calc(10px + env(safe-area-inset-bottom)); }
+  }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
