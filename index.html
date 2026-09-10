@@ -2029,6 +2029,22 @@ function setModalForceChoice(force){
   if(cancelBtn) cancelBtn.style.display=force?'none':'';
 }
 function closeModal(){ setModalForceChoice(false); document.getElementById('modal').classList.remove('show'); }
+// GUARD anti-congelamiento: hay un menú FORZADO de resolución de turno EN PANTALLA (clasificar
+// ponche/ponche corrido, destino de bateador/corredores…). Señal fiable = modalForceChoice===true
+// (lo ponen showStrikeoutMenu/showKCorridoMenu/las secuencias de corredores) Y el #modal visible.
+// En el flujo normal (sin menú forzado) modalForceChoice es false, así que NO bloquea nada de hoy.
+// Abrir otro modal encima abandonaría esa resolución (applyPlay no corre → cuenta pegada, botones
+// bloqueados, sin avance): por eso, si está pendiente, avisamos y NO abrimos el nuevo modal.
+function forcedTurnPending(){
+  return modalForceChoice===true && document.getElementById('modal').classList.contains('show');
+}
+function blockIfForcedTurn(){
+  if(forcedTurnPending()){
+    showToast('Termina de anotar el ponche/base del bateador antes de hacer un cambio.',true);
+    return true;
+  }
+  return false;
+}
 // HISTORIAL (bug #8): al VER el historial de un corredor vivo, selectCell dejó gs.selected
 // apuntando a la celda del corredor. Si al cerrar la narrativa no se restaura, el siguiente
 // ponche/base/registro caería en esa celda equivocada. _narrativeOpen marca que el modal
@@ -3997,6 +4013,7 @@ function interpretVoice(text){
 let pitCambioTeam=null, pitCambioRec=null, pitCambioListening=false;
 
 function openCambioPitcher(){
+  if(blockIfForcedTurn()) return; // no abrir PITCHER con un ponche/base sin clasificar (abandonaría el turno)
   pitCambioTeam=null;
   document.getElementById('mtitle').textContent='CAMBIO DE PITCHER';
   const body=document.getElementById('mbody'); body.innerHTML='';
@@ -4238,6 +4255,7 @@ function cambiosPosToken(abbr){
 // yendo directo al editor. `source` es solo informativo (rótulo/telemetría), no cambia la lógica.
 // NOTA: los accesos ⇄ y módulo de pitcher NO usan esta firma todavía (eso es 4.2 y 4.3).
 function openCambiosMenu(team, opts){
+  if(blockIfForcedTurn()) return; // no abrir CAMBIOS con un ponche/base sin clasificar (abandonaría el turno)
   opts=opts||{};
   if(team){
     setModalForceChoice(false);
