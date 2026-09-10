@@ -347,7 +347,7 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
   import { getFirestore, doc, setDoc, collection, getDocs, getDoc }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -382,8 +382,9 @@
 
   window.fbSignIn = async () => {
     try {
-      const r = await signInWithPopup(auth, provider);
-      showToast(`Bienvenido, ${firstName(r.user.displayName)} ✅`);
+      await signInWithRedirect(auth, provider);
+      // signInWithRedirect navega fuera de la página; el "Bienvenido" se muestra
+      // al volver, en el bloque getRedirectResult de abajo.
     } catch (e) {
       // Mostrar el error REAL de Firebase (código + mensaje) visible SIN consola, para diagnosticar
       // el login (p. ej. appCheck/recaptcha-error, auth/unauthorized-domain, auth/popup-blocked…).
@@ -453,6 +454,18 @@
       if (gamesBtn) gamesBtn.style.display = 'none';
     }
   });
+
+  // Al volver del login por REDIRECT (Plan C). Corre una sola vez al inicio.
+  // r === null es normal cuando no hay resultado pendiente (carga sin login).
+  (async () => {
+    try {
+      const r = await getRedirectResult(auth);
+      if (r && r.user) showToast('Bienvenido, ' + firstName(r.user.displayName) + ' ✅');
+    } catch (e) {
+      showToast('Error al volver del login: ' + (e && e.code ? e.code : '') + ' — ' + (e && e.message ? e.message : e), true);
+      console.error('getRedirectResult', e);
+    }
+  })();
 </script>
 </head>
 <body>
