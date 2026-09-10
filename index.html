@@ -347,7 +347,7 @@
 <script src="vendor/html2canvas.min.js"></script>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged }
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
   import { getFirestore, doc, setDoc, collection, getDocs, getDoc }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -358,7 +358,7 @@
 
   const app = initializeApp({
     apiKey: "AIzaSyAAFVr5DTn0WDEM2Y5XxIG2E-nITmZjGBI",
-    authDomain: "scorevoz.web.app",
+    authDomain: "scorevoz.firebaseapp.com",
     projectId: "scorevoz",
     storageBucket: "scorevoz.firebasestorage.app",
     messagingSenderId: "844270636434",
@@ -374,24 +374,57 @@
 
   const auth = getAuth(app);
   const db   = getFirestore(app);
-  const provider = new GoogleAuthProvider();
 
   function firstName(displayName) {
     return (displayName || 'Usuario').split(' ')[0];
   }
 
-  window.fbSignIn = async () => {
+  // ── LOGIN por CORREO + CONTRASEÑA ──────────────────────────────
+  // El botón ENTRAR abre este formulario (overlay). "Entrar" inicia sesión;
+  // "Crear cuenta" registra. Errores muestran código+mensaje reales de Firebase.
+  window.fbSignIn = () => {
+    const ov = document.getElementById('login-overlay');
+    if (!ov) return;
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-pass').value  = '';
+    ov.classList.add('show');
+    document.getElementById('login-email').focus();
+  };
+  window.closeLogin = () => document.getElementById('login-overlay').classList.remove('show');
+
+  function readLoginInputs() {
+    const email = (document.getElementById('login-email').value || '').trim();
+    const pass  = document.getElementById('login-pass').value || '';
+    if (!email)        { showToast('Escribe tu correo', true); return null; }
+    if (pass.length < 6) { showToast('La contraseña debe tener al menos 6 caracteres', true); return null; }
+    return { email, pass };
+  }
+
+  window.fbEmailSignIn = async () => {
+    const c = readLoginInputs(); if (!c) return;
     try {
-      await signInWithRedirect(auth, provider);
-      // signInWithRedirect navega fuera de la página; el "Bienvenido" se muestra
-      // al volver, en el bloque getRedirectResult de abajo.
+      const r = await signInWithEmailAndPassword(auth, c.email, c.pass);
+      window.closeLogin();
+      showToast('Bienvenido, ' + firstName(r.user.displayName || r.user.email) + ' ✅');
     } catch (e) {
-      // Mostrar el error REAL de Firebase (código + mensaje) visible SIN consola, para diagnosticar
-      // el login (p. ej. appCheck/recaptcha-error, auth/unauthorized-domain, auth/popup-blocked…).
       const code = (e && e.code) ? e.code : '';
       const msg  = (e && e.message) ? e.message : String(e);
       showToast('Error al entrar: ' + code + (code ? ' — ' : '') + msg, true);
-      console.error('fbSignIn error', e);
+      console.error('fbEmailSignIn error', e);
+    }
+  };
+
+  window.fbEmailSignUp = async () => {
+    const c = readLoginInputs(); if (!c) return;
+    try {
+      const r = await createUserWithEmailAndPassword(auth, c.email, c.pass);
+      window.closeLogin();
+      showToast('Cuenta creada. Bienvenido, ' + firstName(r.user.displayName || r.user.email) + ' ✅');
+    } catch (e) {
+      const code = (e && e.code) ? e.code : '';
+      const msg  = (e && e.message) ? e.message : String(e);
+      showToast('Error al crear cuenta: ' + code + (code ? ' — ' : '') + msg, true);
+      console.error('fbEmailSignUp error', e);
     }
   };
 
@@ -454,18 +487,6 @@
       if (gamesBtn) gamesBtn.style.display = 'none';
     }
   });
-
-  // Al volver del login por REDIRECT (Plan C). Corre una sola vez al inicio.
-  // r === null es normal cuando no hay resultado pendiente (carga sin login).
-  (async () => {
-    try {
-      const r = await getRedirectResult(auth);
-      if (r && r.user) showToast('Bienvenido, ' + firstName(r.user.displayName) + ' ✅');
-    } catch (e) {
-      showToast('Error al volver del login: ' + (e && e.code ? e.code : '') + ' — ' + (e && e.message ? e.message : e), true);
-      console.error('getRedirectResult', e);
-    }
-  })();
 </script>
 </head>
 <body>
@@ -484,6 +505,17 @@
     <h3>MIS PARTIDOS</h3>
     <div id="mygames-list"></div>
     <button class="modal-close" onclick="closeMyGames()">Cerrar</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="login-overlay" onclick="if(event.target===this)closeLogin()">
+  <div class="modal" style="max-width:360px">
+    <h3>ENTRAR A SCOREVOZ</h3>
+    <input class="player-input" id="login-email" type="email" autocomplete="email" placeholder="Correo" style="margin-bottom:10px" onkeydown="if(event.key==='Enter')window.fbEmailSignIn()">
+    <input class="player-input" id="login-pass" type="password" autocomplete="current-password" placeholder="Contraseña (mín. 6)" style="margin-bottom:14px" onkeydown="if(event.key==='Enter')window.fbEmailSignIn()">
+    <button onclick="window.fbEmailSignIn()" style="width:100%;background:var(--green);color:#071018;border:none;border-radius:10px;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;padding:11px;cursor:pointer;margin-bottom:8px">ENTRAR</button>
+    <button onclick="window.fbEmailSignUp()" style="width:100%;background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.22);border-radius:10px;font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:2px;padding:11px;cursor:pointer">CREAR CUENTA</button>
+    <button class="modal-close" onclick="closeLogin()">✕ CANCELAR</button>
   </div>
 </div>
 
