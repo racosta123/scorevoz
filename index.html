@@ -349,7 +349,7 @@
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-  import { getFirestore, doc, setDoc, collection, getDocs, getDoc }
+  import { getFirestore, doc, setDoc, collection, getDocs, getDoc, deleteDoc }
     from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
   // ── App Check DESACTIVADO TEMPORALMENTE para diagnóstico de login ──
   //     (re-activar con dominios reCAPTCHA correctos)
@@ -468,6 +468,23 @@
     const snap = await getDoc(doc(db, 'usuarios', user.uid, 'partidas', id));
     if (!snap.exists()) { showToast('Partido no encontrado', true); return; }
     if (typeof window.rehydrateGame === 'function') { window.rehydrateGame(snap.data().gs); showToast('Partido cargado ☁️'); }
+  };
+
+  // Borra SOLO el partido guardado en la nube (no toca la partida en curso).
+  // Devuelve true si se borró; en error muestra el código+mensaje reales.
+  window.fbDeleteGame = async (id) => {
+    const user = auth.currentUser;
+    if (!user) { showToast('Inicia sesión primero', true); return false; }
+    try {
+      await deleteDoc(doc(db, 'usuarios', user.uid, 'partidas', id));
+      return true;
+    } catch (e) {
+      const code = (e && e.code) ? e.code : '';
+      const msg  = (e && e.message) ? e.message : String(e);
+      showToast('Error al borrar: ' + code + (code ? ' — ' : '') + msg, true);
+      console.error('fbDeleteGame error', e);
+      return false;
+    }
   };
 
   onAuthStateChanged(auth, user => {
@@ -1521,9 +1538,20 @@ window.openMyGames = async () => {
     const nombres = (g.vName&&g.lName) ? `${g.vName} vs ${g.lName}` : g.id;
     const fecha = g.savedAt ? new Date(g.savedAt).toLocaleString() : '';
     info.textContent = fecha ? `${nombres} · ${fecha}` : nombres;   // textContent: sin inyección
+    const actions=document.createElement('div');
+    actions.style.cssText='display:flex;gap:8px;flex-shrink:0';
     const btn=document.createElement('button'); btn.textContent='ABRIR';
     btn.addEventListener('click', ()=> loadAndClose(g.id));
-    row.append(info,btn); cont.appendChild(row);
+    const del=document.createElement('button'); del.textContent='🗑'; del.title='Borrar';
+    // estilo rojo inline (sobrescribe el verde de .mygame-row button); NO carga la partida
+    del.style.cssText='background:rgba(255,77,103,.12);color:#ff4d67;border:1px solid #ff4d67';
+    del.addEventListener('click', async ()=>{
+      if (!confirm('¿Borrar este partido guardado? No se puede deshacer.')) return;
+      const ok = await window.fbDeleteGame(g.id);
+      if (ok) { showToast('Partido borrado'); window.openMyGames(); }
+    });
+    actions.append(btn,del);
+    row.append(info,actions); cont.appendChild(row);
   });
   document.getElementById('mygames-overlay').classList.add('show');
 };
